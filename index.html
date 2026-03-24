@@ -130,6 +130,24 @@
         white-space: nowrap;
         left: -10px;
       }
+      .lobby-btn {
+        background: rgba(40, 60, 100, 0.6);
+        border: 2px solid rgba(100, 180, 255, 0.3);
+        border-radius: 8px;
+        color: white;
+        font-size: 16px;
+        padding: 10px 28px;
+        margin: 6px 8px;
+        cursor: pointer;
+        transition: background 0.2s, border-color 0.2s;
+        font-family: inherit;
+      }
+
+      .lobby-btn:hover {
+        background: rgba(60, 100, 160, 0.7);
+        border-color: rgba(100, 180, 255, 0.6);
+      }
+
       #minimap {
         position: absolute;
         bottom: 80px;
@@ -230,8 +248,28 @@
   <body>
     <div id="title">
       <h1>Frozen Planet Survival</h1>
-      <p>Press any key or click to begin</p>
-      <p style="margin-top: 12px; font-size: 13px; opacity: 0.5;">v1.0 - Day/Night, Pause &amp; More Wood</p>
+      <p style="margin-top: 8px; font-size: 14px; opacity: 0.6;">Multiplayer Survival</p>
+      <div id="lobby" style="margin-top: 24px;">
+        <button id="btn-solo" class="lobby-btn">Solo Play</button>
+        <div style="margin: 16px 0; font-size: 13px; opacity: 0.4;">── or play with friends ──</div>
+        <button id="btn-host" class="lobby-btn">Create Room</button>
+        <button id="btn-join" class="lobby-btn">Join Room</button>
+        <div id="room-code-display" style="display:none; margin-top:16px;">
+          <div style="font-size:13px; opacity:0.6;">Room Code:</div>
+          <div id="room-code" style="font-size:32px; letter-spacing:4px; color:#44ff88; text-shadow:0 0 15px rgba(68,255,136,0.6); margin:8px 0; font-family:monospace; cursor:pointer;" title="Click to copy"></div>
+          <div style="font-size:12px; opacity:0.4;">Click code to copy. Waiting for players...</div>
+          <div id="player-list" style="margin-top:12px; font-size:14px;"></div>
+          <button id="btn-start-game" class="lobby-btn" style="margin-top:12px; display:none;">Start Game</button>
+        </div>
+        <div id="join-input" style="display:none; margin-top:16px;">
+          <input id="input-code" type="text" maxlength="6" placeholder="Enter room code" style="background:rgba(30,40,60,0.8); border:2px solid rgba(100,180,255,0.3); border-radius:8px; color:white; font-size:20px; padding:10px 16px; text-align:center; letter-spacing:3px; font-family:monospace; width:200px; outline:none;" />
+          <br/>
+          <button id="btn-connect" class="lobby-btn" style="margin-top:12px;">Connect</button>
+          <div id="join-status" style="margin-top:8px; font-size:13px; opacity:0.6;"></div>
+        </div>
+        <div id="lobby-status" style="margin-top:12px; font-size:13px; opacity:0.5;"></div>
+      </div>
+      <p style="margin-top: 16px; font-size: 13px; opacity: 0.3;">v2.0 - Multiplayer</p>
     </div>
 
     <div id="hud" style="display: none">
@@ -314,6 +352,8 @@
 
     <canvas id="minimap" width="180" height="180"></canvas>
 
+    <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js"></script>
+
     <script type="importmap">
       {
         "imports": {
@@ -371,9 +411,536 @@
         // Rescue beacon
         beaconActive: false,
         beaconTimer: 0,
-        beaconRequired: 120, // survive 120s after activating beacon to win
+        beaconRequired: 120,
         rescued: false,
+        // Multiplayer
+        isMultiplayer: false,
+        isHost: false,
+        peerId: null,
+        roomCode: null,
+        myColor: 0,
       };
+
+      // ── Multiplayer System ────────────────────────────────
+      const PARKA_COLORS = [0x2266aa, 0xcc3333, 0x33aa44, 0xdd8811, 0x8833cc, 0xcc3388];
+      let peer = null;
+      const connections = {}; // peerId -> DataConnection
+      const remotePlayers = {}; // peerId -> { group, color, lastUpdate, data }
+      let lobbyReady = false;
+
+      function generateRoomCode() {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        let code = '';
+        for (let i = 0; i < 5; i++) code += chars[Math.floor(Math.random() * chars.length)];
+        return code;
+      }
+
+      function setLobbyStatus(msg) {
+        document.getElementById('lobby-status').textContent = msg;
+      }
+
+      function updatePlayerList() {
+        const list = document.getElementById('player-list');
+        const names = ['You (Host)'];
+        for (const id of Object.keys(connections)) {
+          names.push('Player ' + (names.length + 1));
+        }
+        list.innerHTML = names.map((n, i) =>
+          `<div style="color:${['#4488cc','#cc4444','#44aa66','#ddaa22','#aa44cc','#cc4488'][i] || '#aaa'}">${n}</div>`
+        ).join('');
+        const startBtn = document.getElementById('btn-start-game');
+        if (Object.keys(connections).length > 0) startBtn.style.display = 'inline-block';
+      }
+
+      function broadcastToAll(data) {
+        const msg = JSON.stringify(data);
+        for (const conn of Object.values(connections)) {
+          if (conn.open) conn.send(msg);
+        }
+      }
+
+      function sendToHost(data) {
+        const hostConn = Object.values(connections)[0];
+        if (hostConn && hostConn.open) hostConn.send(JSON.stringify(data));
+      }
+
+      function handlePeerData(peerId, rawData) {
+        const data = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
+
+        if (data.type === 'player-update') {
+          if (!remotePlayers[peerId]) return;
+          remotePlayers[peerId].data = data;
+          remotePlayers[peerId].lastUpdate = performance.now();
+        }
+        else if (data.type === 'host-state') {
+          // Client receives authoritative state from host
+          if (!state.isHost) {
+            // Sync wolves
+            for (const wolf of wolves) scene.remove(wolf);
+            wolves.length = 0;
+            // Wolf positions come from host — we just update visuals
+            if (data.wolves) {
+              for (const wd of data.wolves) {
+                if (!remotePlayers['_wolf_' + wd.id]) {
+                  const w = createWolf(wd.x, wd.z);
+                  w._netId = wd.id;
+                  wolves.push(w);
+                }
+              }
+              // Update existing wolf positions
+              for (const wolf of wolves) {
+                const wd = data.wolves.find(w => w.id === wolf._netId);
+                if (wd) {
+                  wolf.position.set(wd.x, wd.y, wd.z);
+                  wolf.rotation.y = wd.ry;
+                  wolf.userData.state = wd.state;
+                  wolf.userData.health = wd.health;
+                }
+              }
+            }
+            // Sync time/weather
+            if (data.timeOfDay !== undefined) state.timeOfDay = data.timeOfDay;
+            if (data.weather) state.weather = data.weather;
+            if (data.weatherIntensity !== undefined) state.weatherIntensity = data.weatherIntensity;
+            if (data.beaconActive !== undefined) {
+              state.beaconActive = data.beaconActive;
+              state.beaconTimer = data.beaconTimer || 0;
+            }
+            // Sync resource depletion
+            if (data.depletedResources) {
+              for (const node of resourceNodes) {
+                const key = `${node.position.x.toFixed(1)}_${node.position.z.toFixed(1)}`;
+                if (data.depletedResources.includes(key)) {
+                  node.userData.depleted = true;
+                  node.visible = false;
+                }
+              }
+            }
+          }
+        }
+        else if (data.type === 'all-players') {
+          // Host broadcasts all player states to each client
+          for (const [pid, pdata] of Object.entries(data.players)) {
+            if (pid === state.peerId) continue; // skip self
+            if (!remotePlayers[pid]) continue;
+            remotePlayers[pid].data = pdata;
+            remotePlayers[pid].lastUpdate = performance.now();
+          }
+        }
+        else if (data.type === 'place-object') {
+          // Someone placed a campfire/shelter/beacon
+          let obj;
+          if (data.objType === 'campfire') obj = createCampfire(data.x, data.z);
+          else if (data.objType === 'shelter') obj = createShelter(data.x, data.z);
+          else if (data.objType === 'beacon') {
+            obj = createBeacon(data.x, data.z);
+            state.beaconActive = true;
+            state.beaconTimer = 0;
+          }
+          if (obj) {
+            obj.rotation.y = data.ry || 0;
+            placedObjects.push(obj);
+          }
+          // Host re-broadcasts to other clients
+          if (state.isHost) {
+            for (const [cid, conn] of Object.entries(connections)) {
+              if (cid !== peerId && conn.open) conn.send(JSON.stringify(data));
+            }
+          }
+        }
+        else if (data.type === 'gather-resource') {
+          // A client gathered a resource — mark it depleted
+          for (const node of resourceNodes) {
+            const key = `${node.position.x.toFixed(1)}_${node.position.z.toFixed(1)}`;
+            if (key === data.nodeKey) {
+              node.userData.depleted = true;
+              node.visible = false;
+              node.userData.respawnTimer = 60;
+              break;
+            }
+          }
+          if (state.isHost) {
+            for (const [cid, conn] of Object.entries(connections)) {
+              if (cid !== peerId && conn.open) conn.send(JSON.stringify(data));
+            }
+          }
+        }
+        else if (data.type === 'wolf-hit') {
+          // Client hit a wolf
+          if (state.isHost) {
+            for (const wolf of wolves) {
+              if (wolf._netId === data.wolfId) {
+                wolf.userData.health -= data.dmg;
+                wolf.userData.hitFlash = 0.15;
+                if (wolf.userData.health <= 0) {
+                  scene.remove(wolf);
+                  wolves.splice(wolves.indexOf(wolf), 1);
+                }
+                break;
+              }
+            }
+          }
+        }
+        else if (data.type === 'start-game') {
+          // Host told everyone to start
+          state.myColor = data.colorIndex || 0;
+          startGame();
+        }
+        else if (data.type === 'player-joined') {
+          // Another player joined (client gets notified)
+          createRemotePlayer(data.peerId, data.colorIndex);
+        }
+        else if (data.type === 'player-left') {
+          removeRemotePlayer(data.peerId);
+        }
+      }
+
+      function setupHostConnection(conn) {
+        const peerId = conn.peer;
+        connections[peerId] = conn;
+        const colorIndex = Object.keys(connections).length; // 1,2,3...
+        createRemotePlayer(peerId, colorIndex);
+        updatePlayerList();
+
+        // Tell new client their color and existing players
+        conn.on('open', () => {
+          conn.send(JSON.stringify({
+            type: 'welcome',
+            colorIndex,
+            players: Object.keys(connections).filter(id => id !== peerId).map((id, i) => ({
+              peerId: id, colorIndex: i === 0 ? 0 : i
+            }))
+          }));
+          // Tell existing clients about new player
+          for (const [cid, c] of Object.entries(connections)) {
+            if (cid !== peerId && c.open) {
+              c.send(JSON.stringify({ type: 'player-joined', peerId, colorIndex }));
+            }
+          }
+        });
+
+        conn.on('data', (raw) => handlePeerData(peerId, raw));
+        conn.on('close', () => {
+          delete connections[peerId];
+          removeRemotePlayer(peerId);
+          updatePlayerList();
+          broadcastToAll({ type: 'player-left', peerId });
+        });
+      }
+
+      function createRemotePlayer(peerId, colorIndex) {
+        if (remotePlayers[peerId]) return;
+        const group = new THREE.Group();
+        const color = PARKA_COLORS[colorIndex % PARKA_COLORS.length];
+        const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.7 });
+        const darkMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(color).multiplyScalar(0.6), roughness: 0.7 });
+
+        // Simplified camper model for remote players
+        const torso = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.6, 0.35), mat);
+        torso.position.y = 1.0;
+        group.add(torso);
+
+        const headMat = new THREE.MeshStandardMaterial({ color: 0xddaa88, roughness: 0.6 });
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), headMat);
+        head.position.y = 1.48;
+        group.add(head);
+
+        const beanie = new THREE.Mesh(
+          new THREE.SphereGeometry(0.17, 8, 5, 0, Math.PI * 2, 0, Math.PI * 0.5),
+          new THREE.MeshStandardMaterial({ color, roughness: 0.8 })
+        );
+        beanie.position.y = 1.55;
+        group.add(beanie);
+
+        const pack = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.4, 0.2), darkMat);
+        pack.position.set(0, 1.05, 0.22);
+        group.add(pack);
+
+        const armGeo = new THREE.CapsuleGeometry(0.08, 0.45, 4, 6);
+        const lArm = new THREE.Mesh(armGeo, mat); lArm.position.set(-0.38, 1.0, 0); group.add(lArm);
+        const rArm = new THREE.Mesh(armGeo, mat); rArm.position.set(0.38, 1.0, 0); group.add(rArm);
+
+        const legGeo = new THREE.CapsuleGeometry(0.08, 0.4, 4, 6);
+        const pantsMat = new THREE.MeshStandardMaterial({ color: 0x554433, roughness: 0.8 });
+        const lLeg = new THREE.Mesh(legGeo, pantsMat); lLeg.position.set(-0.13, 0.45, 0); group.add(lLeg);
+        const rLeg = new THREE.Mesh(legGeo, pantsMat); rLeg.position.set(0.13, 0.45, 0); group.add(rLeg);
+
+        // Name tag
+        const canvas = document.createElement('canvas');
+        canvas.width = 256; canvas.height = 64;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.roundRect(0, 0, 256, 64, 8); ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 28px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Player ' + (Object.keys(remotePlayers).length + 2), 128, 42);
+        const tex = new THREE.CanvasTexture(canvas);
+        const tagMat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+        const tag = new THREE.Sprite(tagMat);
+        tag.position.y = 2.0;
+        tag.scale.set(1.2, 0.3, 1);
+        group.add(tag);
+
+        group.visible = false; // hidden until game starts
+        scene.add(group);
+
+        remotePlayers[peerId] = {
+          group, colorIndex, lastUpdate: 0,
+          data: null,
+          lArm, rArm, lLeg, rLeg,
+        };
+      }
+
+      function removeRemotePlayer(peerId) {
+        const rp = remotePlayers[peerId];
+        if (rp) {
+          scene.remove(rp.group);
+          delete remotePlayers[peerId];
+        }
+      }
+
+      // ── Lobby Button Handlers ─────────────────────────────
+      document.getElementById('btn-solo').addEventListener('click', () => {
+        state.isMultiplayer = false;
+        state.isHost = false;
+        state.myColor = 0;
+        startGame();
+      });
+
+      document.getElementById('btn-host').addEventListener('click', () => {
+        state.isMultiplayer = true;
+        state.isHost = true;
+        state.myColor = 0;
+        const roomCode = generateRoomCode();
+        state.roomCode = roomCode;
+        setLobbyStatus('Creating room...');
+
+        peer = new Peer('fps-' + roomCode, { debug: 0 });
+        peer.on('open', (id) => {
+          state.peerId = id;
+          document.getElementById('room-code').textContent = roomCode;
+          document.getElementById('room-code-display').style.display = 'block';
+          document.getElementById('btn-host').style.display = 'none';
+          document.getElementById('btn-join').style.display = 'none';
+          document.getElementById('btn-solo').style.display = 'none';
+          setLobbyStatus('Room created! Share the code with friends.');
+          updatePlayerList();
+        });
+        peer.on('connection', (conn) => {
+          setupHostConnection(conn);
+        });
+        peer.on('error', (err) => {
+          if (err.type === 'unavailable-id') {
+            setLobbyStatus('Room code taken, try again.');
+          } else {
+            setLobbyStatus('Error: ' + err.message);
+          }
+        });
+
+        // Copy room code on click
+        document.getElementById('room-code').addEventListener('click', () => {
+          navigator.clipboard.writeText(roomCode).then(() => {
+            setLobbyStatus('Code copied!');
+          });
+        });
+      });
+
+      document.getElementById('btn-start-game').addEventListener('click', () => {
+        // Host starts the game for everyone
+        let idx = 1;
+        for (const [pid, conn] of Object.entries(connections)) {
+          conn.send(JSON.stringify({
+            type: 'start-game',
+            colorIndex: idx,
+          }));
+          idx++;
+        }
+        startGame();
+      });
+
+      document.getElementById('btn-join').addEventListener('click', () => {
+        document.getElementById('join-input').style.display = 'block';
+        document.getElementById('btn-host').style.display = 'none';
+        document.getElementById('btn-join').style.display = 'none';
+        document.getElementById('btn-solo').style.display = 'none';
+        document.getElementById('input-code').focus();
+      });
+
+      document.getElementById('btn-connect').addEventListener('click', () => {
+        const code = document.getElementById('input-code').value.trim().toUpperCase();
+        if (code.length < 4) { setLobbyStatus('Enter a valid room code'); return; }
+
+        state.isMultiplayer = true;
+        state.isHost = false;
+        state.roomCode = code;
+        document.getElementById('join-status').textContent = 'Connecting...';
+
+        peer = new Peer(undefined, { debug: 0 });
+        peer.on('open', (id) => {
+          state.peerId = id;
+          const conn = peer.connect('fps-' + code, { reliable: true });
+
+          conn.on('open', () => {
+            connections['host'] = conn;
+            document.getElementById('join-status').textContent = 'Connected! Waiting for host to start...';
+            document.getElementById('btn-connect').style.display = 'none';
+            document.getElementById('input-code').disabled = true;
+          });
+
+          conn.on('data', (raw) => {
+            const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            if (data.type === 'welcome') {
+              state.myColor = data.colorIndex;
+              // Create remote players for existing players
+              if (data.players) {
+                for (const p of data.players) {
+                  createRemotePlayer(p.peerId, p.colorIndex);
+                }
+              }
+              // Create host as remote player
+              createRemotePlayer('host', 0);
+            } else {
+              handlePeerData('host', raw);
+            }
+          });
+
+          conn.on('close', () => {
+            document.getElementById('join-status').textContent = 'Disconnected from host.';
+          });
+        });
+
+        peer.on('error', (err) => {
+          document.getElementById('join-status').textContent = 'Error: ' + err.message;
+        });
+      });
+
+      // Allow Enter key to connect
+      document.getElementById('input-code').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') document.getElementById('btn-connect').click();
+      });
+
+      // Multiplayer sync interval (runs in animate loop)
+      let lastSyncTime = 0;
+      const SYNC_INTERVAL = 50; // ms between syncs (20 Hz)
+      const HOST_STATE_INTERVAL = 200; // ms between full state syncs (5 Hz)
+      let lastHostStateTime = 0;
+
+      function sendPlayerUpdate() {
+        if (!state.isMultiplayer || !state.started) return;
+        const now = performance.now();
+        if (now - lastSyncTime < SYNC_INTERVAL) return;
+        lastSyncTime = now;
+
+        const update = {
+          type: 'player-update',
+          x: playerGroup.position.x,
+          y: playerGroup.position.y,
+          z: playerGroup.position.z,
+          ry: playerGroup.rotation.y,
+          moving: state.keys['w'] || state.keys['s'],
+          sprinting: state.isSprinting,
+          crouching: state.isCrouching,
+          heldItem: state.heldItem,
+          health: state.health,
+        };
+
+        if (state.isHost) {
+          broadcastToAll(update);
+        } else {
+          sendToHost(update);
+        }
+      }
+
+      function sendHostState() {
+        if (!state.isHost || !state.isMultiplayer || !state.started) return;
+        const now = performance.now();
+        if (now - lastHostStateTime < HOST_STATE_INTERVAL) return;
+        lastHostStateTime = now;
+
+        // Gather depleted resources
+        const depletedResources = [];
+        for (const node of resourceNodes) {
+          if (node.userData.depleted) {
+            depletedResources.push(`${node.position.x.toFixed(1)}_${node.position.z.toFixed(1)}`);
+          }
+        }
+
+        // Gather wolf states
+        const wolfData = wolves.map((w, i) => ({
+          id: w._netId || i,
+          x: w.position.x, y: w.position.y, z: w.position.z,
+          ry: w.rotation.y,
+          state: w.userData.state,
+          health: w.userData.health,
+        }));
+
+        // Collect all player positions to broadcast
+        const allPlayers = {};
+        // Host's own position
+        allPlayers[state.peerId] = {
+          type: 'player-update',
+          x: playerGroup.position.x,
+          y: playerGroup.position.y,
+          z: playerGroup.position.z,
+          ry: playerGroup.rotation.y,
+          moving: state.keys['w'] || state.keys['s'],
+          sprinting: state.isSprinting,
+          crouching: state.isCrouching,
+          heldItem: state.heldItem,
+          health: state.health,
+        };
+        // Remote player data (from their updates)
+        for (const [pid, rp] of Object.entries(remotePlayers)) {
+          if (rp.data) allPlayers[pid] = rp.data;
+        }
+
+        broadcastToAll({
+          type: 'host-state',
+          wolves: wolfData,
+          timeOfDay: state.timeOfDay,
+          weather: state.weather,
+          weatherIntensity: state.weatherIntensity,
+          beaconActive: state.beaconActive,
+          beaconTimer: state.beaconTimer,
+          depletedResources,
+        });
+
+        // Also broadcast all player positions
+        broadcastToAll({ type: 'all-players', players: allPlayers });
+      }
+
+      function updateRemotePlayers(dt) {
+        for (const [pid, rp] of Object.entries(remotePlayers)) {
+          if (!rp.data || !rp.group.visible) continue;
+          const d = rp.data;
+          // Smooth interpolation
+          rp.group.position.lerp(new THREE.Vector3(d.x, d.y, d.z), 8 * dt);
+          // Smooth rotation
+          let targetRot = d.ry;
+          let diff = targetRot - rp.group.rotation.y;
+          while (diff > Math.PI) diff -= Math.PI * 2;
+          while (diff < -Math.PI) diff += Math.PI * 2;
+          rp.group.rotation.y += diff * 8 * dt;
+          // Animate limbs
+          if (d.moving) {
+            const speed = d.sprinting ? 14 : 8;
+            const swing = Math.sin(performance.now() * 0.001 * speed) * (d.sprinting ? 0.7 : 0.5);
+            rp.lArm.rotation.x = swing;
+            rp.rArm.rotation.x = -swing;
+            rp.lLeg.rotation.x = -swing;
+            rp.rLeg.rotation.x = swing;
+          } else {
+            rp.lArm.rotation.x *= 0.9;
+            rp.rArm.rotation.x *= 0.9;
+            rp.lLeg.rotation.x *= 0.9;
+            rp.rLeg.rotation.x *= 0.9;
+          }
+          // Crouch
+          const targetScale = d.crouching ? 0.7 : 1.0;
+          rp.group.scale.y += (targetScale - rp.group.scale.y) * 8 * dt;
+        }
+      }
 
       // ── Scene Setup ─────────────────────────────────────
       const scene = new THREE.Scene();
@@ -1566,8 +2133,8 @@
       // ── Input ───────────────────────────────────────────
       window.addEventListener('keydown', (e) => {
         state.keys[e.key.toLowerCase()] = true;
-        if (!state.started) startGame();
-        else if (state.dead || state.rescued) restartGame();
+        if (!state.started) return; // lobby handles start
+        if (state.dead || state.rescued) { restartGame(); return; }
         else if (e.key === 'Escape') {
           e.preventDefault();
           state.paused = !state.paused;
@@ -1606,6 +2173,11 @@
             if (state.pendingPlace !== 'beacon') {
               showStatus(`${state.pendingPlace === 'campfire' ? 'Campfire' : 'Shelter'} placed!`, '#44ff88');
             }
+            // Broadcast placement to other players
+            if (state.isMultiplayer) {
+              const msg = { type: 'place-object', objType: state.pendingPlace, x: px, z: pz, ry: playerGroup.rotation.y };
+              if (state.isHost) broadcastToAll(msg); else sendToHost(msg);
+            }
           }
           state.pendingPlace = null;
         }
@@ -1614,8 +2186,7 @@
         state.keys[e.key.toLowerCase()] = false;
       });
       window.addEventListener('click', () => {
-        if (!state.started) { startGame(); return; }
-        if (state.dead || state.rescued || state.paused) return;
+        if (!state.started || state.dead || state.rescued || state.paused) return;
         // Attack nearest wolf in front of player
         const attackRange = 2.5;
         let closest = null;
@@ -1641,6 +2212,10 @@
           const len = Math.sqrt(dx*dx+dz*dz) || 1;
           closest.position.x += (dx/len) * 2;
           closest.position.z += (dz/len) * 2;
+          // Broadcast hit to host
+          if (state.isMultiplayer && !state.isHost) {
+            sendToHost({ type: 'wolf-hit', wolfId: closest._netId, dmg });
+          }
           if (closest.userData.health <= 0) {
             scene.remove(closest);
             wolves.splice(wolves.indexOf(closest), 1);
@@ -1777,7 +2352,19 @@
         document.getElementById('instructions').style.display = 'block';
         document.getElementById('temp-bar-container').style.display = 'block';
         document.getElementById('minimap').style.display = 'block';
-        spawnWolves();
+        // Only host spawns wolves (clients receive via sync)
+        if (!state.isMultiplayer || state.isHost) spawnWolves();
+        // Assign wolf net IDs
+        wolves.forEach((w, i) => { w._netId = i; });
+        // Show remote players
+        for (const rp of Object.values(remotePlayers)) {
+          rp.group.visible = true;
+        }
+        // Show player count in HUD for multiplayer
+        if (state.isMultiplayer) {
+          const count = Object.keys(remotePlayers).length + 1;
+          showStatus(`Game started! ${count} players`, '#44ff88');
+        }
       }
 
       function restartGame() {
@@ -2393,6 +2980,13 @@
                 state.nearestResource.userData.respawnTimer = RESPAWN_TIME;
                 state.nearestResource.visible = false;
 
+                // Broadcast depletion
+                if (state.isMultiplayer) {
+                  const nodeKey = `${state.nearestResource.position.x.toFixed(1)}_${state.nearestResource.position.z.toFixed(1)}`;
+                  const msg = { type: 'gather-resource', nodeKey };
+                  if (state.isHost) broadcastToAll(msg); else sendToHost(msg);
+                }
+
                 // Reset gather state
                 state.gathering = false;
                 state.gatherProgress = 0;
@@ -2558,7 +3152,8 @@
           }
         }
 
-        // ── Wolf AI ───────────────────────────────────────
+        // ── Wolf AI (host only in multiplayer; clients receive via sync) ──
+        const runWolfAI = !state.isMultiplayer || state.isHost;
         for (const wolf of wolves) {
           const wd = wolf.userData;
           // Hit flash timer
@@ -2568,6 +3163,17 @@
               wd.body.material = new THREE.MeshStandardMaterial({ color: 0x99aacc, roughness: 0.7 });
             }
           }
+          if (!runWolfAI) {
+            // Client: just animate legs based on state
+            const legSwing = (wd.state === 'roam' || wd.state === 'stalk' ? 0.3 : 0.6) * Math.sin(elapsed * (wd.state === 'chase' ? 12 : 6));
+            wd.legs[0].position.y = 0.175 + Math.abs(legSwing) * 0.05;
+            wd.legs[1].position.y = 0.175 + Math.abs(-legSwing) * 0.05;
+            wd.legs[2].position.y = 0.175 + Math.abs(-legSwing) * 0.05;
+            wd.legs[3].position.y = 0.175 + Math.abs(legSwing) * 0.05;
+            wd.tail.rotation.x = -0.5 + Math.sin(elapsed * 4) * 0.3;
+            continue;
+          }
+
           const dx = playerGroup.position.x - wolf.position.x;
           const dz = playerGroup.position.z - wolf.position.z;
           const distToPlayer = Math.sqrt(dx * dx + dz * dz);
@@ -2682,8 +3288,8 @@
           wd.tail.rotation.x = -0.5 + Math.sin(elapsed * 4) * 0.3;
         }
 
-        // Respawn wolves occasionally if count drops
-        if (state.started && wolves.length < 3 && Math.random() < dt * 0.03) {
+        // Respawn wolves occasionally if count drops (host only)
+        if (runWolfAI && state.started && wolves.length < 3 && Math.random() < dt * 0.03) {
           const angle = Math.random() * Math.PI * 2;
           const dist = 40 + Math.random() * 50;
           const wx = playerGroup.position.x + Math.cos(angle) * dist;
@@ -2710,8 +3316,8 @@
             bd.beam.rotation.y = elapsed * 0.5;
           }
 
-          // Wolves drawn to beacon — spawn more during rescue countdown
-          if (Math.random() < dt * 0.08 && wolves.length < 10) {
+          // Wolves drawn to beacon — spawn more during rescue countdown (host only)
+          if (runWolfAI && Math.random() < dt * 0.08 && wolves.length < 10) {
             const angle = Math.random() * Math.PI * 2;
             const dist = 35 + Math.random() * 30;
             wolves.push(createWolf(
@@ -2800,6 +3406,19 @@
             mctx.fillRect(wx - 2, wz - 2, 3, 3);
           }
 
+          // Remote players (colored dots)
+          for (const [pid, rp] of Object.entries(remotePlayers)) {
+            if (!rp.group.visible) continue;
+            const rpx = cx + (rp.group.position.x - playerGroup.position.x) * mapScale;
+            const rpz = cy + (rp.group.position.z - playerGroup.position.z) * mapScale;
+            if (rpx < 0 || rpx > mw || rpz < 0 || rpz > mh) continue;
+            const c = PARKA_COLORS[rp.colorIndex % PARKA_COLORS.length];
+            mctx.fillStyle = '#' + c.toString(16).padStart(6, '0');
+            mctx.beginPath();
+            mctx.arc(rpx, rpz, 3, 0, Math.PI * 2);
+            mctx.fill();
+          }
+
           // Player (center, with direction indicator)
           mctx.fillStyle = '#44aaff';
           mctx.beginPath();
@@ -2834,6 +3453,13 @@
           playerGroup.position.y + 1,
           playerGroup.position.z
         );
+
+        // ── Multiplayer Sync ─────────────────────────────
+        if (state.isMultiplayer && state.started) {
+          sendPlayerUpdate();
+          if (state.isHost) sendHostState();
+          updateRemotePlayers(dt);
+        }
 
         renderer.render(scene, camera);
       }
