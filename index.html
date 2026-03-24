@@ -217,7 +217,7 @@
     <div id="title">
       <h1>Frozen Planet Survival</h1>
       <p>Press any key or click to begin</p>
-      <p style="margin-top: 12px; font-size: 13px; opacity: 0.5;">v0.9 - Day/Night Cycle &amp; Torch</p>
+      <p style="margin-top: 12px; font-size: 13px; opacity: 0.5;">v1.0 - Day/Night, Pause &amp; More Wood</p>
     </div>
 
     <div id="hud" style="display: none">
@@ -246,7 +246,7 @@
     </div>
 
     <div id="instructions" style="display: none">
-      W/S - Move &nbsp;|&nbsp; A/D - Turn &nbsp;|&nbsp; Shift - Sprint &nbsp;|&nbsp; C - Crouch &nbsp;|&nbsp; Space - Jump &nbsp;|&nbsp; E - Gather &nbsp;|&nbsp; Tab - Craft &nbsp;|&nbsp; F - Place
+      W/S - Move &nbsp;|&nbsp; A/D - Turn &nbsp;|&nbsp; Shift - Sprint &nbsp;|&nbsp; C - Crouch &nbsp;|&nbsp; Space - Jump &nbsp;|&nbsp; E - Gather &nbsp;|&nbsp; Tab - Craft &nbsp;|&nbsp; F - Place &nbsp;|&nbsp; Esc - Pause
     </div>
 
     <div id="craft-menu">
@@ -259,6 +259,22 @@
       <h1 style="font-size:52px; color:#88ccff; text-shadow:0 0 20px rgba(100,180,255,0.8); margin-bottom:16px;">YOU FROZE TO DEATH</h1>
       <p style="font-size:20px; opacity:0.7; margin-bottom:8px;">Survived for <span id="death-score">0</span> points</p>
       <p style="font-size:16px; opacity:0.5; margin-top:24px;">Press any key to try again</p>
+    </div>
+
+    <div id="pause-screen" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:28; justify-content:center; align-items:center; flex-direction:column; text-align:center; backdrop-filter:blur(4px);">
+      <h1 style="font-size:42px; color:#88ccff; text-shadow:0 0 20px rgba(100,180,255,0.8); margin-bottom:24px;">PAUSED</h1>
+      <p style="font-size:18px; opacity:0.7; margin-bottom:8px;">Press Escape to resume</p>
+      <div style="margin-top:32px; font-size:14px; opacity:0.5; line-height:2;">
+        <div>W/S - Move Forward/Back</div>
+        <div>A/D - Turn Left/Right</div>
+        <div>Shift - Sprint</div>
+        <div>C - Crouch</div>
+        <div>Space - Jump</div>
+        <div>E - Gather Resources</div>
+        <div>Tab - Crafting Menu</div>
+        <div>F - Place Item</div>
+        <div>Esc - Pause/Resume</div>
+      </div>
     </div>
 
     <canvas id="wind-overlay" width="512" height="512"></canvas>
@@ -319,6 +335,8 @@
         timeOfDay: 0.25,       // 0-1, 0=midnight, 0.25=sunrise, 0.5=noon, 0.75=sunset
         dayDuration: 240,      // full day cycle in seconds (4 minutes)
         isDay: false,
+        // State management
+        paused: false,
       };
 
       // ── Scene Setup ─────────────────────────────────────
@@ -706,11 +724,11 @@
 
       // Biome resource weights: which resources spawn where
       const biomeResources = {
-        [BIOMES.TUNDRA]:     [{ type: 'cloth', w: 3 }, { type: 'fuel', w: 2 }, { type: 'stone', w: 1 }],
-        [BIOMES.ICE_FIELDS]: [{ type: 'metal', w: 3 }, { type: 'fuel', w: 2 }, { type: 'stone', w: 1 }],
-        [BIOMES.MOUNTAINS]:  [{ type: 'stone', w: 4 }, { type: 'metal', w: 3 }, { type: 'fuel', w: 1 }],
-        [BIOMES.FOREST]:     [{ type: 'wood', w: 5 }, { type: 'cloth', w: 2 }, { type: 'fuel', w: 1 }],
-        [BIOMES.CRYSTAL]:    [{ type: 'fuel', w: 3 }, { type: 'metal', w: 2 }, { type: 'cloth', w: 1 }],
+        [BIOMES.TUNDRA]:     [{ type: 'wood', w: 2 }, { type: 'cloth', w: 3 }, { type: 'fuel', w: 2 }, { type: 'stone', w: 1 }],
+        [BIOMES.ICE_FIELDS]: [{ type: 'wood', w: 1 }, { type: 'metal', w: 3 }, { type: 'fuel', w: 2 }, { type: 'stone', w: 1 }],
+        [BIOMES.MOUNTAINS]:  [{ type: 'wood', w: 1 }, { type: 'stone', w: 4 }, { type: 'metal', w: 3 }, { type: 'fuel', w: 1 }],
+        [BIOMES.FOREST]:     [{ type: 'wood', w: 6 }, { type: 'cloth', w: 2 }, { type: 'fuel', w: 1 }],
+        [BIOMES.CRYSTAL]:    [{ type: 'wood', w: 1 }, { type: 'fuel', w: 3 }, { type: 'metal', w: 2 }, { type: 'cloth', w: 1 }],
       };
 
       function pickResource(biome) {
@@ -803,7 +821,29 @@
 
       // Spawn resource nodes across the map
       const resourceNodes = [];
-      const RESOURCE_COUNT = 150;
+      const RESOURCE_COUNT = 250;
+
+      // Guarantee wood near spawn so player can craft early
+      const NEAR_WOOD_COUNT = 8;
+      for (let i = 0; i < NEAR_WOOD_COUNT; i++) {
+        const angle = (i / NEAR_WOOD_COUNT) * Math.PI * 2 + Math.random() * 0.5;
+        const dist = 6 + Math.random() * 12;
+        const wx = Math.cos(angle) * dist;
+        const wz = Math.sin(angle) * dist;
+        const ty = getProceduralHeight(wx, wz);
+        const node = createResourceNode('wood', wx, wz, ty);
+        resourceNodes.push(node);
+      }
+      // Also spawn some fuel near spawn
+      for (let i = 0; i < 4; i++) {
+        const angle = (i / 4) * Math.PI * 2 + 0.3;
+        const dist = 8 + Math.random() * 10;
+        const fx = Math.cos(angle) * dist;
+        const fz = Math.sin(angle) * dist;
+        const ty = getProceduralHeight(fx, fz);
+        const node = createResourceNode('fuel', fx, fz, ty);
+        resourceNodes.push(node);
+      }
 
       for (let i = 0; i < RESOURCE_COUNT; i++) {
         const x = (Math.random() - 0.5) * DECO_RANGE * 2;
@@ -1278,6 +1318,17 @@
         state.keys[e.key.toLowerCase()] = true;
         if (!state.started) startGame();
         else if (state.dead) restartGame();
+        else if (e.key === 'Escape') {
+          e.preventDefault();
+          state.paused = !state.paused;
+          document.getElementById('pause-screen').style.display = state.paused ? 'flex' : 'none';
+          if (state.paused) {
+            state.craftMenuOpen = false;
+            document.getElementById('craft-menu').style.display = 'none';
+          }
+          return;
+        }
+        else if (state.paused) return; // ignore other keys while paused
         else if (e.key === 'Tab') {
           e.preventDefault();
           state.craftMenuOpen = !state.craftMenuOpen;
@@ -1459,8 +1510,10 @@
         state.nearCampfire = false;
         state.insideShelter = false;
         state.timeOfDay = 0.25; // restart at sunrise
+        state.paused = false;
         torchGroup.visible = false;
         document.getElementById('craft-menu').style.display = 'none';
+        document.getElementById('pause-screen').style.display = 'none';
         // Remove placed objects
         for (const obj of placedObjects) scene.remove(obj);
         placedObjects.length = 0;
@@ -1737,7 +1790,15 @@
 
       function animate() {
         requestAnimationFrame(animate);
-        const dt = Math.min(clock.getDelta(), 0.1);
+        const rawDt = Math.min(clock.getDelta(), 0.1);
+
+        // When paused, still render but don't advance game time
+        if (state.paused) {
+          renderer.render(scene, camera);
+          return;
+        }
+
+        const dt = rawDt;
         elapsed += dt;
 
         // Day/night cycle
