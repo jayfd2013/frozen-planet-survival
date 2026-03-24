@@ -559,11 +559,13 @@
           document.getElementById('energy').textContent = Math.floor(state.energy);
         }
 
-        // Camera follows player (fixed behind, player walks away from screen)
+        // Camera orbits behind player (always looking at their back)
+        const camDist = 6;
+        const camHeight = 3;
         const cameraTarget = new THREE.Vector3(
-          playerGroup.position.x,
-          playerGroup.position.y + 3,
-          playerGroup.position.z + 6
+          playerGroup.position.x + Math.sin(playerGroup.rotation.y + Math.PI) * camDist,
+          playerGroup.position.y + camHeight,
+          playerGroup.position.z + Math.cos(playerGroup.rotation.y + Math.PI) * camDist
         );
         camera.position.lerp(cameraTarget, 3 * dt);
         camera.lookAt(
