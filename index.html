@@ -148,6 +148,70 @@
         border-color: rgba(100, 180, 255, 0.6);
       }
 
+      #customize-panel {
+        margin-top: 20px;
+        padding: 16px;
+        background: rgba(20, 30, 50, 0.6);
+        border: 1px solid rgba(100, 180, 255, 0.2);
+        border-radius: 10px;
+        display: inline-block;
+        text-align: center;
+      }
+
+      #customize-panel h3 {
+        font-size: 14px;
+        opacity: 0.7;
+        margin-bottom: 12px;
+        letter-spacing: 1px;
+      }
+
+      .color-row {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 10px;
+        gap: 8px;
+      }
+
+      .color-row label {
+        font-size: 12px;
+        width: 55px;
+        text-align: right;
+        opacity: 0.6;
+      }
+
+      .color-swatch {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        border: 2px solid rgba(255,255,255,0.15);
+        cursor: pointer;
+        transition: transform 0.15s, border-color 0.15s;
+      }
+
+      .color-swatch:hover {
+        transform: scale(1.2);
+      }
+
+      .color-swatch.selected {
+        border-color: #ffffff;
+        transform: scale(1.15);
+        box-shadow: 0 0 10px rgba(255,255,255,0.4);
+      }
+
+      #char-preview {
+        width: 160px;
+        height: 220px;
+        margin: 0 auto 12px;
+        border-radius: 8px;
+        display: block;
+      }
+
+      .swatch-group {
+        display: flex;
+        gap: 5px;
+      }
+
       #minimap {
         position: absolute;
         bottom: 80px;
@@ -250,7 +314,29 @@
       <h1>Frozen Planet Survival</h1>
       <p style="margin-top: 8px; font-size: 14px; opacity: 0.6;">Multiplayer Survival</p>
       <div id="lobby" style="margin-top: 24px;">
+        <div id="customize-panel">
+          <h3>CUSTOMIZE CHARACTER</h3>
+          <canvas id="char-preview" width="160" height="220"></canvas>
+          <div class="color-row">
+            <label>Parka</label>
+            <div id="swatch-parka" class="swatch-group"></div>
+          </div>
+          <div class="color-row">
+            <label>Beanie</label>
+            <div id="swatch-beanie" class="swatch-group"></div>
+          </div>
+          <div class="color-row">
+            <label>Scarf</label>
+            <div id="swatch-scarf" class="swatch-group"></div>
+          </div>
+          <div class="color-row">
+            <label>Pack</label>
+            <div id="swatch-pack" class="swatch-group"></div>
+          </div>
+        </div>
+        <div style="margin-top: 16px;">
         <button id="btn-solo" class="lobby-btn">Solo Play</button>
+        </div>
         <div style="margin: 16px 0; font-size: 13px; opacity: 0.4;">── or play with friends ──</div>
         <button id="btn-host" class="lobby-btn">Create Room</button>
         <button id="btn-join" class="lobby-btn">Join Room</button>
@@ -419,6 +505,13 @@
         peerId: null,
         roomCode: null,
         myColor: 0,
+        // Character customization
+        customization: {
+          parka: 0x2266aa,
+          beanie: 0x883322,
+          scarf: 0xcc3333,
+          pack: 0x556633,
+        },
       };
 
       // ── Multiplayer System ────────────────────────────────
@@ -819,6 +912,179 @@
       document.getElementById('input-code').addEventListener('keydown', (e) => {
         if (e.key === 'Enter') document.getElementById('btn-connect').click();
       });
+
+      // ── Character Customization ───────────────────────────
+      const CUSTOM_COLORS = {
+        parka: [0x2266aa, 0xcc3333, 0x33aa44, 0xdd8811, 0x8833cc, 0xcc3388, 0x44cccc, 0xeeeeee, 0x222222],
+        beanie: [0x883322, 0xcc3333, 0x2255aa, 0x222222, 0xeeeeee, 0x33aa44, 0xdd8811, 0x8833cc],
+        scarf:  [0xcc3333, 0x2266aa, 0x33aa44, 0xdd8811, 0xeeeeee, 0x8833cc, 0xcc3388, 0x222222],
+        pack:   [0x556633, 0x664422, 0x883322, 0x335566, 0x444444, 0x222222, 0x886633],
+      };
+
+      // Build color swatches
+      for (const [part, colors] of Object.entries(CUSTOM_COLORS)) {
+        const container = document.getElementById('swatch-' + part);
+        colors.forEach((hex, i) => {
+          const swatch = document.createElement('div');
+          swatch.className = 'color-swatch' + (hex === state.customization[part] ? ' selected' : '');
+          swatch.style.background = '#' + hex.toString(16).padStart(6, '0');
+          swatch.addEventListener('click', () => {
+            state.customization[part] = hex;
+            container.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+            swatch.classList.add('selected');
+            drawCharacterPreview();
+          });
+          container.appendChild(swatch);
+        });
+      }
+
+      // Draw 2D character preview on the canvas
+      function drawCharacterPreview() {
+        const canvas = document.getElementById('char-preview');
+        const ctx = canvas.getContext('2d');
+        const w = canvas.width, h = canvas.height;
+        ctx.clearRect(0, 0, w, h);
+
+        const cx = w / 2, baseY = h - 15;
+        const c = state.customization;
+
+        function hexToCSS(hex) { return '#' + hex.toString(16).padStart(6, '0'); }
+        function darken(hex, factor) {
+          const r = Math.floor(((hex >> 16) & 0xff) * factor);
+          const g = Math.floor(((hex >> 8) & 0xff) * factor);
+          const b = Math.floor((hex & 0xff) * factor);
+          return `rgb(${r},${g},${b})`;
+        }
+
+        // Boots
+        ctx.fillStyle = '#333';
+        ctx.fillRect(cx - 22, baseY - 18, 16, 18);
+        ctx.fillRect(cx + 6, baseY - 18, 16, 18);
+
+        // Legs (pants)
+        ctx.fillStyle = '#554433';
+        ctx.fillRect(cx - 20, baseY - 62, 14, 48);
+        ctx.fillRect(cx + 6, baseY - 62, 14, 48);
+
+        // Belt
+        ctx.fillStyle = '#333';
+        ctx.fillRect(cx - 24, baseY - 66, 48, 6);
+
+        // Torso (parka)
+        ctx.fillStyle = hexToCSS(c.parka);
+        ctx.beginPath();
+        ctx.roundRect(cx - 24, baseY - 120, 48, 58, 4);
+        ctx.fill();
+
+        // Backpack (behind, peeking out sides)
+        ctx.fillStyle = hexToCSS(c.pack);
+        ctx.beginPath();
+        ctx.roundRect(cx - 16, baseY - 115, 32, 44, 3);
+        ctx.fill();
+        // Redraw torso front on top
+        ctx.fillStyle = hexToCSS(c.parka);
+        ctx.beginPath();
+        ctx.roundRect(cx - 24, baseY - 120, 48, 58, 4);
+        ctx.fill();
+        // Pack straps
+        ctx.strokeStyle = '#443322';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(cx - 10, baseY - 118); ctx.lineTo(cx - 10, baseY - 80);
+        ctx.moveTo(cx + 10, baseY - 118); ctx.lineTo(cx + 10, baseY - 80);
+        ctx.stroke();
+
+        // Arms (parka sleeves)
+        ctx.fillStyle = hexToCSS(c.parka);
+        ctx.fillRect(cx - 38, baseY - 116, 14, 50);
+        ctx.fillRect(cx + 24, baseY - 116, 14, 50);
+
+        // Gloves
+        ctx.fillStyle = '#444';
+        ctx.beginPath();
+        ctx.arc(cx - 31, baseY - 64, 7, 0, Math.PI * 2);
+        ctx.arc(cx + 31, baseY - 64, 7, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Scarf
+        ctx.fillStyle = hexToCSS(c.scarf);
+        ctx.beginPath();
+        ctx.ellipse(cx, baseY - 124, 20, 7, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // Scarf tail
+        ctx.fillRect(cx + 8, baseY - 128, 8, 18);
+
+        // Head (skin)
+        ctx.fillStyle = '#ddaa88';
+        ctx.beginPath();
+        ctx.arc(cx, baseY - 143, 15, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Eyes
+        ctx.fillStyle = '#333';
+        ctx.beginPath();
+        ctx.arc(cx - 5, baseY - 143, 2, 0, Math.PI * 2);
+        ctx.arc(cx + 5, baseY - 143, 2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Beanie
+        ctx.fillStyle = hexToCSS(c.beanie);
+        ctx.beginPath();
+        ctx.ellipse(cx, baseY - 155, 17, 12, 0, Math.PI, 0);
+        ctx.fill();
+        ctx.fillRect(cx - 17, baseY - 155, 34, 5);
+
+        // Pom-pom
+        ctx.fillStyle = hexToCSS(c.scarf);
+        ctx.beginPath();
+        ctx.arc(cx, baseY - 167, 5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Hood (behind head, darker parka)
+        ctx.fillStyle = darken(c.parka, 0.6);
+        ctx.beginPath();
+        ctx.arc(cx, baseY - 144, 20, Math.PI * 0.8, Math.PI * 0.2);
+        ctx.fill();
+
+        // Redraw head on top of hood
+        ctx.fillStyle = '#ddaa88';
+        ctx.beginPath();
+        ctx.arc(cx, baseY - 143, 15, 0, Math.PI * 2);
+        ctx.fill();
+        // Re-draw eyes
+        ctx.fillStyle = '#333';
+        ctx.beginPath();
+        ctx.arc(cx - 5, baseY - 143, 2, 0, Math.PI * 2);
+        ctx.arc(cx + 5, baseY - 143, 2, 0, Math.PI * 2);
+        ctx.fill();
+        // Re-draw beanie on top
+        ctx.fillStyle = hexToCSS(c.beanie);
+        ctx.beginPath();
+        ctx.ellipse(cx, baseY - 155, 17, 12, 0, Math.PI, 0);
+        ctx.fill();
+        ctx.fillRect(cx - 17, baseY - 155, 34, 5);
+        // Re-draw pom
+        ctx.fillStyle = hexToCSS(c.scarf);
+        ctx.beginPath();
+        ctx.arc(cx, baseY - 167, 5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Initial draw
+      drawCharacterPreview();
+
+      // Apply customization to 3D player model materials (set after player model is built)
+      const playerMats = {};
+      function applyCustomization() {
+        const c = state.customization;
+        if (playerMats.jacket) {
+          playerMats.jacket.color.setHex(c.parka);
+          playerMats.jacketDark.color.set(new THREE.Color(c.parka).multiplyScalar(0.6));
+          playerMats.beanie.color.setHex(c.beanie);
+          playerMats.scarf.color.setHex(c.scarf);
+          playerMats.pack.color.setHex(c.pack);
+        }
+      }
 
       // Multiplayer sync interval (runs in animate loop)
       let lastSyncTime = 0;
@@ -2055,6 +2321,13 @@
       backpack.castShadow = true;
       playerGroup.add(backpack);
 
+      // Register materials for customization
+      playerMats.jacket = jacketMat;
+      playerMats.jacketDark = jacketDarkMat;
+      playerMats.beanie = beanieMat;
+      playerMats.scarf = scarfMat;
+      playerMats.pack = packMat;
+
       // ── Held Torch (visible when equipped) ──────────────
       const torchGroup = new THREE.Group();
       torchGroup.visible = false;
@@ -2361,6 +2634,7 @@
           moonLight.intensity = (1 - p) * 1.2;
           ambientLight.intensity = 0.3 + p * 0.3;
         }
+        applyCustomization();
         document.getElementById('title').classList.add('hidden');
         document.getElementById('hud').style.display = 'block';
         document.getElementById('instructions').style.display = 'block';
