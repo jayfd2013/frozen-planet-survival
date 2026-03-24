@@ -118,8 +118,8 @@
 
       // ── Scene Setup ─────────────────────────────────────
       const scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x0a0a1a);
-      scene.fog = new THREE.FogExp2(0x0a0a2e, 0.015);
+      scene.background = new THREE.Color(0x667fa5);
+      scene.fog = new THREE.FogExp2(0x667fa5, 0.008);
 
       const camera = new THREE.PerspectiveCamera(
         75,
@@ -137,10 +137,10 @@
       document.body.appendChild(renderer.domElement);
 
       // ── Lighting ────────────────────────────────────────
-      const ambientLight = new THREE.AmbientLight(0x4466aa, 0.4);
+      const ambientLight = new THREE.AmbientLight(0x8899cc, 0.8);
       scene.add(ambientLight);
 
-      const moonLight = new THREE.DirectionalLight(0x8899cc, 0.8);
+      const moonLight = new THREE.DirectionalLight(0xccddeeff, 1.5);
       moonLight.position.set(20, 40, -20);
       moonLight.castShadow = true;
       moonLight.shadow.mapSize.width = 2048;
@@ -152,7 +152,7 @@
       moonLight.shadow.camera.bottom = -30;
       scene.add(moonLight);
 
-      const hemiLight = new THREE.HemisphereLight(0x4488cc, 0x223344, 0.3);
+      const hemiLight = new THREE.HemisphereLight(0xaaccff, 0x446688, 0.7);
       scene.add(hemiLight);
 
       // ── Ground (Frozen Terrain) ─────────────────────────
@@ -170,7 +170,7 @@
       groundGeo.computeVertexNormals();
 
       const groundMat = new THREE.MeshStandardMaterial({
-        color: 0x667799,
+        color: 0x99aabb,
         roughness: 0.3,
         metalness: 0.1,
         flatShading: true,
