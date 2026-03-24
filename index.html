@@ -559,13 +559,11 @@
           document.getElementById('energy').textContent = Math.floor(state.energy);
         }
 
-        // Camera follows player and rotates behind them
-        const camDist = 6;
-        const camHeight = 3;
+        // Camera follows player (fixed behind, player walks away from screen)
         const cameraTarget = new THREE.Vector3(
-          playerGroup.position.x + Math.sin(playerGroup.rotation.y) * camDist,
-          playerGroup.position.y + camHeight,
-          playerGroup.position.z + Math.cos(playerGroup.rotation.y) * camDist
+          playerGroup.position.x,
+          playerGroup.position.y + 3,
+          playerGroup.position.z + 6
         );
         camera.position.lerp(cameraTarget, 3 * dt);
         camera.lookAt(
