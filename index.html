@@ -136,7 +136,7 @@
     <div id="title">
       <h1>Frozen Planet Survival</h1>
       <p>Press any key or click to begin</p>
-      <p style="margin-top: 12px; font-size: 13px; opacity: 0.5;">v0.6 - Dynamic Weather</p>
+      <p style="margin-top: 12px; font-size: 13px; opacity: 0.5;">v0.7 - Resource Gathering</p>
     </div>
 
     <div id="hud" style="display: none">
@@ -147,10 +147,24 @@
       <div>Biome: <span id="biome-name">Tundra</span></div>
       <div>Weather: <span id="weather-name">Clear</span></div>
       <div id="status-msg" style="color: #ffaa44; display: none;"></div>
+      <div style="margin-top: 12px; font-size: 14px; opacity: 0.7;">
+        <span id="inv-wood">Wood: 0</span> &nbsp;
+        <span id="inv-stone">Stone: 0</span> &nbsp;
+        <span id="inv-metal">Metal: 0</span> &nbsp;
+        <span id="inv-cloth">Cloth: 0</span> &nbsp;
+        <span id="inv-fuel">Fuel: 0</span>
+      </div>
+    </div>
+
+    <div id="gather-prompt" style="display:none; position:fixed; bottom:120px; left:50%; transform:translateX(-50%); z-index:10; text-align:center; pointer-events:none;">
+      <div id="gather-label" style="font-size:16px; margin-bottom:6px; text-shadow:0 0 8px rgba(0,150,255,0.6);"></div>
+      <div style="width:200px; height:8px; background:rgba(0,0,0,0.5); border-radius:4px; overflow:hidden; border:1px solid rgba(100,180,255,0.3);">
+        <div id="gather-bar" style="height:100%; width:0%; background:linear-gradient(to right,#44aaff,#88ddff); border-radius:4px; transition:width 0.05s;"></div>
+      </div>
     </div>
 
     <div id="instructions" style="display: none">
-      W/S - Move &nbsp;|&nbsp; A/D - Turn &nbsp;|&nbsp; Shift - Sprint &nbsp;|&nbsp; C - Crouch &nbsp;|&nbsp; Space - Jump
+      W/S - Move &nbsp;|&nbsp; A/D - Turn &nbsp;|&nbsp; Shift - Sprint &nbsp;|&nbsp; C - Crouch &nbsp;|&nbsp; Space - Jump &nbsp;|&nbsp; E - Gather
     </div>
 
     <div id="death-screen" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:30; justify-content:center; align-items:center; flex-direction:column; text-align:center;">
@@ -201,6 +215,12 @@
         weatherTimer: 0,        // time until next weather change
         weatherDuration: 30,    // how long current weather lasts
         nextWeather: null,
+        // Inventory
+        inventory: { wood: 0, stone: 0, metal: 0, cloth: 0, fuel: 0 },
+        gathering: false,
+        gatherProgress: 0,
+        gatherTarget: null,
+        nearestResource: null,
       };
 
       // ── Scene Setup ─────────────────────────────────────
@@ -564,6 +584,131 @@
         return getBiome(playerGroup.position.x, playerGroup.position.z);
       }
 
+      // ── Resource Nodes ─────────────────────────────────────
+      const RESOURCE_TYPES = {
+        wood:  { name: 'Wood',  gatherTime: 2.0, amount: [1, 3], color: 0x886644 },
+        stone: { name: 'Stone', gatherTime: 2.5, amount: [1, 2], color: 0x888888 },
+        metal: { name: 'Metal Scrap', gatherTime: 3.0, amount: [1, 2], color: 0x8899aa },
+        cloth: { name: 'Cloth', gatherTime: 1.5, amount: [1, 2], color: 0xccbbaa },
+        fuel:  { name: 'Fuel',  gatherTime: 2.0, amount: [1, 2], color: 0xddaa33 },
+      };
+
+      // Biome resource weights: which resources spawn where
+      const biomeResources = {
+        [BIOMES.TUNDRA]:     [{ type: 'cloth', w: 3 }, { type: 'fuel', w: 2 }, { type: 'stone', w: 1 }],
+        [BIOMES.ICE_FIELDS]: [{ type: 'metal', w: 3 }, { type: 'fuel', w: 2 }, { type: 'stone', w: 1 }],
+        [BIOMES.MOUNTAINS]:  [{ type: 'stone', w: 4 }, { type: 'metal', w: 3 }, { type: 'fuel', w: 1 }],
+        [BIOMES.FOREST]:     [{ type: 'wood', w: 5 }, { type: 'cloth', w: 2 }, { type: 'fuel', w: 1 }],
+        [BIOMES.CRYSTAL]:    [{ type: 'fuel', w: 3 }, { type: 'metal', w: 2 }, { type: 'cloth', w: 1 }],
+      };
+
+      function pickResource(biome) {
+        const pool = biomeResources[biome] || biomeResources[BIOMES.TUNDRA];
+        const totalW = pool.reduce((s, r) => s + r.w, 0);
+        let roll = Math.random() * totalW;
+        for (const r of pool) {
+          roll -= r.w;
+          if (roll <= 0) return r.type;
+        }
+        return pool[0].type;
+      }
+
+      function createResourceNode(type, x, z, terrainY) {
+        const res = RESOURCE_TYPES[type];
+        const group = new THREE.Group();
+
+        if (type === 'wood') {
+          // Fallen log
+          const logGeo = new THREE.CylinderGeometry(0.12, 0.15, 1.5, 6);
+          const logMat = new THREE.MeshStandardMaterial({ color: res.color, roughness: 0.9 });
+          const log = new THREE.Mesh(logGeo, logMat);
+          log.rotation.z = Math.PI / 2;
+          log.rotation.y = Math.random() * Math.PI;
+          log.position.y = 0.15;
+          log.castShadow = true;
+          group.add(log);
+        } else if (type === 'stone') {
+          // Rock pile
+          for (let i = 0; i < 3; i++) {
+            const geo = new THREE.DodecahedronGeometry(0.2 + Math.random() * 0.2, 0);
+            const mat = new THREE.MeshStandardMaterial({ color: res.color, roughness: 0.85, flatShading: true });
+            const rock = new THREE.Mesh(geo, mat);
+            rock.position.set((Math.random() - 0.5) * 0.3, 0.15 + i * 0.1, (Math.random() - 0.5) * 0.3);
+            rock.castShadow = true;
+            group.add(rock);
+          }
+        } else if (type === 'metal') {
+          // Scrap metal piece
+          const geo = new THREE.BoxGeometry(0.4, 0.15, 0.6);
+          const mat = new THREE.MeshStandardMaterial({ color: res.color, roughness: 0.3, metalness: 0.7 });
+          const scrap = new THREE.Mesh(geo, mat);
+          scrap.position.y = 0.1;
+          scrap.rotation.y = Math.random() * Math.PI;
+          scrap.rotation.z = (Math.random() - 0.5) * 0.3;
+          scrap.castShadow = true;
+          group.add(scrap);
+        } else if (type === 'cloth') {
+          // Tattered cloth on a stick
+          const stickGeo = new THREE.CylinderGeometry(0.02, 0.03, 0.8, 4);
+          const stickMat = new THREE.MeshStandardMaterial({ color: 0x665544, roughness: 0.9 });
+          const stick = new THREE.Mesh(stickGeo, stickMat);
+          stick.position.y = 0.4;
+          group.add(stick);
+          const clothGeo = new THREE.PlaneGeometry(0.4, 0.3);
+          const clothMat = new THREE.MeshStandardMaterial({ color: res.color, roughness: 0.8, side: THREE.DoubleSide });
+          const cloth = new THREE.Mesh(clothGeo, clothMat);
+          cloth.position.set(0.15, 0.6, 0);
+          cloth.rotation.y = Math.random() * Math.PI;
+          group.add(cloth);
+        } else if (type === 'fuel') {
+          // Glowing canister
+          const canGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.35, 8);
+          const canMat = new THREE.MeshStandardMaterial({ color: res.color, roughness: 0.4, emissive: 0x553300, emissiveIntensity: 0.5 });
+          const can = new THREE.Mesh(canGeo, canMat);
+          can.position.y = 0.2;
+          can.castShadow = true;
+          group.add(can);
+        }
+
+        // Floating indicator ring
+        const ringGeo = new THREE.TorusGeometry(0.5, 0.03, 8, 16);
+        const ringMat = new THREE.MeshBasicMaterial({ color: res.color, transparent: true, opacity: 0.4 });
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.rotation.x = -Math.PI / 2;
+        ring.position.y = 0.02;
+        group.add(ring);
+
+        group.position.set(x, terrainY, z);
+        group.userData = {
+          resourceType: type,
+          depleted: false,
+          respawnTimer: 0,
+          ring: ring,
+        };
+
+        scene.add(group);
+        return group;
+      }
+
+      // Spawn resource nodes across the map
+      const resourceNodes = [];
+      const RESOURCE_COUNT = 150;
+
+      for (let i = 0; i < RESOURCE_COUNT; i++) {
+        const x = (Math.random() - 0.5) * DECO_RANGE * 2;
+        const z = (Math.random() - 0.5) * DECO_RANGE * 2;
+        // Don't spawn too close to origin (player start)
+        if (Math.abs(x) < 5 && Math.abs(z) < 5) continue;
+        const biome = getBiome(x, z);
+        const type = pickResource(biome);
+        const terrainY = getProceduralHeight(x, z);
+        const node = createResourceNode(type, x, z, terrainY);
+        resourceNodes.push(node);
+      }
+
+      const GATHER_RANGE = 2.5;
+      const RESPAWN_TIME = 60; // seconds
+
       // ── Snow Particles (scaled for weather system) ─────
       const snowCount = 12000;
       const snowGeo = new THREE.BufferGeometry();
@@ -884,6 +1029,16 @@
         state.weather = 'clear';
         state.weatherIntensity = 0;
         state.weatherTimer = 0;
+        state.inventory = { wood: 0, stone: 0, metal: 0, cloth: 0, fuel: 0 };
+        state.gathering = false;
+        state.gatherProgress = 0;
+        state.gatherTarget = null;
+        // Restore all resource nodes
+        for (const node of resourceNodes) {
+          node.userData.depleted = false;
+          node.userData.respawnTimer = 0;
+          node.visible = true;
+        }
         playerGroup.position.set(0, 0, 0);
         playerGroup.rotation.y = 0;
         document.getElementById('death-screen').style.display = 'none';
@@ -1089,6 +1244,14 @@
           crystal.rotation.y += dt * 0.3;
         }
 
+        // Resource node ring pulse
+        for (const node of resourceNodes) {
+          if (node.userData.depleted) continue;
+          const ring = node.userData.ring;
+          ring.material.opacity = 0.25 + Math.sin(elapsed * 2) * 0.15;
+          ring.rotation.z = elapsed * 0.5;
+        }
+
         // Aurora pulse
         auroraMat.opacity = 0.1 + Math.sin(elapsed * 0.5) * 0.05;
 
@@ -1203,6 +1366,97 @@
           // Score ticks up over time
           state.score = Math.floor(elapsed * 10);
           document.getElementById('score').textContent = state.score;
+
+          // ── Resource Gathering ──
+          // Find nearest resource node
+          let nearestDist = Infinity;
+          state.nearestResource = null;
+          for (const node of resourceNodes) {
+            if (node.userData.depleted) continue;
+            const dx = node.position.x - playerGroup.position.x;
+            const dz = node.position.z - playerGroup.position.z;
+            const dist = Math.sqrt(dx * dx + dz * dz);
+            if (dist < nearestDist) {
+              nearestDist = dist;
+              state.nearestResource = dist <= GATHER_RANGE ? node : null;
+              if (dist <= GATHER_RANGE) nearestDist = dist;
+            }
+          }
+
+          const gatherPrompt = document.getElementById('gather-prompt');
+          const gatherLabel = document.getElementById('gather-label');
+          const gatherBar = document.getElementById('gather-bar');
+
+          if (state.nearestResource) {
+            const resType = state.nearestResource.userData.resourceType;
+            const resInfo = RESOURCE_TYPES[resType];
+            gatherPrompt.style.display = 'block';
+
+            if (state.keys['e']) {
+              // Gathering
+              if (state.gatherTarget !== state.nearestResource) {
+                state.gatherTarget = state.nearestResource;
+                state.gatherProgress = 0;
+              }
+              state.gathering = true;
+              state.gatherProgress += dt / resInfo.gatherTime;
+              gatherLabel.textContent = `Gathering ${resInfo.name}...`;
+              gatherBar.style.width = Math.min(100, state.gatherProgress * 100) + '%';
+
+              if (state.gatherProgress >= 1) {
+                // Gather complete
+                const [minAmt, maxAmt] = resInfo.amount;
+                const amt = minAmt + Math.floor(Math.random() * (maxAmt - minAmt + 1));
+                state.inventory[resType] += amt;
+                state.score += amt * 5;
+
+                // Deplete the node
+                state.nearestResource.userData.depleted = true;
+                state.nearestResource.userData.respawnTimer = RESPAWN_TIME;
+                state.nearestResource.visible = false;
+
+                // Reset gather state
+                state.gathering = false;
+                state.gatherProgress = 0;
+                state.gatherTarget = null;
+
+                // Flash status
+                const statusEl2 = document.getElementById('status-msg');
+                statusEl2.style.display = 'block';
+                statusEl2.textContent = `+${amt} ${resInfo.name}`;
+                statusEl2.style.color = '#44ff88';
+                setTimeout(() => { if (!state.dead) statusEl2.style.display = 'none'; }, 1500);
+              }
+            } else {
+              state.gathering = false;
+              state.gatherProgress = 0;
+              state.gatherTarget = null;
+              gatherLabel.textContent = `[E] Gather ${resInfo.name}`;
+              gatherBar.style.width = '0%';
+            }
+          } else {
+            gatherPrompt.style.display = 'none';
+            state.gathering = false;
+            state.gatherProgress = 0;
+            state.gatherTarget = null;
+          }
+
+          // Resource node respawn
+          for (const node of resourceNodes) {
+            if (!node.userData.depleted) continue;
+            node.userData.respawnTimer -= dt;
+            if (node.userData.respawnTimer <= 0) {
+              node.userData.depleted = false;
+              node.visible = true;
+            }
+          }
+
+          // Update inventory HUD
+          document.getElementById('inv-wood').textContent = `Wood: ${state.inventory.wood}`;
+          document.getElementById('inv-stone').textContent = `Stone: ${state.inventory.stone}`;
+          document.getElementById('inv-metal').textContent = `Metal: ${state.inventory.metal}`;
+          document.getElementById('inv-cloth').textContent = `Cloth: ${state.inventory.cloth}`;
+          document.getElementById('inv-fuel').textContent = `Fuel: ${state.inventory.fuel}`;
 
           // Update biome display
           const biomeNames = ['Frozen Tundra', 'Ice Fields', 'Glacial Mountains', 'Frozen Forest', 'Crystal Caverns'];
