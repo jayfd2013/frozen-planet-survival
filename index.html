@@ -454,10 +454,14 @@
         if (state.started) {
           const moveDir = new THREE.Vector3();
 
+          // Turn left/right with A/D
+          const turnSpeed = 2.5;
+          if (state.keys['a']) playerGroup.rotation.y += turnSpeed * dt;
+          if (state.keys['d']) playerGroup.rotation.y -= turnSpeed * dt;
+
+          // Move forward/backward relative to facing direction with W/S
           if (state.keys['w']) moveDir.z -= 1;
           if (state.keys['s']) moveDir.z += 1;
-          if (state.keys['a']) moveDir.x -= 1;
-          if (state.keys['d']) moveDir.x += 1;
 
           const isMoving = moveDir.length() > 0;
 
@@ -474,14 +478,11 @@
 
           if (isMoving) {
             moveDir.normalize();
-            playerGroup.position.x += moveDir.x * speed * dt;
-            playerGroup.position.z += moveDir.z * speed * dt;
-
-            // Rotate player toward movement direction
-            const targetAngle = Math.atan2(moveDir.x, moveDir.z);
-            const currentAngle = playerGroup.rotation.y;
-            const angleDiff = targetAngle - currentAngle;
-            playerGroup.rotation.y += angleDiff * 5 * dt;
+            // Move relative to player's facing direction
+            const sin = Math.sin(playerGroup.rotation.y);
+            const cos = Math.cos(playerGroup.rotation.y);
+            playerGroup.position.x -= moveDir.z * sin * speed * dt;
+            playerGroup.position.z -= moveDir.z * cos * speed * dt;
           }
 
           // Energy drain/recovery
