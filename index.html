@@ -1935,7 +1935,7 @@
           state.windChill = windDir.strength * 2 + Math.sin(elapsed * 0.23) * 0.5;
 
           // Base heat loss rate (°C per second)
-          let heatLoss = 0.8;
+          let heatLoss = 0.25;
 
           // Heat loss multipliers
           let multiplier = 1.0;
@@ -1984,7 +1984,7 @@
 
           // Natural body heat recovery (very slow, simulates shivering)
           if (state.bodyTemp < 37) {
-            state.bodyTemp += 0.15 * dt;
+            state.bodyTemp += 0.3 * dt;
           }
 
           // Clamp body temp
