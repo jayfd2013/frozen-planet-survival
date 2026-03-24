@@ -967,7 +967,7 @@
       scene.add(ambientLight);
 
       // Sun light (for daytime)
-      const sunLight = new THREE.DirectionalLight(0xffeedd, 0);
+      const sunLight = new THREE.DirectionalLight(0xffeedd, 0.5);
       sunLight.position.set(30, 50, 20);
       sunLight.castShadow = true;
       sunLight.shadow.mapSize.width = 2048;
@@ -2347,6 +2347,20 @@
       // ── Start Game ──────────────────────────────────────
       function startGame() {
         state.started = true;
+        // Apply initial day/night lighting immediately (avoid slow lerp from dark)
+        const t = state.timeOfDay; // 0.25 = sunrise
+        if (t > 0.25 && t < 0.75) {
+          const dayProgress = (t - 0.25) / 0.5;
+          const peak = Math.sin(dayProgress * Math.PI);
+          sunLight.intensity = peak * 2.5;
+          moonLight.intensity = 0;
+          ambientLight.intensity = 0.6 + peak * 0.6;
+        } else if (t >= 0.2 && t <= 0.25) {
+          const p = (t - 0.2) / 0.05;
+          sunLight.intensity = p * 0.5;
+          moonLight.intensity = (1 - p) * 1.2;
+          ambientLight.intensity = 0.3 + p * 0.3;
+        }
         document.getElementById('title').classList.add('hidden');
         document.getElementById('hud').style.display = 'block';
         document.getElementById('instructions').style.display = 'block';
