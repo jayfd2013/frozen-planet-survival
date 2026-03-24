@@ -130,13 +130,94 @@
         white-space: nowrap;
         left: -10px;
       }
+      #craft-menu {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(10, 15, 30, 0.92);
+        border: 2px solid rgba(100, 180, 255, 0.3);
+        border-radius: 12px;
+        padding: 24px 32px;
+        z-index: 25;
+        min-width: 360px;
+        backdrop-filter: blur(6px);
+      }
+
+      #craft-menu h2 {
+        text-align: center;
+        font-size: 22px;
+        margin-bottom: 16px;
+        text-shadow: 0 0 12px rgba(100, 180, 255, 0.6);
+      }
+
+      .craft-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 12px;
+        margin-bottom: 8px;
+        background: rgba(40, 60, 90, 0.4);
+        border: 1px solid rgba(100, 180, 255, 0.15);
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background 0.15s, border-color 0.15s;
+      }
+
+      .craft-item:hover:not(.craft-disabled) {
+        background: rgba(60, 100, 150, 0.5);
+        border-color: rgba(100, 180, 255, 0.4);
+      }
+
+      .craft-item.craft-disabled {
+        opacity: 0.4;
+        cursor: default;
+      }
+
+      .craft-name {
+        font-size: 16px;
+        font-weight: bold;
+      }
+
+      .craft-cost {
+        font-size: 12px;
+        opacity: 0.7;
+        margin-top: 2px;
+      }
+
+      .craft-desc {
+        font-size: 11px;
+        opacity: 0.5;
+        margin-top: 2px;
+      }
+
+      .craft-btn {
+        padding: 6px 16px;
+        background: rgba(68, 170, 255, 0.3);
+        border: 1px solid rgba(100, 180, 255, 0.4);
+        border-radius: 6px;
+        color: white;
+        font-size: 13px;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+
+      .craft-btn:hover {
+        background: rgba(68, 170, 255, 0.5);
+      }
+
+      .craft-disabled .craft-btn {
+        opacity: 0.3;
+        pointer-events: none;
+      }
     </style>
   </head>
   <body>
     <div id="title">
       <h1>Frozen Planet Survival</h1>
       <p>Press any key or click to begin</p>
-      <p style="margin-top: 12px; font-size: 13px; opacity: 0.5;">v0.7 - Resource Gathering</p>
+      <p style="margin-top: 12px; font-size: 13px; opacity: 0.5;">v0.8 - Crafting &amp; Campfires</p>
     </div>
 
     <div id="hud" style="display: none">
@@ -164,7 +245,13 @@
     </div>
 
     <div id="instructions" style="display: none">
-      W/S - Move &nbsp;|&nbsp; A/D - Turn &nbsp;|&nbsp; Shift - Sprint &nbsp;|&nbsp; C - Crouch &nbsp;|&nbsp; Space - Jump &nbsp;|&nbsp; E - Gather
+      W/S - Move &nbsp;|&nbsp; A/D - Turn &nbsp;|&nbsp; Shift - Sprint &nbsp;|&nbsp; C - Crouch &nbsp;|&nbsp; Space - Jump &nbsp;|&nbsp; E - Gather &nbsp;|&nbsp; Tab - Craft &nbsp;|&nbsp; F - Place
+    </div>
+
+    <div id="craft-menu">
+      <h2>Crafting</h2>
+      <div id="craft-list"></div>
+      <p style="text-align:center; font-size:12px; opacity:0.4; margin-top:12px;">Tab to close</p>
     </div>
 
     <div id="death-screen" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:30; justify-content:center; align-items:center; flex-direction:column; text-align:center;">
@@ -221,6 +308,12 @@
         gatherProgress: 0,
         gatherTarget: null,
         nearestResource: null,
+        // Crafting
+        craftMenuOpen: false,
+        placedItems: [],       // { type, mesh, ... }
+        heldItem: null,        // 'torch' or null
+        nearCampfire: false,
+        insideShelter: false,
       };
 
       // ── Scene Setup ─────────────────────────────────────
@@ -709,6 +802,241 @@
       const GATHER_RANGE = 2.5;
       const RESPAWN_TIME = 60; // seconds
 
+      // ── Crafting System ────────────────────────────────────
+      const RECIPES = [
+        {
+          id: 'campfire', name: 'Campfire', desc: 'Place to warm up nearby',
+          cost: { wood: 3, fuel: 1 }, placeable: true,
+        },
+        {
+          id: 'shelter', name: 'Shelter', desc: 'Reduces heat loss when inside',
+          cost: { wood: 5, cloth: 3 }, placeable: true,
+        },
+        {
+          id: 'torch', name: 'Torch', desc: 'Held item, small warmth bonus',
+          cost: { wood: 1, cloth: 1 }, placeable: false,
+        },
+        {
+          id: 'ice_pick', name: 'Ice Pick', desc: 'Gather resources 2x faster',
+          cost: { stone: 2, metal: 2 }, placeable: false,
+        },
+      ];
+
+      function canCraft(recipe) {
+        for (const [res, amt] of Object.entries(recipe.cost)) {
+          if ((state.inventory[res] || 0) < amt) return false;
+        }
+        return true;
+      }
+
+      function doCraft(recipe) {
+        if (!canCraft(recipe)) return;
+        for (const [res, amt] of Object.entries(recipe.cost)) {
+          state.inventory[res] -= amt;
+        }
+        if (recipe.placeable) {
+          // Add to placement queue
+          state.pendingPlace = recipe.id;
+          state.craftMenuOpen = false;
+          document.getElementById('craft-menu').style.display = 'none';
+          showStatus(`Press F to place ${recipe.name}`, '#44ff88');
+        } else if (recipe.id === 'torch') {
+          state.heldItem = 'torch';
+          showStatus('Torch equipped!', '#ffcc44');
+        } else if (recipe.id === 'ice_pick') {
+          state.hasIcePick = true;
+          showStatus('Ice Pick crafted! Gather 2x faster', '#aaddff');
+        }
+        updateCraftMenu();
+      }
+
+      function showStatus(msg, color) {
+        const el = document.getElementById('status-msg');
+        el.style.display = 'block';
+        el.textContent = msg;
+        el.style.color = color;
+        clearTimeout(el._timer);
+        el._timer = setTimeout(() => { if (!state.dead) el.style.display = 'none'; }, 2000);
+      }
+
+      function costString(cost) {
+        return Object.entries(cost).map(([r, a]) => `${a} ${r}`).join(', ');
+      }
+
+      function updateCraftMenu() {
+        const list = document.getElementById('craft-list');
+        list.innerHTML = '';
+        for (const recipe of RECIPES) {
+          // Hide ice pick if already crafted
+          if (recipe.id === 'ice_pick' && state.hasIcePick) continue;
+          // Hide torch if already held
+          if (recipe.id === 'torch' && state.heldItem === 'torch') continue;
+
+          const ok = canCraft(recipe);
+          const div = document.createElement('div');
+          div.className = 'craft-item' + (ok ? '' : ' craft-disabled');
+          div.innerHTML = `
+            <div>
+              <div class="craft-name">${recipe.name}</div>
+              <div class="craft-cost">${costString(recipe.cost)}</div>
+              <div class="craft-desc">${recipe.desc}</div>
+            </div>
+            <button class="craft-btn">Craft</button>
+          `;
+          if (ok) {
+            div.querySelector('.craft-btn').addEventListener('click', () => doCraft(recipe));
+          }
+          list.appendChild(div);
+        }
+      }
+
+      // ── Campfire Creation ──────────────────────────────────
+      function createCampfire(x, z) {
+        const group = new THREE.Group();
+        const terrainY = getTerrainHeight(x, z);
+
+        // Stone ring
+        for (let i = 0; i < 8; i++) {
+          const angle = (i / 8) * Math.PI * 2;
+          const stoneGeo = new THREE.DodecahedronGeometry(0.12, 0);
+          const stoneMat = new THREE.MeshStandardMaterial({ color: 0x666666, roughness: 0.9, flatShading: true });
+          const stone = new THREE.Mesh(stoneGeo, stoneMat);
+          stone.position.set(Math.cos(angle) * 0.4, 0.06, Math.sin(angle) * 0.4);
+          stone.castShadow = true;
+          group.add(stone);
+        }
+
+        // Logs
+        for (let i = 0; i < 3; i++) {
+          const logGeo = new THREE.CylinderGeometry(0.04, 0.05, 0.5, 5);
+          const logMat = new THREE.MeshStandardMaterial({ color: 0x553322, roughness: 0.9 });
+          const log = new THREE.Mesh(logGeo, logMat);
+          const angle = (i / 3) * Math.PI * 2;
+          log.position.set(Math.cos(angle) * 0.12, 0.1, Math.sin(angle) * 0.12);
+          log.rotation.z = 0.3 + Math.random() * 0.4;
+          log.rotation.y = angle;
+          group.add(log);
+        }
+
+        // Fire light (point light for warmth glow)
+        const fireLight = new THREE.PointLight(0xff6622, 3, 12);
+        fireLight.position.y = 0.5;
+        group.add(fireLight);
+
+        // Fire particles (simple cones for flames)
+        const flames = [];
+        for (let i = 0; i < 5; i++) {
+          const flameGeo = new THREE.ConeGeometry(0.08, 0.3 + Math.random() * 0.2, 4);
+          const flameMat = new THREE.MeshBasicMaterial({
+            color: i < 3 ? 0xff6622 : 0xffaa22,
+            transparent: true,
+            opacity: 0.8,
+          });
+          const flame = new THREE.Mesh(flameGeo, flameMat);
+          flame.position.set(
+            (Math.random() - 0.5) * 0.2,
+            0.2 + Math.random() * 0.15,
+            (Math.random() - 0.5) * 0.2
+          );
+          flame.userData = { phase: Math.random() * Math.PI * 2, baseY: flame.position.y };
+          group.add(flame);
+          flames.push(flame);
+        }
+
+        // Ember particles
+        const emberCount = 20;
+        const emberGeo = new THREE.BufferGeometry();
+        const emberPos = new Float32Array(emberCount * 3);
+        for (let i = 0; i < emberCount; i++) {
+          emberPos[i * 3] = (Math.random() - 0.5) * 0.4;
+          emberPos[i * 3 + 1] = Math.random() * 1.5;
+          emberPos[i * 3 + 2] = (Math.random() - 0.5) * 0.4;
+        }
+        emberGeo.setAttribute('position', new THREE.BufferAttribute(emberPos, 3));
+        const emberMat = new THREE.PointsMaterial({
+          color: 0xff4400, size: 0.06, transparent: true, opacity: 0.8, depthWrite: false,
+        });
+        const embers = new THREE.Points(emberGeo, emberMat);
+        group.add(embers);
+
+        group.position.set(x, terrainY, z);
+
+        group.userData = {
+          type: 'campfire',
+          fuel: 120, // seconds of burn time
+          warmthRange: 6,
+          warmthPower: 4, // °C/s recovery at center
+          fireLight,
+          flames,
+          embers,
+        };
+
+        scene.add(group);
+        return group;
+      }
+
+      // ── Shelter Creation ───────────────────────────────────
+      function createShelter(x, z) {
+        const group = new THREE.Group();
+        const terrainY = getTerrainHeight(x, z);
+
+        const frameMat = new THREE.MeshStandardMaterial({ color: 0x664422, roughness: 0.9 });
+        const clothMat = new THREE.MeshStandardMaterial({
+          color: 0xbbaa88, roughness: 0.7, side: THREE.DoubleSide, transparent: true, opacity: 0.85,
+        });
+
+        // A-frame poles
+        const poleGeo = new THREE.CylinderGeometry(0.04, 0.04, 2.5, 4);
+        const pole1 = new THREE.Mesh(poleGeo, frameMat);
+        pole1.position.set(0, 1.0, -1.2);
+        pole1.rotation.z = 0.4;
+        pole1.castShadow = true;
+        group.add(pole1);
+
+        const pole2 = new THREE.Mesh(poleGeo, frameMat);
+        pole2.position.set(0, 1.0, -1.2);
+        pole2.rotation.z = -0.4;
+        pole2.castShadow = true;
+        group.add(pole2);
+
+        // Ridge pole
+        const ridgeGeo = new THREE.CylinderGeometry(0.03, 0.03, 3, 4);
+        const ridge = new THREE.Mesh(ridgeGeo, frameMat);
+        ridge.position.set(0, 1.8, 0);
+        ridge.rotation.x = Math.PI / 2;
+        group.add(ridge);
+
+        // Cloth covering (two angled planes)
+        const coverGeo = new THREE.PlaneGeometry(2, 3);
+        const cover1 = new THREE.Mesh(coverGeo, clothMat);
+        cover1.position.set(-0.7, 1.1, 0);
+        cover1.rotation.y = 0;
+        cover1.rotation.z = 0.55;
+        cover1.receiveShadow = true;
+        group.add(cover1);
+
+        const cover2 = new THREE.Mesh(coverGeo, clothMat);
+        cover2.position.set(0.7, 1.1, 0);
+        cover2.rotation.y = 0;
+        cover2.rotation.z = -0.55;
+        cover2.receiveShadow = true;
+        group.add(cover2);
+
+        group.position.set(x, terrainY, z);
+
+        group.userData = {
+          type: 'shelter',
+          shelterRange: 3,
+          heatReduction: 0.3, // multiplier (70% less heat loss)
+        };
+
+        scene.add(group);
+        return group;
+      }
+
+      // Placed world items
+      const placedObjects = [];
+
       // ── Snow Particles (scaled for weather system) ─────
       const snowCount = 12000;
       const snowGeo = new THREE.BufferGeometry();
@@ -882,6 +1210,29 @@
         state.keys[e.key.toLowerCase()] = true;
         if (!state.started) startGame();
         else if (state.dead) restartGame();
+        else if (e.key === 'Tab') {
+          e.preventDefault();
+          state.craftMenuOpen = !state.craftMenuOpen;
+          document.getElementById('craft-menu').style.display = state.craftMenuOpen ? 'block' : 'none';
+          if (state.craftMenuOpen) updateCraftMenu();
+        }
+        else if (e.key.toLowerCase() === 'f' && state.pendingPlace) {
+          // Place item in front of player
+          const px = playerGroup.position.x - Math.sin(playerGroup.rotation.y) * 2;
+          const pz = playerGroup.position.z - Math.cos(playerGroup.rotation.y) * 2;
+          let obj;
+          if (state.pendingPlace === 'campfire') {
+            obj = createCampfire(px, pz);
+          } else if (state.pendingPlace === 'shelter') {
+            obj = createShelter(px, pz);
+          }
+          if (obj) {
+            obj.rotation.y = playerGroup.rotation.y;
+            placedObjects.push(obj);
+            showStatus(`${state.pendingPlace === 'campfire' ? 'Campfire' : 'Shelter'} placed!`, '#44ff88');
+          }
+          state.pendingPlace = null;
+        }
       });
       window.addEventListener('keyup', (e) => {
         state.keys[e.key.toLowerCase()] = false;
@@ -1033,6 +1384,16 @@
         state.gathering = false;
         state.gatherProgress = 0;
         state.gatherTarget = null;
+        state.heldItem = null;
+        state.hasIcePick = false;
+        state.pendingPlace = null;
+        state.craftMenuOpen = false;
+        state.nearCampfire = false;
+        state.insideShelter = false;
+        document.getElementById('craft-menu').style.display = 'none';
+        // Remove placed objects
+        for (const obj of placedObjects) scene.remove(obj);
+        placedObjects.length = 0;
         // Restore all resource nodes
         for (const node of resourceNodes) {
           node.userData.depleted = false;
@@ -1252,6 +1613,61 @@
           ring.rotation.z = elapsed * 0.5;
         }
 
+        // Campfire animation + warmth check
+        state.nearCampfire = false;
+        state.insideShelter = false;
+        for (let i = placedObjects.length - 1; i >= 0; i--) {
+          const obj = placedObjects[i];
+          const dx = obj.position.x - playerGroup.position.x;
+          const dz = obj.position.z - playerGroup.position.z;
+          const dist = Math.sqrt(dx * dx + dz * dz);
+
+          if (obj.userData.type === 'campfire') {
+            const data = obj.userData;
+            // Burn fuel
+            data.fuel -= dt;
+            if (data.fuel <= 0) {
+              // Fire burned out
+              scene.remove(obj);
+              placedObjects.splice(i, 1);
+              continue;
+            }
+
+            // Flicker flames
+            const fuelFade = Math.min(1, data.fuel / 20); // dims in last 20s
+            for (const flame of data.flames) {
+              flame.position.y = flame.userData.baseY + Math.sin(elapsed * 8 + flame.userData.phase) * 0.08;
+              flame.scale.y = 0.7 + Math.sin(elapsed * 12 + flame.userData.phase) * 0.3;
+              flame.scale.x = 0.8 + Math.sin(elapsed * 10 + flame.userData.phase * 2) * 0.2;
+              flame.material.opacity = 0.6 * fuelFade + Math.sin(elapsed * 15 + flame.userData.phase) * 0.2;
+            }
+
+            // Flicker light
+            data.fireLight.intensity = (2.5 + Math.sin(elapsed * 10) * 0.5) * fuelFade;
+            data.fireLight.color.setHex(Math.random() > 0.5 ? 0xff6622 : 0xff8833);
+
+            // Animate embers
+            const ePos = data.embers.geometry.attributes.position;
+            for (let j = 0; j < ePos.count; j++) {
+              let ey = ePos.getY(j) + dt * (1 + Math.random());
+              if (ey > 2) { ey = 0; ePos.setX(j, (Math.random() - 0.5) * 0.4); }
+              ePos.setY(j, ey);
+              ePos.setX(j, ePos.getX(j) + Math.sin(elapsed * 3 + j) * 0.003);
+            }
+            ePos.needsUpdate = true;
+
+            // Warmth check
+            if (dist < data.warmthRange) {
+              state.nearCampfire = true;
+              state.campfireWarmth = data.warmthPower * (1 - dist / data.warmthRange) * fuelFade;
+            }
+          } else if (obj.userData.type === 'shelter') {
+            if (dist < obj.userData.shelterRange) {
+              state.insideShelter = true;
+            }
+          }
+        }
+
         // Aurora pulse
         auroraMat.opacity = 0.1 + Math.sin(elapsed * 0.5) * 0.05;
 
@@ -1347,6 +1763,18 @@
             statusEl.style.display = 'block';
             statusEl.textContent = 'FREEZING';
             statusEl.style.color = '#88ccff';
+          } else if (state.nearCampfire) {
+            statusEl.style.display = 'block';
+            statusEl.textContent = 'WARMING UP';
+            statusEl.style.color = '#ff8844';
+          } else if (state.insideShelter) {
+            statusEl.style.display = 'block';
+            statusEl.textContent = 'SHELTERED';
+            statusEl.style.color = '#88ddaa';
+          } else if (state.pendingPlace) {
+            statusEl.style.display = 'block';
+            statusEl.textContent = `Press F to place ${state.pendingPlace}`;
+            statusEl.style.color = '#44ff88';
           } else if (state.isSprinting) {
             statusEl.style.display = 'block';
             statusEl.textContent = 'SPRINTING';
@@ -1399,7 +1827,8 @@
                 state.gatherProgress = 0;
               }
               state.gathering = true;
-              state.gatherProgress += dt / resInfo.gatherTime;
+              const gatherSpeed = state.hasIcePick ? 2 : 1;
+              state.gatherProgress += (dt * gatherSpeed) / resInfo.gatherTime;
               gatherLabel.textContent = `Gathering ${resInfo.name}...`;
               gatherBar.style.width = Math.min(100, state.gatherProgress * 100) + '%';
 
@@ -1508,8 +1937,19 @@
           // Weather multiplier: blizzards are deadly
           multiplier *= weatherConfig[state.weather].heatMult;
 
+          // Shelter reduces heat loss
+          if (state.insideShelter) multiplier *= 0.3;
+
+          // Torch provides small warmth bonus
+          if (state.heldItem === 'torch') multiplier *= 0.85;
+
           // Apply heat loss
           state.bodyTemp -= heatLoss * multiplier * dt;
+
+          // Campfire warmth: actively heats player
+          if (state.nearCampfire && state.campfireWarmth) {
+            state.bodyTemp += state.campfireWarmth * dt;
+          }
 
           // Natural body heat recovery (very slow, simulates shivering)
           if (state.bodyTemp < 37) {
