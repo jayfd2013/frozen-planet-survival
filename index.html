@@ -217,7 +217,7 @@
     <div id="title">
       <h1>Frozen Planet Survival</h1>
       <p>Press any key or click to begin</p>
-      <p style="margin-top: 12px; font-size: 13px; opacity: 0.5;">v0.8 - Crafting &amp; Campfires</p>
+      <p style="margin-top: 12px; font-size: 13px; opacity: 0.5;">v0.9 - Day/Night Cycle &amp; Torch</p>
     </div>
 
     <div id="hud" style="display: none">
@@ -227,6 +227,7 @@
       <div>Score: <span id="score">0</span></div>
       <div>Biome: <span id="biome-name">Tundra</span></div>
       <div>Weather: <span id="weather-name">Clear</span></div>
+      <div id="time-display" style="color: #ffdd88;">Day 06:00</div>
       <div id="status-msg" style="color: #ffaa44; display: none;"></div>
       <div style="margin-top: 12px; font-size: 14px; opacity: 0.7;">
         <span id="inv-wood">Wood: 0</span> &nbsp;
@@ -314,6 +315,10 @@
         heldItem: null,        // 'torch' or null
         nearCampfire: false,
         insideShelter: false,
+        // Day/night cycle
+        timeOfDay: 0.25,       // 0-1, 0=midnight, 0.25=sunrise, 0.5=noon, 0.75=sunset
+        dayDuration: 240,      // full day cycle in seconds (4 minutes)
+        isDay: false,
       };
 
       // ── Scene Setup ─────────────────────────────────────
@@ -339,6 +344,19 @@
       // ── Lighting ────────────────────────────────────────
       const ambientLight = new THREE.AmbientLight(0x8899cc, 0.8);
       scene.add(ambientLight);
+
+      // Sun light (for daytime)
+      const sunLight = new THREE.DirectionalLight(0xffeedd, 0);
+      sunLight.position.set(30, 50, 20);
+      sunLight.castShadow = true;
+      sunLight.shadow.mapSize.width = 2048;
+      sunLight.shadow.mapSize.height = 2048;
+      sunLight.shadow.camera.far = 100;
+      sunLight.shadow.camera.left = -30;
+      sunLight.shadow.camera.right = 30;
+      sunLight.shadow.camera.top = 30;
+      sunLight.shadow.camera.bottom = -30;
+      scene.add(sunLight);
 
       const moonLight = new THREE.DirectionalLight(0xccddeeff, 1.5);
       moonLight.position.set(20, 40, -20);
@@ -1180,6 +1198,39 @@
       backpack.castShadow = true;
       playerGroup.add(backpack);
 
+      // ── Held Torch (visible when equipped) ──────────────
+      const torchGroup = new THREE.Group();
+      torchGroup.visible = false;
+      // Stick
+      const stickGeo = new THREE.CylinderGeometry(0.025, 0.03, 0.6, 6);
+      const stickMat = new THREE.MeshStandardMaterial({ color: 0x553311, roughness: 0.9 });
+      const stick = new THREE.Mesh(stickGeo, stickMat);
+      stick.position.y = 0;
+      torchGroup.add(stick);
+      // Wrap at top
+      const wrapGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.1, 6);
+      const wrapMat = new THREE.MeshStandardMaterial({ color: 0x887744, roughness: 0.8 });
+      const wrap = new THREE.Mesh(wrapGeo, wrapMat);
+      wrap.position.y = 0.28;
+      torchGroup.add(wrap);
+      // Flame (cone)
+      const tFlameMat = new THREE.MeshBasicMaterial({ color: 0xff6622, transparent: true, opacity: 0.85 });
+      const tFlame1 = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.2, 5), tFlameMat);
+      tFlame1.position.y = 0.43;
+      torchGroup.add(tFlame1);
+      const tFlameMat2 = new THREE.MeshBasicMaterial({ color: 0xffaa22, transparent: true, opacity: 0.7 });
+      const tFlame2 = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.15, 4), tFlameMat2);
+      tFlame2.position.y = 0.48;
+      torchGroup.add(tFlame2);
+      // Torch point light
+      const torchLight = new THREE.PointLight(0xff8833, 0, 10);
+      torchLight.position.y = 0.45;
+      torchGroup.add(torchLight);
+      // Position torch at right hand
+      torchGroup.position.set(0.42, 0.75, 0.15);
+      torchGroup.rotation.z = -0.3;
+      playerGroup.add(torchGroup);
+
       playerGroup.position.set(0, 0, 0);
       scene.add(playerGroup);
 
@@ -1407,6 +1458,8 @@
         state.craftMenuOpen = false;
         state.nearCampfire = false;
         state.insideShelter = false;
+        state.timeOfDay = 0.25; // restart at sunrise
+        torchGroup.visible = false;
         document.getElementById('craft-menu').style.display = 'none';
         // Remove placed objects
         for (const obj of placedObjects) scene.remove(obj);
@@ -1590,6 +1643,94 @@
         return config;
       }
 
+      // ── Day/Night Cycle Colors ─────────────────────────
+      const skyColors = {
+        night:   new THREE.Color(0x0a0a2a),
+        dawn:    new THREE.Color(0x886655),
+        day:     new THREE.Color(0x88bbdd),
+        dusk:    new THREE.Color(0x995533),
+      };
+
+      function updateDayNight(dt) {
+        state.timeOfDay = (state.timeOfDay + dt / state.dayDuration) % 1.0;
+        const t = state.timeOfDay;
+
+        // Determine if it's day (between 0.2 and 0.8)
+        state.isDay = t > 0.2 && t < 0.8;
+
+        // Sun position (arc across sky)
+        const sunAngle = (t - 0.2) / 0.6 * Math.PI; // 0 at sunrise, PI at sunset
+        if (state.isDay) {
+          sunLight.position.set(
+            Math.cos(sunAngle) * 40,
+            Math.sin(sunAngle) * 50 + 5,
+            20
+          );
+        }
+
+        // Calculate light intensities based on time
+        let sunIntensity = 0;
+        let moonIntensity = 0;
+        let ambientBase = 0;
+        let starOpacity = 0;
+        let skyColor;
+
+        if (t > 0.25 && t < 0.75) {
+          // Full day
+          const dayProgress = (t - 0.25) / 0.5;
+          const peak = Math.sin(dayProgress * Math.PI); // 0 at edges, 1 at noon
+          sunIntensity = peak * 2.5;
+          ambientBase = 0.6 + peak * 0.6;
+          starOpacity = 0;
+          skyColor = skyColors.day;
+        } else if (t >= 0.2 && t <= 0.25) {
+          // Dawn transition
+          const p = (t - 0.2) / 0.05;
+          sunIntensity = p * 0.5;
+          moonIntensity = (1 - p) * 1.2;
+          ambientBase = 0.3 + p * 0.3;
+          starOpacity = (1 - p) * 0.9;
+          skyColor = new THREE.Color().lerpColors(skyColors.night, skyColors.dawn, p);
+        } else if (t >= 0.75 && t <= 0.8) {
+          // Dusk transition
+          const p = (t - 0.75) / 0.05;
+          sunIntensity = (1 - p) * 0.5;
+          moonIntensity = p * 1.2;
+          ambientBase = 0.6 - p * 0.3;
+          starOpacity = p * 0.9;
+          skyColor = new THREE.Color().lerpColors(skyColors.dusk, skyColors.night, p);
+        } else {
+          // Night
+          moonIntensity = 1.5;
+          ambientBase = 0.3;
+          starOpacity = 0.9;
+          skyColor = skyColors.night;
+        }
+
+        // Apply (lerp for smoothness)
+        const ls = 1.5 * dt;
+        sunLight.intensity += (sunIntensity - sunLight.intensity) * ls;
+        moonLight.intensity += (moonIntensity - moonLight.intensity) * ls;
+        ambientLight.intensity += (ambientBase - ambientLight.intensity) * ls;
+        starMat.opacity += (starOpacity - starMat.opacity) * ls;
+
+        // Sky color blending (only override if weather isn't blizzard)
+        if (state.weatherIntensity < 0.3) {
+          scene.background.lerp(skyColor, ls);
+          scene.fog.color.lerp(skyColor, ls * 0.5);
+        }
+
+        // Update time display
+        const hours = Math.floor(t * 24);
+        const mins = Math.floor((t * 24 - hours) * 60);
+        const timeStr = `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+        const timeEl = document.getElementById('time-display');
+        if (timeEl) {
+          timeEl.textContent = `${state.isDay ? 'Day' : 'Night'} ${timeStr}`;
+          timeEl.style.color = state.isDay ? '#ffdd88' : '#8899cc';
+        }
+      }
+
       // ── Game Loop ───────────────────────────────────────
       const clock = new THREE.Clock();
       let elapsed = 0;
@@ -1598,6 +1739,9 @@
         requestAnimationFrame(animate);
         const dt = Math.min(clock.getDelta(), 0.1);
         elapsed += dt;
+
+        // Day/night cycle
+        if (state.started) updateDayNight(dt);
 
         // Weather update
         const weatherCfg = state.started ? updateWeather(dt) : weatherConfig.clear;
@@ -1699,8 +1843,23 @@
           }
         }
 
-        // Aurora pulse
-        auroraMat.opacity = 0.1 + Math.sin(elapsed * 0.5) * 0.05;
+        // Aurora pulse (only visible at night)
+        auroraMat.opacity = state.isDay ? 0 : 0.1 + Math.sin(elapsed * 0.5) * 0.05;
+
+        // Torch visibility & animation
+        torchGroup.visible = state.heldItem === 'torch';
+        if (torchGroup.visible) {
+          torchLight.intensity = 2.0 + Math.sin(elapsed * 10) * 0.5;
+          torchLight.color.setHex(Math.random() > 0.5 ? 0xff8833 : 0xff6622);
+          tFlame1.position.y = 0.43 + Math.sin(elapsed * 8) * 0.02;
+          tFlame1.scale.y = 0.8 + Math.sin(elapsed * 12) * 0.2;
+          tFlame2.position.y = 0.48 + Math.sin(elapsed * 9 + 1) * 0.02;
+          tFlame2.scale.set(
+            0.8 + Math.sin(elapsed * 11) * 0.2,
+            0.7 + Math.sin(elapsed * 13) * 0.3,
+            0.8 + Math.sin(elapsed * 11) * 0.2
+          );
+        }
 
         // Player movement
         if (state.started && !state.dead) {
@@ -1928,63 +2087,76 @@
 
           // ── Temperature System with Heat Loss Multipliers ──
 
-          // Ambient temperature fluctuates over time
-          state.temperature = -30 + Math.sin(elapsed * 0.2) * 5;
+          // Ambient temperature depends on day/night
+          const dayWarmth = state.isDay ? 20 : 0; // daytime is much warmer
+          state.temperature = -30 + dayWarmth + Math.sin(elapsed * 0.2) * 5;
 
           // Wind chill driven by weather system
           state.windChill = windDir.strength * 2 + Math.sin(elapsed * 0.23) * 0.5;
 
-          // Base heat loss rate (°C per second)
-          let heatLoss = 0.25;
+          if (state.isDay) {
+            // Daytime: no heat loss, fast recovery — enjoy exploring!
+            if (state.bodyTemp < 37) {
+              state.bodyTemp += 2.0 * dt; // warm up quickly in the sun
+            }
+            // Campfire still helps
+            if (state.nearCampfire && state.campfireWarmth) {
+              state.bodyTemp += state.campfireWarmth * dt;
+            }
+          } else {
+            // Nighttime: full heat loss system kicks in
+            // Base heat loss rate (°C per second)
+            let heatLoss = 0.25;
 
-          // Heat loss multipliers
-          let multiplier = 1.0;
+            // Heat loss multipliers
+            let multiplier = 1.0;
 
-          // Sprinting: sweating makes you lose heat faster (1.6x)
-          if (state.isSprinting) multiplier *= 1.6;
+            // Sprinting: sweating makes you lose heat faster (1.6x)
+            if (state.isSprinting) multiplier *= 1.6;
 
-          // Standing still: body cools faster without movement generating warmth (1.2x)
-          if (!isMoving && !state.isCrouching) multiplier *= 1.2;
+            // Standing still: body cools faster without movement generating warmth (1.2x)
+            if (!isMoving && !state.isCrouching) multiplier *= 1.2;
 
-          // Crouching: less body exposed to wind (0.6x — protective)
-          if (state.isCrouching) multiplier *= 0.6;
+            // Crouching: less body exposed to wind (0.6x — protective)
+            if (state.isCrouching) multiplier *= 0.6;
 
-          // Wind chill: stronger wind = faster heat loss
-          const windFactor = 1.0 + Math.max(0, state.windChill) * 0.1;
-          multiplier *= windFactor;
+            // Wind chill: stronger wind = faster heat loss
+            const windFactor = 1.0 + Math.max(0, state.windChill) * 0.1;
+            multiplier *= windFactor;
 
-          // Colder ambient temp = faster heat loss
-          const coldFactor = 1.0 + Math.abs(state.temperature + 25) * 0.02;
-          multiplier *= coldFactor;
+            // Colder ambient temp = faster heat loss
+            const coldFactor = 1.0 + Math.abs(state.temperature + 25) * 0.02;
+            multiplier *= coldFactor;
 
-          // Higher elevation = colder (player Y position)
-          const elevationFactor = 1.0 + Math.max(0, playerGroup.position.y - 2) * 0.05;
-          multiplier *= elevationFactor;
+            // Higher elevation = colder (player Y position)
+            const elevationFactor = 1.0 + Math.max(0, playerGroup.position.y - 2) * 0.05;
+            multiplier *= elevationFactor;
 
-          // Biome multiplier: some biomes are harsher than others
-          const biomeHeatMultiplier = [1.0, 1.3, 1.5, 0.7, 0.9]; // tundra, ice, mountains, forest, crystal
-          multiplier *= biomeHeatMultiplier[state.currentBiome] || 1.0;
+            // Biome multiplier: some biomes are harsher than others
+            const biomeHeatMultiplier = [1.0, 1.3, 1.5, 0.7, 0.9]; // tundra, ice, mountains, forest, crystal
+            multiplier *= biomeHeatMultiplier[state.currentBiome] || 1.0;
 
-          // Weather multiplier: blizzards are deadly
-          multiplier *= weatherConfig[state.weather].heatMult;
+            // Weather multiplier: blizzards are deadly
+            multiplier *= weatherConfig[state.weather].heatMult;
 
-          // Shelter reduces heat loss
-          if (state.insideShelter) multiplier *= 0.3;
+            // Shelter reduces heat loss
+            if (state.insideShelter) multiplier *= 0.3;
 
-          // Torch provides small warmth bonus
-          if (state.heldItem === 'torch') multiplier *= 0.85;
+            // Torch provides small warmth bonus
+            if (state.heldItem === 'torch') multiplier *= 0.85;
 
-          // Apply heat loss
-          state.bodyTemp -= heatLoss * multiplier * dt;
+            // Apply heat loss
+            state.bodyTemp -= heatLoss * multiplier * dt;
 
-          // Campfire warmth: actively heats player
-          if (state.nearCampfire && state.campfireWarmth) {
-            state.bodyTemp += state.campfireWarmth * dt;
-          }
+            // Campfire warmth: actively heats player
+            if (state.nearCampfire && state.campfireWarmth) {
+              state.bodyTemp += state.campfireWarmth * dt;
+            }
 
-          // Natural body heat recovery (very slow, simulates shivering)
-          if (state.bodyTemp < 37) {
-            state.bodyTemp += 0.3 * dt;
+            // Natural body heat recovery (very slow, simulates shivering)
+            if (state.bodyTemp < 37) {
+              state.bodyTemp += 0.3 * dt;
+            }
           }
 
           // Clamp body temp
