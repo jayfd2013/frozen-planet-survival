@@ -130,6 +130,20 @@
         white-space: nowrap;
         left: -10px;
       }
+      #minimap {
+        position: absolute;
+        bottom: 80px;
+        right: 20px;
+        width: 180px;
+        height: 180px;
+        border-radius: 50%;
+        border: 2px solid rgba(100, 180, 255, 0.4);
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 10;
+        pointer-events: none;
+        display: none;
+      }
+
       #craft-menu {
         display: none;
         position: fixed;
@@ -246,7 +260,7 @@
     </div>
 
     <div id="instructions" style="display: none">
-      W/S - Move &nbsp;|&nbsp; A/D - Turn &nbsp;|&nbsp; Shift - Sprint &nbsp;|&nbsp; C - Crouch &nbsp;|&nbsp; Space - Jump &nbsp;|&nbsp; E - Gather &nbsp;|&nbsp; Tab - Craft &nbsp;|&nbsp; F - Place &nbsp;|&nbsp; Esc - Pause
+      W/S - Move &nbsp;|&nbsp; A/D - Turn &nbsp;|&nbsp; Shift - Sprint &nbsp;|&nbsp; C - Crouch &nbsp;|&nbsp; Space - Jump &nbsp;|&nbsp; E - Gather &nbsp;|&nbsp; Tab - Craft &nbsp;|&nbsp; F - Place &nbsp;|&nbsp; Click - Attack &nbsp;|&nbsp; Esc - Pause
     </div>
 
     <div id="craft-menu">
@@ -261,6 +275,18 @@
       <p style="font-size:16px; opacity:0.5; margin-top:24px;">Press any key to try again</p>
     </div>
 
+    <div id="win-screen" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,20,0.9); z-index:30; justify-content:center; align-items:center; flex-direction:column; text-align:center;">
+      <h1 style="font-size:52px; color:#44ff88; text-shadow:0 0 30px rgba(68,255,136,0.8); margin-bottom:16px;">RESCUED!</h1>
+      <p style="font-size:22px; opacity:0.8; margin-bottom:8px;">You survived the frozen planet!</p>
+      <p style="font-size:18px; opacity:0.6; margin-bottom:8px;">Final score: <span id="win-score">0</span></p>
+      <p style="font-size:16px; opacity:0.5; margin-top:24px;">Press any key to play again</p>
+    </div>
+
+    <div id="beacon-timer-hud" style="display:none; position:fixed; top:50%; right:60px; transform:translateY(-50%); z-index:10; text-align:center; pointer-events:none;">
+      <div style="font-size:14px; color:#ff44ff; text-shadow:0 0 10px rgba(255,68,255,0.6); margin-bottom:8px;">RESCUE ETA</div>
+      <div id="beacon-countdown" style="font-size:36px; color:#ff88cc; text-shadow:0 0 20px rgba(255,68,255,0.6);">2:00</div>
+    </div>
+
     <div id="pause-screen" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:28; justify-content:center; align-items:center; flex-direction:column; text-align:center; backdrop-filter:blur(4px);">
       <h1 style="font-size:42px; color:#88ccff; text-shadow:0 0 20px rgba(100,180,255,0.8); margin-bottom:24px;">PAUSED</h1>
       <p style="font-size:18px; opacity:0.7; margin-bottom:8px;">Press Escape to resume</p>
@@ -273,6 +299,7 @@
         <div>E - Gather Resources</div>
         <div>Tab - Crafting Menu</div>
         <div>F - Place Item</div>
+        <div>Click - Attack Wolves</div>
         <div>Esc - Pause/Resume</div>
       </div>
     </div>
@@ -284,6 +311,8 @@
       <div id="temp-bar-label">BODY</div>
       <div id="temp-bar-fill"></div>
     </div>
+
+    <canvas id="minimap" width="180" height="180"></canvas>
 
     <script type="importmap">
       {
@@ -337,6 +366,13 @@
         isDay: false,
         // State management
         paused: false,
+        // Enemies
+        wolves: [],
+        // Rescue beacon
+        beaconActive: false,
+        beaconTimer: 0,
+        beaconRequired: 120, // survive 120s after activating beacon to win
+        rescued: false,
       };
 
       // ── Scene Setup ─────────────────────────────────────
@@ -436,9 +472,9 @@
       ];
 
       function getBiome(x, z) {
-        // Large-scale noise determines biome
-        const n1 = fbm(x * 0.003, z * 0.003, 3);
-        const n2 = fbm(x * 0.005 + 100, z * 0.005 + 100, 3);
+        // Large-scale noise determines biome (lower freq = bigger biomes)
+        const n1 = fbm(x * 0.0012, z * 0.0012, 3);
+        const n2 = fbm(x * 0.002 + 100, z * 0.002 + 100, 3);
         if (n1 < 0.35) return n2 < 0.5 ? BIOMES.ICE_FIELDS : BIOMES.TUNDRA;
         if (n1 < 0.55) return n2 < 0.45 ? BIOMES.FOREST : BIOMES.CRYSTAL;
         return BIOMES.MOUNTAINS;
@@ -887,6 +923,10 @@
           id: 'ice_pick', name: 'Ice Pick', desc: 'Gather resources 2x faster',
           cost: { stone: 2, metal: 2 }, placeable: false,
         },
+        {
+          id: 'beacon', name: 'Rescue Beacon', desc: 'Signal for rescue! Survive 2 min to win',
+          cost: { metal: 5, fuel: 3, stone: 3 }, placeable: true,
+        },
       ];
 
       function canCraft(recipe) {
@@ -913,6 +953,11 @@
         } else if (recipe.id === 'ice_pick') {
           state.hasIcePick = true;
           showStatus('Ice Pick crafted! Gather 2x faster', '#aaddff');
+        } else if (recipe.id === 'beacon') {
+          state.pendingPlace = 'beacon';
+          state.craftMenuOpen = false;
+          document.getElementById('craft-menu').style.display = 'none';
+          showStatus('Press F to place Rescue Beacon', '#ff44ff');
         }
         updateCraftMenu();
       }
@@ -938,6 +983,8 @@
           if (recipe.id === 'ice_pick' && state.hasIcePick) continue;
           // Hide torch if already held
           if (recipe.id === 'torch' && state.heldItem === 'torch') continue;
+          // Hide beacon if already active
+          if (recipe.id === 'beacon' && state.beaconActive) continue;
 
           const ok = canCraft(recipe);
           const div = document.createElement('div');
@@ -1120,6 +1167,128 @@
       const startFire = createCampfire(5, -4);
       startFire.userData.fuel = 200;
       placedObjects.push(startFire);
+
+      // ── Rescue Beacon ────────────────────────────────────
+      function createBeacon(x, z) {
+        const terrainY = getProceduralHeight(x, z);
+        const group = new THREE.Group();
+        // Base cylinder
+        const baseGeo = new THREE.CylinderGeometry(0.3, 0.4, 1.2, 8);
+        const baseMat = new THREE.MeshStandardMaterial({ color: 0x888899, metalness: 0.8, roughness: 0.3 });
+        const base = new THREE.Mesh(baseGeo, baseMat);
+        base.position.y = 0.6;
+        group.add(base);
+        // Antenna
+        const antGeo = new THREE.CylinderGeometry(0.03, 0.03, 1.5, 4);
+        const antMat = new THREE.MeshStandardMaterial({ color: 0xcccccc });
+        const ant = new THREE.Mesh(antGeo, antMat);
+        ant.position.y = 1.95;
+        group.add(ant);
+        // Blinking light
+        const lightGeo = new THREE.SphereGeometry(0.08, 8, 8);
+        const lightMat = new THREE.MeshBasicMaterial({ color: 0xff0044 });
+        const blinker = new THREE.Mesh(lightGeo, lightMat);
+        blinker.position.y = 2.7;
+        group.add(blinker);
+        // Point light for glow
+        const glow = new THREE.PointLight(0xff0044, 2, 15);
+        glow.position.y = 2.7;
+        group.add(glow);
+        // Beam (tall cone going up)
+        const beamGeo = new THREE.CylinderGeometry(0.05, 1.5, 30, 8, 1, true);
+        const beamMat = new THREE.MeshBasicMaterial({ color: 0xff4488, transparent: true, opacity: 0.15, side: THREE.DoubleSide });
+        const beam = new THREE.Mesh(beamGeo, beamMat);
+        beam.position.y = 17;
+        group.add(beam);
+
+        group.position.set(x, terrainY, z);
+        group.userData = { type: 'beacon', blinker, glow, beam, beamMat };
+        scene.add(group);
+        return group;
+      }
+
+      // ── Ice Wolves ─────────────────────────────────────────
+      const wolves = [];
+      const WOLF_COUNT = 12;
+      const WOLF_SPEED = 3.5;
+      const WOLF_ATTACK_RANGE = 1.8;
+      const WOLF_AGGRO_RANGE = 25;
+      const WOLF_DAMAGE = 12; // per second when attacking
+      const WOLF_FLEE_FIRE_RANGE = 8;
+
+      function createWolf(x, z) {
+        const group = new THREE.Group();
+        const wolfMat = new THREE.MeshStandardMaterial({ color: 0x99aacc, roughness: 0.7 });
+        const darkMat = new THREE.MeshStandardMaterial({ color: 0x556677, roughness: 0.8 });
+        // Body
+        const bodyGeo = new THREE.BoxGeometry(0.5, 0.4, 1.0);
+        const body = new THREE.Mesh(bodyGeo, wolfMat);
+        body.position.y = 0.5;
+        group.add(body);
+        // Head
+        const headGeo = new THREE.BoxGeometry(0.35, 0.3, 0.4);
+        const head = new THREE.Mesh(headGeo, wolfMat);
+        head.position.set(0, 0.6, -0.6);
+        group.add(head);
+        // Snout
+        const snoutGeo = new THREE.BoxGeometry(0.2, 0.15, 0.25);
+        const snout = new THREE.Mesh(snoutGeo, darkMat);
+        snout.position.set(0, 0.55, -0.85);
+        group.add(snout);
+        // Eyes (red, glowing)
+        const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff2200 });
+        const eyeGeo = new THREE.SphereGeometry(0.04, 6, 6);
+        const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
+        eyeL.position.set(-0.12, 0.65, -0.75);
+        group.add(eyeL);
+        const eyeR = new THREE.Mesh(eyeGeo, eyeMat);
+        eyeR.position.set(0.12, 0.65, -0.75);
+        group.add(eyeR);
+        // Legs
+        const legGeo = new THREE.BoxGeometry(0.12, 0.35, 0.12);
+        const positions = [[-0.15, 0.175, -0.35], [0.15, 0.175, -0.35], [-0.15, 0.175, 0.35], [0.15, 0.175, 0.35]];
+        const legs = [];
+        for (const [lx, ly, lz] of positions) {
+          const leg = new THREE.Mesh(legGeo, darkMat);
+          leg.position.set(lx, ly, lz);
+          group.add(leg);
+          legs.push(leg);
+        }
+        // Tail
+        const tailGeo = new THREE.BoxGeometry(0.1, 0.1, 0.4);
+        const tail = new THREE.Mesh(tailGeo, wolfMat);
+        tail.position.set(0, 0.65, 0.65);
+        tail.rotation.x = -0.5;
+        group.add(tail);
+
+        const terrainY = getProceduralHeight(x, z);
+        group.position.set(x, terrainY, z);
+        group.userData = {
+          health: 40,
+          state: 'roam', // 'roam', 'chase', 'attack', 'flee'
+          roamTarget: new THREE.Vector3(x + (Math.random()-0.5)*30, 0, z + (Math.random()-0.5)*30),
+          roamTimer: Math.random() * 5,
+          attackCooldown: 0,
+          legs,
+          tail,
+          hitFlash: 0,
+          body,
+        };
+        scene.add(group);
+        return group;
+      }
+
+      function spawnWolves() {
+        for (const w of wolves) scene.remove(w);
+        wolves.length = 0;
+        for (let i = 0; i < WOLF_COUNT; i++) {
+          const angle = (i / WOLF_COUNT) * Math.PI * 2;
+          const dist = 30 + Math.random() * 70;
+          const wx = Math.cos(angle) * dist;
+          const wz = Math.sin(angle) * dist;
+          wolves.push(createWolf(wx, wz));
+        }
+      }
 
       // ── Snow Particles (scaled for weather system) ─────
       const snowCount = 12000;
@@ -1326,7 +1495,7 @@
       window.addEventListener('keydown', (e) => {
         state.keys[e.key.toLowerCase()] = true;
         if (!state.started) startGame();
-        else if (state.dead) restartGame();
+        else if (state.dead || state.rescued) restartGame();
         else if (e.key === 'Escape') {
           e.preventDefault();
           state.paused = !state.paused;
@@ -1353,11 +1522,18 @@
             obj = createCampfire(px, pz);
           } else if (state.pendingPlace === 'shelter') {
             obj = createShelter(px, pz);
+          } else if (state.pendingPlace === 'beacon') {
+            obj = createBeacon(px, pz);
+            state.beaconActive = true;
+            state.beaconTimer = 0;
+            showStatus('BEACON ACTIVE! Survive 2 minutes for rescue!', '#ff44ff');
           }
           if (obj) {
             obj.rotation.y = playerGroup.rotation.y;
             placedObjects.push(obj);
-            showStatus(`${state.pendingPlace === 'campfire' ? 'Campfire' : 'Shelter'} placed!`, '#44ff88');
+            if (state.pendingPlace !== 'beacon') {
+              showStatus(`${state.pendingPlace === 'campfire' ? 'Campfire' : 'Shelter'} placed!`, '#44ff88');
+            }
           }
           state.pendingPlace = null;
         }
@@ -1366,7 +1542,40 @@
         state.keys[e.key.toLowerCase()] = false;
       });
       window.addEventListener('click', () => {
-        if (!state.started) startGame();
+        if (!state.started) { startGame(); return; }
+        if (state.dead || state.rescued || state.paused) return;
+        // Attack nearest wolf in front of player
+        const attackRange = 2.5;
+        let closest = null;
+        let closestDist = attackRange;
+        for (const wolf of wolves) {
+          const dx = wolf.position.x - playerGroup.position.x;
+          const dz = wolf.position.z - playerGroup.position.z;
+          const dist = Math.sqrt(dx * dx + dz * dz);
+          if (dist < closestDist) {
+            closestDist = dist;
+            closest = wolf;
+          }
+        }
+        if (closest) {
+          const dmg = state.hasIcePick ? 20 : 10;
+          closest.userData.health -= dmg;
+          closest.userData.hitFlash = 0.15;
+          closest.userData.body.material = new THREE.MeshBasicMaterial({ color: 0xff4444 });
+          showStatus(`Hit wolf! (${Math.max(0, closest.userData.health)} HP)`, '#ff8844');
+          // Knockback
+          const dx = closest.position.x - playerGroup.position.x;
+          const dz = closest.position.z - playerGroup.position.z;
+          const len = Math.sqrt(dx*dx+dz*dz) || 1;
+          closest.position.x += (dx/len) * 2;
+          closest.position.z += (dz/len) * 2;
+          if (closest.userData.health <= 0) {
+            scene.remove(closest);
+            wolves.splice(wolves.indexOf(closest), 1);
+            state.score += 50;
+            showStatus('Wolf killed! +50 pts', '#44ff88');
+          }
+        }
       });
 
       window.addEventListener('resize', () => {
@@ -1495,6 +1704,8 @@
         document.getElementById('hud').style.display = 'block';
         document.getElementById('instructions').style.display = 'block';
         document.getElementById('temp-bar-container').style.display = 'block';
+        document.getElementById('minimap').style.display = 'block';
+        spawnWolves();
       }
 
       function restartGame() {
@@ -1520,7 +1731,13 @@
         state.insideShelter = false;
         state.timeOfDay = 0.25; // restart at sunrise
         state.paused = false;
+        state.beaconActive = false;
+        state.beaconTimer = 0;
+        state.rescued = false;
+        document.getElementById('beacon-timer-hud').style.display = 'none';
+        document.getElementById('win-screen').style.display = 'none';
         torchGroup.visible = false;
+        spawnWolves();
         document.getElementById('craft-menu').style.display = 'none';
         document.getElementById('pause-screen').style.display = 'none';
         // Remove placed objects
@@ -2267,6 +2484,239 @@
           } else {
             tempFill.style.background = 'linear-gradient(to top, #cc4444, #ff4444)';
           }
+        }
+
+        // ── Wolf AI ───────────────────────────────────────
+        for (const wolf of wolves) {
+          const wd = wolf.userData;
+          // Hit flash timer
+          if (wd.hitFlash > 0) {
+            wd.hitFlash -= dt;
+            if (wd.hitFlash <= 0) {
+              wd.body.material = new THREE.MeshStandardMaterial({ color: 0x99aacc, roughness: 0.7 });
+            }
+          }
+          const dx = playerGroup.position.x - wolf.position.x;
+          const dz = playerGroup.position.z - wolf.position.z;
+          const distToPlayer = Math.sqrt(dx * dx + dz * dz);
+
+          // Check if near fire — wolves flee fire
+          let nearFire = false;
+          for (const obj of placedObjects) {
+            if (obj.userData.type !== 'campfire') continue;
+            const fdx = obj.position.x - wolf.position.x;
+            const fdz = obj.position.z - wolf.position.z;
+            if (Math.sqrt(fdx*fdx+fdz*fdz) < WOLF_FLEE_FIRE_RANGE) { nearFire = true; break; }
+          }
+
+          if (nearFire) {
+            wd.state = 'flee';
+          } else if (distToPlayer < WOLF_ATTACK_RANGE && state.started && !state.dead) {
+            wd.state = 'attack';
+          } else if (distToPlayer < WOLF_AGGRO_RANGE && state.started && !state.dead) {
+            wd.state = 'chase';
+          } else {
+            wd.state = 'roam';
+          }
+
+          let moveX = 0, moveZ = 0;
+          const wolfSpeed = wd.state === 'chase' ? WOLF_SPEED * 1.3 : WOLF_SPEED;
+
+          if (wd.state === 'chase') {
+            const len = distToPlayer || 1;
+            moveX = (dx / len) * wolfSpeed * dt;
+            moveZ = (dz / len) * wolfSpeed * dt;
+          } else if (wd.state === 'attack') {
+            // Deal damage
+            wd.attackCooldown -= dt;
+            if (wd.attackCooldown <= 0) {
+              state.health -= WOLF_DAMAGE;
+              state.health = Math.max(0, state.health);
+              wd.attackCooldown = 1;
+            }
+          } else if (wd.state === 'flee') {
+            // Run away from nearest fire
+            for (const obj of placedObjects) {
+              if (obj.userData.type !== 'campfire') continue;
+              const fdx = wolf.position.x - obj.position.x;
+              const fdz = wolf.position.z - obj.position.z;
+              const fd = Math.sqrt(fdx*fdx+fdz*fdz) || 1;
+              moveX += (fdx/fd) * wolfSpeed * dt;
+              moveZ += (fdz/fd) * wolfSpeed * dt;
+              break;
+            }
+          } else {
+            // Roam
+            wd.roamTimer -= dt;
+            if (wd.roamTimer <= 0) {
+              wd.roamTarget.set(
+                wolf.position.x + (Math.random()-0.5) * 40,
+                0,
+                wolf.position.z + (Math.random()-0.5) * 40
+              );
+              wd.roamTimer = 3 + Math.random() * 5;
+            }
+            const rdx = wd.roamTarget.x - wolf.position.x;
+            const rdz = wd.roamTarget.z - wolf.position.z;
+            const rd = Math.sqrt(rdx*rdx+rdz*rdz) || 1;
+            moveX = (rdx/rd) * wolfSpeed * 0.5 * dt;
+            moveZ = (rdz/rd) * wolfSpeed * 0.5 * dt;
+          }
+
+          wolf.position.x += moveX;
+          wolf.position.z += moveZ;
+          wolf.position.y = getProceduralHeight(wolf.position.x, wolf.position.z);
+
+          // Face movement direction
+          if (Math.abs(moveX) > 0.001 || Math.abs(moveZ) > 0.001) {
+            wolf.rotation.y = Math.atan2(moveX, moveZ);
+          }
+
+          // Animate legs
+          const legSwing = (wd.state === 'roam' ? 0.3 : 0.6) * Math.sin(elapsed * (wd.state === 'chase' ? 12 : 6));
+          wd.legs[0].position.y = 0.175 + Math.abs(legSwing) * 0.05;
+          wd.legs[1].position.y = 0.175 + Math.abs(-legSwing) * 0.05;
+          wd.legs[2].position.y = 0.175 + Math.abs(-legSwing) * 0.05;
+          wd.legs[3].position.y = 0.175 + Math.abs(legSwing) * 0.05;
+          wd.tail.rotation.x = -0.5 + Math.sin(elapsed * 4) * 0.3;
+        }
+
+        // Respawn wolves that wandered too far or if count is low
+        if (state.started && wolves.length < 6 && Math.random() < dt * 0.1) {
+          const angle = Math.random() * Math.PI * 2;
+          const dist = 40 + Math.random() * 50;
+          const wx = playerGroup.position.x + Math.cos(angle) * dist;
+          const wz = playerGroup.position.z + Math.sin(angle) * dist;
+          wolves.push(createWolf(wx, wz));
+        }
+
+        // ── Beacon Timer & Win Condition ──────────────────
+        if (state.beaconActive && !state.rescued && !state.dead) {
+          state.beaconTimer += dt;
+          const remaining = Math.max(0, state.beaconRequired - state.beaconTimer);
+          const mins = Math.floor(remaining / 60);
+          const secs = Math.floor(remaining % 60);
+          document.getElementById('beacon-timer-hud').style.display = 'block';
+          document.getElementById('beacon-countdown').textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+
+          // Animate beacon
+          for (const obj of placedObjects) {
+            if (obj.userData.type !== 'beacon') continue;
+            const bd = obj.userData;
+            bd.blinker.material.color.setHex(Math.sin(elapsed * 6) > 0 ? 0xff0044 : 0x440011);
+            bd.glow.intensity = 2 + Math.sin(elapsed * 6) * 1.5;
+            bd.beamMat.opacity = 0.1 + Math.sin(elapsed * 2) * 0.05;
+            bd.beam.rotation.y = elapsed * 0.5;
+          }
+
+          // Wolves get more aggressive when beacon is active — spawn extras
+          if (Math.random() < dt * 0.15 && wolves.length < 20) {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 35 + Math.random() * 30;
+            wolves.push(createWolf(
+              playerGroup.position.x + Math.cos(angle) * dist,
+              playerGroup.position.z + Math.sin(angle) * dist
+            ));
+          }
+
+          if (state.beaconTimer >= state.beaconRequired) {
+            state.rescued = true;
+            state.score += 500;
+            document.getElementById('win-score').textContent = state.score;
+            document.getElementById('win-screen').style.display = 'flex';
+            document.getElementById('beacon-timer-hud').style.display = 'none';
+          }
+        }
+
+        // ── Minimap ──────────────────────────────────────
+        if (state.started) {
+          const mc = document.getElementById('minimap');
+          const mctx = mc.getContext('2d');
+          const mw = mc.width, mh = mc.height;
+          const cx = mw / 2, cy = mh / 2;
+          const mapScale = 1.2; // pixels per world unit
+
+          mctx.clearRect(0, 0, mw, mh);
+
+          // Clip to circle
+          mctx.save();
+          mctx.beginPath();
+          mctx.arc(cx, cy, cx - 2, 0, Math.PI * 2);
+          mctx.clip();
+
+          // Background with biome colors
+          const biomeColors = ['#334455', '#446688', '#556677', '#335544', '#445566'];
+          mctx.fillStyle = '#1a2233';
+          mctx.fillRect(0, 0, mw, mh);
+
+          // Draw biome patches (sampled)
+          for (let gx = 0; gx < mw; gx += 6) {
+            for (let gy = 0; gy < mh; gy += 6) {
+              const worldX = playerGroup.position.x + (gx - cx) / mapScale;
+              const worldZ = playerGroup.position.z + (gy - cy) / mapScale;
+              const b = getBiome(worldX, worldZ);
+              mctx.fillStyle = biomeColors[b];
+              mctx.fillRect(gx, gy, 6, 6);
+            }
+          }
+
+          // Draw resource nodes
+          for (const node of resourceNodes) {
+            if (node.userData.depleted) continue;
+            const nx = cx + (node.position.x - playerGroup.position.x) * mapScale;
+            const nz = cy + (node.position.z - playerGroup.position.z) * mapScale;
+            if (nx < 0 || nx > mw || nz < 0 || nz > mh) continue;
+            const resColors = { wood: '#886633', stone: '#888888', metal: '#aaccee', cloth: '#cc88cc', fuel: '#ff8844' };
+            mctx.fillStyle = resColors[node.userData.resourceType] || '#ffffff';
+            mctx.fillRect(nx - 1, nz - 1, 2, 2);
+          }
+
+          // Draw campfires
+          for (const obj of placedObjects) {
+            const ox = cx + (obj.position.x - playerGroup.position.x) * mapScale;
+            const oz = cy + (obj.position.z - playerGroup.position.z) * mapScale;
+            if (ox < 0 || ox > mw || oz < 0 || oz > mh) continue;
+            if (obj.userData.type === 'campfire') {
+              mctx.fillStyle = '#ff6622';
+              mctx.fillRect(ox - 2, oz - 2, 4, 4);
+            } else if (obj.userData.type === 'shelter') {
+              mctx.fillStyle = '#44ff88';
+              mctx.fillRect(ox - 2, oz - 2, 4, 4);
+            } else if (obj.userData.type === 'beacon') {
+              mctx.fillStyle = '#ff44ff';
+              mctx.beginPath();
+              mctx.arc(ox, oz, 4, 0, Math.PI * 2);
+              mctx.fill();
+            }
+          }
+
+          // Draw wolves (red dots)
+          for (const wolf of wolves) {
+            const wx = cx + (wolf.position.x - playerGroup.position.x) * mapScale;
+            const wz = cy + (wolf.position.z - playerGroup.position.z) * mapScale;
+            if (wx < 0 || wx > mw || wz < 0 || wz > mh) continue;
+            mctx.fillStyle = wolf.userData.state === 'chase' ? '#ff2200' : '#cc4444';
+            mctx.fillRect(wx - 2, wz - 2, 3, 3);
+          }
+
+          // Player (center, with direction indicator)
+          mctx.fillStyle = '#44aaff';
+          mctx.beginPath();
+          mctx.arc(cx, cy, 3, 0, Math.PI * 2);
+          mctx.fill();
+          // Direction line
+          const dirLen = 8;
+          mctx.strokeStyle = '#44aaff';
+          mctx.lineWidth = 2;
+          mctx.beginPath();
+          mctx.moveTo(cx, cy);
+          mctx.lineTo(
+            cx - Math.sin(playerGroup.rotation.y) * dirLen,
+            cy - Math.cos(playerGroup.rotation.y) * dirLen
+          );
+          mctx.stroke();
+
+          mctx.restore();
         }
 
         // Camera orbits behind player (always looking at their back)
