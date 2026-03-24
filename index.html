@@ -74,6 +74,17 @@
         pointer-events: none;
       }
 
+      #wind-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 4;
+        opacity: 0;
+      }
+
       #frost-overlay {
         position: fixed;
         top: 0;
@@ -125,7 +136,7 @@
     <div id="title">
       <h1>Frozen Planet Survival</h1>
       <p>Press any key or click to begin</p>
-      <p style="margin-top: 12px; font-size: 13px; opacity: 0.5;">v0.5 - Procedural Biome Terrain</p>
+      <p style="margin-top: 12px; font-size: 13px; opacity: 0.5;">v0.6 - Dynamic Weather</p>
     </div>
 
     <div id="hud" style="display: none">
@@ -134,6 +145,7 @@
       <div>Body Temp: <span id="temp">37.0</span>&deg;C</div>
       <div>Score: <span id="score">0</span></div>
       <div>Biome: <span id="biome-name">Tundra</span></div>
+      <div>Weather: <span id="weather-name">Clear</span></div>
       <div id="status-msg" style="color: #ffaa44; display: none;"></div>
     </div>
 
@@ -147,6 +159,7 @@
       <p style="font-size:16px; opacity:0.5; margin-top:24px;">Press any key to try again</p>
     </div>
 
+    <canvas id="wind-overlay" width="512" height="512"></canvas>
     <canvas id="frost-overlay" width="512" height="512"></canvas>
 
     <div id="temp-bar-container">
@@ -182,6 +195,12 @@
         isSprinting: false,
         isCrouching: false,
         windChill: 0,          // extra wind chill factor
+        // Weather system
+        weather: 'clear',       // 'clear', 'snowfall', 'blizzard'
+        weatherIntensity: 0,    // 0-1 smooth blend
+        weatherTimer: 0,        // time until next weather change
+        weatherDuration: 30,    // how long current weather lasts
+        nextWeather: null,
       };
 
       // ── Scene Setup ─────────────────────────────────────
@@ -545,17 +564,19 @@
         return getBiome(playerGroup.position.x, playerGroup.position.z);
       }
 
-      // ── Snow Particles ──────────────────────────────────
-      const snowCount = 5000;
+      // ── Snow Particles (scaled for weather system) ─────
+      const snowCount = 12000;
       const snowGeo = new THREE.BufferGeometry();
       const snowPos = new Float32Array(snowCount * 3);
       const snowVel = new Float32Array(snowCount);
+      const snowDrift = new Float32Array(snowCount); // per-particle horizontal drift
 
       for (let i = 0; i < snowCount; i++) {
-        snowPos[i * 3] = (Math.random() - 0.5) * 100;
+        snowPos[i * 3] = (Math.random() - 0.5) * 120;
         snowPos[i * 3 + 1] = Math.random() * 50;
-        snowPos[i * 3 + 2] = (Math.random() - 0.5) * 100;
+        snowPos[i * 3 + 2] = (Math.random() - 0.5) * 120;
         snowVel[i] = 0.5 + Math.random() * 1.5;
+        snowDrift[i] = (Math.random() - 0.5) * 2;
       }
       snowGeo.setAttribute('position', new THREE.BufferAttribute(snowPos, 3));
 
@@ -568,6 +589,9 @@
       });
       const snow = new THREE.Points(snowGeo, snowMat);
       scene.add(snow);
+
+      // Wind direction for weather
+      const windDir = { x: 0, z: 0, strength: 0, targetX: 1, targetZ: 0 };
 
       // ── Terrain Height Helper ────────────────────────────
       function getTerrainHeight(x, z) {
@@ -857,11 +881,166 @@
         state.score = 0;
         state.velocity.set(0, 0, 0);
         state.onGround = true;
+        state.weather = 'clear';
+        state.weatherIntensity = 0;
+        state.weatherTimer = 0;
         playerGroup.position.set(0, 0, 0);
         playerGroup.rotation.y = 0;
         document.getElementById('death-screen').style.display = 'none';
         elapsed = 0;
         clock.getDelta(); // reset clock
+      }
+
+      // ── Wind Overlay (blizzard streaks) ────────────────
+      const windCanvas = document.getElementById('wind-overlay');
+      const windCtx = windCanvas.getContext('2d');
+
+      function resizeWindCanvas() {
+        windCanvas.width = window.innerWidth;
+        windCanvas.height = window.innerHeight;
+      }
+      resizeWindCanvas();
+      window.addEventListener('resize', resizeWindCanvas);
+
+      // Pre-generate wind streak positions
+      const windStreaks = [];
+      for (let i = 0; i < 80; i++) {
+        windStreaks.push({
+          x: Math.random(), y: Math.random(),
+          len: 30 + Math.random() * 100,
+          speed: 0.3 + Math.random() * 0.7,
+          offset: Math.random() * 1000,
+        });
+      }
+
+      function updateWindOverlay(intensity, windAngle) {
+        const w = windCanvas.width, h = windCanvas.height;
+        windCtx.clearRect(0, 0, w, h);
+
+        if (intensity < 0.1) {
+          windCanvas.style.opacity = '0';
+          return;
+        }
+
+        windCanvas.style.opacity = String(Math.min(1, intensity));
+
+        // White-out effect during blizzard
+        if (intensity > 0.6) {
+          const whiteout = (intensity - 0.6) / 0.4 * 0.25;
+          windCtx.fillStyle = `rgba(200, 220, 240, ${whiteout})`;
+          windCtx.fillRect(0, 0, w, h);
+        }
+
+        // Wind streaks
+        const cos = Math.cos(windAngle);
+        const sin = Math.sin(windAngle);
+
+        for (const streak of windStreaks) {
+          const alpha = intensity * 0.3 * streak.speed;
+          if (alpha < 0.02) continue;
+
+          // Animate position
+          const time = elapsed * streak.speed * 2 + streak.offset;
+          const sx = ((streak.x * w + cos * time * 200) % (w + 200)) - 100;
+          const sy = ((streak.y * h + sin * time * 200) % (h + 200)) - 100;
+
+          windCtx.strokeStyle = `rgba(220, 235, 250, ${alpha})`;
+          windCtx.lineWidth = 1 + intensity;
+          windCtx.beginPath();
+          windCtx.moveTo(sx, sy);
+          windCtx.lineTo(sx + cos * streak.len * intensity, sy + sin * streak.len * intensity);
+          windCtx.stroke();
+        }
+      }
+
+      // ── Weather System ─────────────────────────────────
+      const weatherTypes = ['clear', 'snowfall', 'blizzard'];
+      const weatherConfig = {
+        clear:    { fogDensity: 0.006, snowOpacity: 0.3,  snowSize: 0.1,  snowSpeed: 1.0, windStr: 0.2,  lightIntensity: 1.5, ambientIntensity: 0.8, heatMult: 1.0 },
+        snowfall: { fogDensity: 0.012, snowOpacity: 0.7,  snowSize: 0.18, snowSpeed: 1.5, windStr: 0.8,  lightIntensity: 0.8, ambientIntensity: 0.6, heatMult: 1.3 },
+        blizzard: { fogDensity: 0.025, snowOpacity: 1.0,  snowSize: 0.25, snowSpeed: 3.0, windStr: 2.5,  lightIntensity: 0.3, ambientIntensity: 0.35, heatMult: 2.0 },
+      };
+
+      const fogColors = {
+        clear:    new THREE.Color(0x667fa5),
+        snowfall: new THREE.Color(0x7788aa),
+        blizzard: new THREE.Color(0x99aabb),
+      };
+
+      function pickNextWeather() {
+        const current = state.weather;
+        // Weighted transitions: blizzard is rarer
+        const transitions = {
+          clear:    ['clear', 'snowfall', 'snowfall', 'blizzard'],
+          snowfall: ['clear', 'snowfall', 'blizzard', 'blizzard'],
+          blizzard: ['snowfall', 'snowfall', 'clear'],
+        };
+        const options = transitions[current];
+        return options[Math.floor(Math.random() * options.length)];
+      }
+
+      function updateWeather(dt) {
+        state.weatherTimer -= dt;
+
+        if (state.weatherTimer <= 0) {
+          state.weather = state.nextWeather || pickNextWeather();
+          state.nextWeather = pickNextWeather();
+          // Blizzards are shorter, clear skies longer
+          const durations = { clear: 40, snowfall: 30, blizzard: 15 };
+          state.weatherDuration = durations[state.weather] + (Math.random() - 0.5) * 20;
+          state.weatherTimer = state.weatherDuration;
+        }
+
+        // Smooth transition to target weather config
+        const config = weatherConfig[state.weather];
+        const lerpSpeed = 0.8 * dt;
+
+        // Fog
+        scene.fog.density += (config.fogDensity - scene.fog.density) * lerpSpeed;
+        const targetFogColor = fogColors[state.weather];
+        scene.fog.color.lerp(targetFogColor, lerpSpeed);
+        scene.background.lerp(targetFogColor, lerpSpeed);
+
+        // Snow particles
+        snowMat.opacity += (config.snowOpacity - snowMat.opacity) * lerpSpeed;
+        snowMat.size += (config.snowSize - snowMat.size) * lerpSpeed;
+
+        // Lighting
+        moonLight.intensity += (config.lightIntensity - moonLight.intensity) * lerpSpeed;
+        ambientLight.intensity += (config.ambientIntensity - ambientLight.intensity) * lerpSpeed;
+
+        // Wind direction slowly shifts
+        const windShiftSpeed = 0.3 * dt;
+        windDir.x += (windDir.targetX * config.windStr - windDir.x) * windShiftSpeed;
+        windDir.z += (windDir.targetZ * config.windStr - windDir.z) * windShiftSpeed;
+        windDir.strength += (config.windStr - windDir.strength) * lerpSpeed;
+
+        // Occasionally shift wind direction
+        if (Math.random() < 0.005) {
+          const angle = Math.random() * Math.PI * 2;
+          windDir.targetX = Math.cos(angle);
+          windDir.targetZ = Math.sin(angle);
+        }
+
+        // Weather intensity for overlays (0 = clear, 1 = full blizzard)
+        let targetIntensity = 0;
+        if (state.weather === 'snowfall') targetIntensity = 0.3;
+        if (state.weather === 'blizzard') targetIntensity = 1.0;
+        state.weatherIntensity += (targetIntensity - state.weatherIntensity) * lerpSpeed;
+
+        // Update weather HUD
+        const weatherNames = { clear: 'Clear', snowfall: 'Snowfall', blizzard: 'BLIZZARD' };
+        const weatherEl = document.getElementById('weather-name');
+        weatherEl.textContent = weatherNames[state.weather];
+        if (state.weather === 'blizzard') {
+          weatherEl.style.color = '#ff6666';
+        } else if (state.weather === 'snowfall') {
+          weatherEl.style.color = '#aaccff';
+        } else {
+          weatherEl.style.color = 'white';
+        }
+
+        return config;
       }
 
       // ── Game Loop ───────────────────────────────────────
@@ -873,22 +1052,34 @@
         const dt = Math.min(clock.getDelta(), 0.1);
         elapsed += dt;
 
-        // Snow animation
+        // Weather update
+        const weatherCfg = state.started ? updateWeather(dt) : weatherConfig.clear;
+
+        // Snow animation (driven by weather)
+        const snowSpeedMult = weatherCfg.snowSpeed;
         const positions = snow.geometry.attributes.position;
         for (let i = 0; i < snowCount; i++) {
           let y = positions.getY(i);
-          y -= snowVel[i] * dt;
+          y -= snowVel[i] * snowSpeedMult * dt;
           if (y < 0) {
-            y = 50;
-            positions.setX(i, (Math.random() - 0.5) * 100);
-            positions.setZ(i, (Math.random() - 0.5) * 100);
+            y = 40 + Math.random() * 10;
+            positions.setX(i, playerGroup.position.x + (Math.random() - 0.5) * 120);
+            positions.setZ(i, playerGroup.position.z + (Math.random() - 0.5) * 120);
           }
           positions.setY(i, y);
-          // Gentle sway
-          const x = positions.getX(i);
-          positions.setX(i, x + Math.sin(elapsed + i) * 0.002);
+          // Wind-driven horizontal movement
+          let px = positions.getX(i);
+          let pz = positions.getZ(i);
+          px += (windDir.x * windDir.strength * 2 + Math.sin(elapsed + i) * 0.003) * dt * 10;
+          pz += (windDir.z * windDir.strength * 2 + Math.cos(elapsed + i * 0.7) * 0.003) * dt * 10;
+          positions.setX(i, px);
+          positions.setZ(i, pz);
         }
         positions.needsUpdate = true;
+
+        // Wind overlay (blizzard streaks)
+        const windAngle = Math.atan2(windDir.z, windDir.x);
+        updateWindOverlay(state.weatherIntensity, windAngle);
 
         // Crystal hover animation
         for (const crystal of crystals) {
@@ -1026,8 +1217,8 @@
           // Ambient temperature fluctuates over time
           state.temperature = -30 + Math.sin(elapsed * 0.2) * 5;
 
-          // Wind gusts that come and go
-          state.windChill = Math.sin(elapsed * 0.07) * 3 + Math.sin(elapsed * 0.23) * 2;
+          // Wind chill driven by weather system
+          state.windChill = windDir.strength * 2 + Math.sin(elapsed * 0.23) * 0.5;
 
           // Base heat loss rate (°C per second)
           let heatLoss = 0.8;
@@ -1059,6 +1250,9 @@
           // Biome multiplier: some biomes are harsher than others
           const biomeHeatMultiplier = [1.0, 1.3, 1.5, 0.7, 0.9]; // tundra, ice, mountains, forest, crystal
           multiplier *= biomeHeatMultiplier[state.currentBiome] || 1.0;
+
+          // Weather multiplier: blizzards are deadly
+          multiplier *= weatherConfig[state.weather].heatMult;
 
           // Apply heat loss
           state.bodyTemp -= heatLoss * multiplier * dt;
