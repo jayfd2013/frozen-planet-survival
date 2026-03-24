@@ -79,17 +79,19 @@
     <div id="title">
       <h1>Frozen Planet Survival</h1>
       <p>Press any key or click to begin</p>
-      <p style="margin-top: 12px; font-size: 13px; opacity: 0.5;">v0.2 - Humanoid Player</p>
+      <p style="margin-top: 12px; font-size: 13px; opacity: 0.5;">v0.3 - Sprint, Crouch &amp; Energy</p>
     </div>
 
     <div id="hud" style="display: none">
       <div>Health: <span id="health">100</span></div>
-      <div>Score: <span id="score">0</span></div>
+      <div>Energy: <span id="energy">100</span></div>
       <div>Temperature: <span id="temp">-30</span>&deg;C</div>
+      <div>Score: <span id="score">0</span></div>
+      <div id="status-msg" style="color: #ffaa44; display: none;"></div>
     </div>
 
     <div id="instructions" style="display: none">
-      WASD - Move &nbsp;|&nbsp; Mouse - Look &nbsp;|&nbsp; Space - Jump
+      WASD - Move &nbsp;|&nbsp; Shift - Sprint &nbsp;|&nbsp; C - Crouch &nbsp;|&nbsp; Space - Jump
     </div>
 
     <script type="importmap">
@@ -108,12 +110,15 @@
       const state = {
         started: false,
         health: 100,
+        energy: 100,
         score: 0,
         temperature: -30,
         keys: {},
         mouse: { x: 0, y: 0 },
         velocity: new THREE.Vector3(),
         onGround: true,
+        isSprinting: false,
+        isCrouching: false,
       };
 
       // ── Scene Setup ─────────────────────────────────────
@@ -447,7 +452,6 @@
 
         // Player movement
         if (state.started) {
-          const speed = 8;
           const moveDir = new THREE.Vector3();
 
           if (state.keys['w']) moveDir.z -= 1;
@@ -455,7 +459,20 @@
           if (state.keys['a']) moveDir.x -= 1;
           if (state.keys['d']) moveDir.x += 1;
 
-          if (moveDir.length() > 0) {
+          const isMoving = moveDir.length() > 0;
+
+          // Sprint: hold Shift (needs energy, can't sprint while crouching)
+          state.isSprinting = state.keys['shift'] && isMoving && state.energy > 0 && !state.isCrouching;
+
+          // Crouch: toggle with C key handled below, or hold
+          state.isCrouching = state.keys['c'] && state.onGround;
+
+          // Speed: base 6, sprint 12, crouch 3
+          let speed = 6;
+          if (state.isSprinting) speed = 12;
+          if (state.isCrouching) speed = 3;
+
+          if (isMoving) {
             moveDir.normalize();
             playerGroup.position.x += moveDir.x * speed * dt;
             playerGroup.position.z += moveDir.z * speed * dt;
@@ -467,13 +484,27 @@
             playerGroup.rotation.y += angleDiff * 5 * dt;
           }
 
+          // Energy drain/recovery
+          if (state.isSprinting) {
+            state.energy = Math.max(0, state.energy - 15 * dt); // drains in ~7 seconds
+          } else if (isMoving) {
+            state.energy = Math.min(100, state.energy + 3 * dt); // slow recovery while walking
+          } else {
+            state.energy = Math.min(100, state.energy + 10 * dt); // faster recovery when standing still
+          }
+
+          // Crouch visual: scale player down, lower camera
+          const targetScale = state.isCrouching ? 0.7 : 1.0;
+          playerGroup.scale.y += (targetScale - playerGroup.scale.y) * 8 * dt;
+
           // Get terrain height at player position
           const terrainY = getTerrainHeight(playerGroup.position.x, playerGroup.position.z);
 
-          // Simple jump
-          if (state.keys[' '] && state.onGround) {
+          // Jump (can't jump while crouching)
+          if (state.keys[' '] && state.onGround && !state.isCrouching) {
             state.velocity.y = 6;
             state.onGround = false;
+            state.energy = Math.max(0, state.energy - 5); // jumping costs energy
           }
 
           // Gravity
@@ -486,23 +517,46 @@
             state.onGround = true;
           }
 
-          // Animate limbs when walking
-          const isMoving = moveDir.length() > 0;
-          const walkCycle = elapsed * 8;
-          const swing = isMoving ? Math.sin(walkCycle) * 0.5 : 0;
+          // Animate limbs — faster cycle when sprinting
+          const walkSpeed = state.isSprinting ? 14 : 8;
+          const walkCycle = elapsed * walkSpeed;
+          const swingAmount = state.isCrouching ? 0.2 : (state.isSprinting ? 0.7 : 0.5);
+          const swing = isMoving ? Math.sin(walkCycle) * swingAmount : 0;
           leftArm.rotation.x = swing;
           rightArm.rotation.x = -swing;
           leftLeg.rotation.x = -swing;
           rightLeg.rotation.x = swing;
 
+          // Status message
+          const statusEl = document.getElementById('status-msg');
+          if (state.isSprinting) {
+            statusEl.style.display = 'block';
+            statusEl.textContent = 'SPRINTING';
+            statusEl.style.color = '#ffaa44';
+          } else if (state.isCrouching) {
+            statusEl.style.display = 'block';
+            statusEl.textContent = 'CROUCHING';
+            statusEl.style.color = '#44ccff';
+          } else if (state.energy < 20) {
+            statusEl.style.display = 'block';
+            statusEl.textContent = 'EXHAUSTED';
+            statusEl.style.color = '#ff4444';
+          } else {
+            statusEl.style.display = 'none';
+          }
+
           // Score ticks up over time
           state.score = Math.floor(elapsed * 10);
           document.getElementById('score').textContent = state.score;
 
-          // Temperature fluctuation
-          state.temperature = -30 + Math.sin(elapsed * 0.2) * 5;
-          document.getElementById('temp').textContent =
-            state.temperature.toFixed(0);
+          // Temperature fluctuation (sprint increases heat loss)
+          const sprintHeatPenalty = state.isSprinting ? -3 : 0;
+          state.temperature = -30 + Math.sin(elapsed * 0.2) * 5 + sprintHeatPenalty;
+          document.getElementById('temp').textContent = state.temperature.toFixed(0);
+
+          // Update HUD
+          document.getElementById('health').textContent = Math.floor(state.health);
+          document.getElementById('energy').textContent = Math.floor(state.energy);
         }
 
         // Camera follows player (third-person)
