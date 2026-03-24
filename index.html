@@ -1089,59 +1089,88 @@
         return group;
       }
 
-      // ── Shelter Creation ───────────────────────────────────
+      // ── Shelter Creation (Camping Tent) ─────────────────────
       function createShelter(x, z) {
         const group = new THREE.Group();
         const terrainY = getTerrainHeight(x, z);
 
-        const frameMat = new THREE.MeshStandardMaterial({ color: 0x664422, roughness: 0.9 });
-        const clothMat = new THREE.MeshStandardMaterial({
-          color: 0xbbaa88, roughness: 0.7, side: THREE.DoubleSide, transparent: true, opacity: 0.85,
+        const poleMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.5, roughness: 0.4 });
+        const tentMat = new THREE.MeshStandardMaterial({
+          color: 0xdd6622, roughness: 0.6, side: THREE.DoubleSide,
+        });
+        const floorMat = new THREE.MeshStandardMaterial({
+          color: 0x556655, roughness: 0.9, side: THREE.DoubleSide,
+        });
+        const flyMat = new THREE.MeshStandardMaterial({
+          color: 0x336644, roughness: 0.5, side: THREE.DoubleSide, transparent: true, opacity: 0.9,
         });
 
-        // A-frame poles
-        const poleGeo = new THREE.CylinderGeometry(0.04, 0.04, 2.5, 4);
-        const pole1 = new THREE.Mesh(poleGeo, frameMat);
-        pole1.position.set(0, 1.0, -1.2);
-        pole1.rotation.z = 0.4;
-        pole1.castShadow = true;
-        group.add(pole1);
+        // Ground footprint
+        const floorGeo = new THREE.PlaneGeometry(2.4, 3.0);
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        floor.position.y = 0.02;
+        group.add(floor);
 
-        const pole2 = new THREE.Mesh(poleGeo, frameMat);
-        pole2.position.set(0, 1.0, -1.2);
-        pole2.rotation.z = -0.4;
-        pole2.castShadow = true;
+        // Tent body — dome shape using a half-sphere squashed
+        const domeGeo = new THREE.SphereGeometry(1.2, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.55);
+        const dome = new THREE.Mesh(domeGeo, tentMat);
+        dome.position.y = 0.05;
+        dome.scale.set(1, 0.9, 1.2);
+        dome.castShadow = true;
+        dome.receiveShadow = true;
+        group.add(dome);
+
+        // Rain fly (slightly larger, green)
+        const flyGeo = new THREE.SphereGeometry(1.3, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.5);
+        const fly = new THREE.Mesh(flyGeo, flyMat);
+        fly.position.y = 0.1;
+        fly.scale.set(1.05, 0.85, 1.25);
+        group.add(fly);
+
+        // Cross poles (visible through tent)
+        const poleGeo = new THREE.CylinderGeometry(0.015, 0.015, 2.8, 4);
+        const pole1 = new THREE.Mesh(poleGeo, poleMat);
+        pole1.position.set(0, 0.6, 0);
+        pole1.rotation.z = Math.PI * 0.35;
+        pole1.rotation.y = Math.PI * 0.25;
+        group.add(pole1);
+        const pole2 = new THREE.Mesh(poleGeo, poleMat);
+        pole2.position.set(0, 0.6, 0);
+        pole2.rotation.z = Math.PI * 0.35;
+        pole2.rotation.y = -Math.PI * 0.25;
         group.add(pole2);
 
-        // Ridge pole
-        const ridgeGeo = new THREE.CylinderGeometry(0.03, 0.03, 3, 4);
-        const ridge = new THREE.Mesh(ridgeGeo, frameMat);
-        ridge.position.set(0, 1.8, 0);
-        ridge.rotation.x = Math.PI / 2;
-        group.add(ridge);
+        // Door flap (darker opening)
+        const doorMat = new THREE.MeshStandardMaterial({ color: 0x221111, roughness: 0.9 });
+        const doorGeo = new THREE.PlaneGeometry(0.6, 0.8);
+        const door = new THREE.Mesh(doorGeo, doorMat);
+        door.position.set(0, 0.4, -1.35);
+        group.add(door);
 
-        // Cloth covering (two angled planes)
-        const coverGeo = new THREE.PlaneGeometry(2, 3);
-        const cover1 = new THREE.Mesh(coverGeo, clothMat);
-        cover1.position.set(-0.7, 1.1, 0);
-        cover1.rotation.y = 0;
-        cover1.rotation.z = 0.55;
-        cover1.receiveShadow = true;
-        group.add(cover1);
-
-        const cover2 = new THREE.Mesh(coverGeo, clothMat);
-        cover2.position.set(0.7, 1.1, 0);
-        cover2.rotation.y = 0;
-        cover2.rotation.z = -0.55;
-        cover2.receiveShadow = true;
-        group.add(cover2);
+        // Stakes at corners
+        const stakeGeo = new THREE.CylinderGeometry(0.01, 0.02, 0.15, 4);
+        const stakeMat = new THREE.MeshStandardMaterial({ color: 0xaaaa66 });
+        const stakePositions = [[-1.1, 0, -1.3], [1.1, 0, -1.3], [-1.1, 0, 1.3], [1.1, 0, 1.3]];
+        for (const [sx, sy, sz] of stakePositions) {
+          const stake = new THREE.Mesh(stakeGeo, stakeMat);
+          stake.position.set(sx, 0.07, sz);
+          group.add(stake);
+          // Guy line
+          const lineGeo = new THREE.CylinderGeometry(0.005, 0.005, 1.2, 3);
+          const lineMat = new THREE.MeshBasicMaterial({ color: 0x888888 });
+          const line = new THREE.Mesh(lineGeo, lineMat);
+          line.position.set(sx * 0.5, 0.5, sz * 0.5);
+          line.lookAt(new THREE.Vector3(sx, 0.07, sz));
+          group.add(line);
+        }
 
         group.position.set(x, terrainY, z);
 
         group.userData = {
           type: 'shelter',
-          shelterRange: 3,
-          heatReduction: 0.3, // multiplier (70% less heat loss)
+          shelterRange: 3.5,
+          heatReduction: 0.3,
         };
 
         scene.add(group);
@@ -1209,12 +1238,13 @@
 
       // ── Ice Wolves ─────────────────────────────────────────
       const wolves = [];
-      const WOLF_COUNT = 12;
-      const WOLF_SPEED = 3.5;
+      const WOLF_COUNT = 5;
+      const WOLF_SPEED = 2.8;
       const WOLF_ATTACK_RANGE = 1.8;
-      const WOLF_AGGRO_RANGE = 25;
-      const WOLF_DAMAGE = 12; // per second when attacking
-      const WOLF_FLEE_FIRE_RANGE = 8;
+      const WOLF_AGGRO_RANGE = 18;
+      const WOLF_DAMAGE = 8; // per second when attacking
+      const WOLF_FLEE_FIRE_RANGE = 10;
+      const WOLF_STALK_RANGE = 30; // wolves circle at this range before charging
 
       function createWolf(x, z) {
         const group = new THREE.Group();
@@ -1283,7 +1313,7 @@
         wolves.length = 0;
         for (let i = 0; i < WOLF_COUNT; i++) {
           const angle = (i / WOLF_COUNT) * Math.PI * 2;
-          const dist = 30 + Math.random() * 70;
+          const dist = 40 + Math.random() * 60;
           const wx = Math.cos(angle) * dist;
           const wz = Math.sin(angle) * dist;
           wolves.push(createWolf(wx, wz));
@@ -1324,82 +1354,124 @@
         return getProceduralHeight(x, z);
       }
 
-      // ── Player (Humanoid) ──────────────────────────────
+      // ── Player (Camper/Hiker) ──────────────────────────
       const playerGroup = new THREE.Group();
-      const suitColor = 0xcc4444;
-      const suitDark = 0x992222;
+      const jacketColor = 0x2266aa; // blue parka
+      const jacketDark = 0x1a4477;
+      const pantsColor = 0x554433; // brown hiking pants
       const bootColor = 0x333333;
       const skinColor = 0xddaa88;
-      const visorColor = 0x44aaff;
+      const scarfColor = 0xcc3333; // red scarf
 
-      const suitMat = new THREE.MeshStandardMaterial({ color: suitColor, roughness: 0.6 });
-      const suitDarkMat = new THREE.MeshStandardMaterial({ color: suitDark, roughness: 0.7 });
+      const jacketMat = new THREE.MeshStandardMaterial({ color: jacketColor, roughness: 0.7 });
+      const jacketDarkMat = new THREE.MeshStandardMaterial({ color: jacketDark, roughness: 0.7 });
+      const pantsMat = new THREE.MeshStandardMaterial({ color: pantsColor, roughness: 0.8 });
       const bootMat = new THREE.MeshStandardMaterial({ color: bootColor, roughness: 0.8 });
-      const visorMat = new THREE.MeshPhysicalMaterial({ color: visorColor, roughness: 0.05, metalness: 0.8 });
+      const skinMat = new THREE.MeshStandardMaterial({ color: skinColor, roughness: 0.6 });
+      const scarfMat = new THREE.MeshStandardMaterial({ color: scarfColor, roughness: 0.6 });
 
-      // Torso
-      const torsoGeo = new THREE.BoxGeometry(0.5, 0.6, 0.3);
-      const torso = new THREE.Mesh(torsoGeo, suitMat);
+      // Torso (puffy parka)
+      const torsoGeo = new THREE.BoxGeometry(0.55, 0.6, 0.35);
+      const torso = new THREE.Mesh(torsoGeo, jacketMat);
       torso.position.y = 1.0;
       torso.castShadow = true;
       playerGroup.add(torso);
 
+      // Parka hood (behind head)
+      const hoodGeo = new THREE.SphereGeometry(0.2, 10, 8, 0, Math.PI * 2, 0, Math.PI * 0.6);
+      const hood = new THREE.Mesh(hoodGeo, jacketDarkMat);
+      hood.position.set(0, 1.42, 0.04);
+      hood.rotation.x = -0.2;
+      playerGroup.add(hood);
+
+      // Head (face visible)
+      const headGeo = new THREE.SphereGeometry(0.16, 12, 10);
+      const head = new THREE.Mesh(headGeo, skinMat);
+      head.position.y = 1.48;
+      head.castShadow = true;
+      playerGroup.add(head);
+
+      // Beanie hat
+      const beanieGeo = new THREE.SphereGeometry(0.17, 10, 6, 0, Math.PI * 2, 0, Math.PI * 0.5);
+      const beanieMat = new THREE.MeshStandardMaterial({ color: 0x883322, roughness: 0.8 });
+      const beanie = new THREE.Mesh(beanieGeo, beanieMat);
+      beanie.position.y = 1.55;
+      playerGroup.add(beanie);
+      // Beanie pom-pom
+      const pomGeo = new THREE.SphereGeometry(0.04, 6, 6);
+      const pom = new THREE.Mesh(pomGeo, scarfMat);
+      pom.position.y = 1.67;
+      playerGroup.add(pom);
+
+      // Scarf
+      const scarfGeo = new THREE.TorusGeometry(0.18, 0.04, 6, 12);
+      const scarf = new THREE.Mesh(scarfGeo, scarfMat);
+      scarf.position.y = 1.32;
+      scarf.rotation.x = Math.PI / 2;
+      playerGroup.add(scarf);
+
+      // Backpack
+      const packGeo = new THREE.BoxGeometry(0.35, 0.4, 0.2);
+      const packMat = new THREE.MeshStandardMaterial({ color: 0x556633, roughness: 0.8 });
+      const pack = new THREE.Mesh(packGeo, packMat);
+      pack.position.set(0, 1.05, 0.22);
+      pack.castShadow = true;
+      playerGroup.add(pack);
+      // Pack straps
+      const strapGeo = new THREE.BoxGeometry(0.04, 0.35, 0.02);
+      const strapMat = new THREE.MeshStandardMaterial({ color: 0x443322 });
+      const strapL = new THREE.Mesh(strapGeo, strapMat);
+      strapL.position.set(-0.12, 1.05, 0.1);
+      playerGroup.add(strapL);
+      const strapR = new THREE.Mesh(strapGeo, strapMat);
+      strapR.position.set(0.12, 1.05, 0.1);
+      playerGroup.add(strapR);
+
       // Belt
-      const beltGeo = new THREE.BoxGeometry(0.52, 0.08, 0.32);
+      const beltGeo = new THREE.BoxGeometry(0.56, 0.06, 0.36);
       const belt = new THREE.Mesh(beltGeo, bootMat);
       belt.position.y = 0.72;
       playerGroup.add(belt);
 
-      // Head
-      const headGeo = new THREE.SphereGeometry(0.18, 12, 10);
-      const head = new THREE.Mesh(headGeo, suitMat);
-      head.position.y = 1.52;
-      head.castShadow = true;
-      playerGroup.add(head);
-
-      // Helmet (slightly larger sphere around head)
-      const helmetGeo = new THREE.SphereGeometry(0.22, 12, 10);
-      const helmetMat = new THREE.MeshStandardMaterial({ color: suitDark, roughness: 0.4 });
-      const helmet = new THREE.Mesh(helmetGeo, helmetMat);
-      helmet.position.y = 1.52;
-      helmet.castShadow = true;
-      playerGroup.add(helmet);
-
-      // Visor
-      const visorGeo = new THREE.SphereGeometry(0.17, 12, 8, 0, Math.PI, 0, Math.PI * 0.6);
-      const visor = new THREE.Mesh(visorGeo, visorMat);
-      visor.position.set(0, 1.55, 0.08);
-      visor.rotation.x = -0.3;
-      playerGroup.add(visor);
-
-      // Left arm
-      const armGeo = new THREE.CapsuleGeometry(0.07, 0.45, 6, 8);
-      const leftArm = new THREE.Mesh(armGeo, suitMat);
-      leftArm.position.set(-0.35, 1.0, 0);
+      // Left arm (puffy jacket sleeves)
+      const armGeo = new THREE.CapsuleGeometry(0.08, 0.45, 6, 8);
+      const leftArm = new THREE.Mesh(armGeo, jacketMat);
+      leftArm.position.set(-0.38, 1.0, 0);
       leftArm.castShadow = true;
       playerGroup.add(leftArm);
 
+      // Gloves
+      const gloveGeo = new THREE.SphereGeometry(0.06, 6, 6);
+      const gloveMat = new THREE.MeshStandardMaterial({ color: 0x444444 });
+      const gloveL = new THREE.Mesh(gloveGeo, gloveMat);
+      gloveL.position.set(-0.38, 0.7, 0);
+      playerGroup.add(gloveL);
+
       // Right arm
-      const rightArm = new THREE.Mesh(armGeo, suitMat);
-      rightArm.position.set(0.35, 1.0, 0);
+      const rightArm = new THREE.Mesh(armGeo, jacketMat);
+      rightArm.position.set(0.38, 1.0, 0);
       rightArm.castShadow = true;
       playerGroup.add(rightArm);
 
-      // Left leg
+      const gloveR = new THREE.Mesh(gloveGeo, gloveMat);
+      gloveR.position.set(0.38, 0.7, 0);
+      playerGroup.add(gloveR);
+
+      // Left leg (hiking pants)
       const legGeo = new THREE.CapsuleGeometry(0.08, 0.4, 6, 8);
-      const leftLeg = new THREE.Mesh(legGeo, suitDarkMat);
+      const leftLeg = new THREE.Mesh(legGeo, pantsMat);
       leftLeg.position.set(-0.13, 0.45, 0);
       leftLeg.castShadow = true;
       playerGroup.add(leftLeg);
 
       // Right leg
-      const rightLeg = new THREE.Mesh(legGeo, suitDarkMat);
+      const rightLeg = new THREE.Mesh(legGeo, pantsMat);
       rightLeg.position.set(0.13, 0.45, 0);
       rightLeg.castShadow = true;
       playerGroup.add(rightLeg);
 
-      // Left boot
-      const bootGeo = new THREE.BoxGeometry(0.12, 0.1, 0.2);
+      // Left boot (hiking boots)
+      const bootGeo = new THREE.BoxGeometry(0.13, 0.12, 0.22);
       const leftBoot = new THREE.Mesh(bootGeo, bootMat);
       leftBoot.position.set(-0.13, 0.18, 0.03);
       playerGroup.add(leftBoot);
@@ -2509,30 +2581,59 @@
             if (Math.sqrt(fdx*fdx+fdz*fdz) < WOLF_FLEE_FIRE_RANGE) { nearFire = true; break; }
           }
 
+          // Nighttime wolves are bolder
+          const aggroMult = state.isDay ? 0.6 : 1.0;
+          const effectiveAggro = WOLF_AGGRO_RANGE * aggroMult;
+          const effectiveStalk = WOLF_STALK_RANGE * aggroMult;
+
           if (nearFire) {
             wd.state = 'flee';
           } else if (distToPlayer < WOLF_ATTACK_RANGE && state.started && !state.dead) {
             wd.state = 'attack';
-          } else if (distToPlayer < WOLF_AGGRO_RANGE && state.started && !state.dead) {
+          } else if (distToPlayer < effectiveAggro && state.started && !state.dead && !state.isDay) {
             wd.state = 'chase';
+          } else if (distToPlayer < effectiveStalk && state.started && !state.dead) {
+            wd.state = 'stalk'; // circle the player, keeping distance
           } else {
             wd.state = 'roam';
           }
 
           let moveX = 0, moveZ = 0;
-          const wolfSpeed = wd.state === 'chase' ? WOLF_SPEED * 1.3 : WOLF_SPEED;
 
           if (wd.state === 'chase') {
+            // Charge at player
             const len = distToPlayer || 1;
-            moveX = (dx / len) * wolfSpeed * dt;
-            moveZ = (dz / len) * wolfSpeed * dt;
+            const chargeSpeed = WOLF_SPEED * 1.4;
+            moveX = (dx / len) * chargeSpeed * dt;
+            moveZ = (dz / len) * chargeSpeed * dt;
+          } else if (wd.state === 'stalk') {
+            // Circle the player at a distance, occasionally darting closer
+            const angle = Math.atan2(dx, dz);
+            const circleAngle = angle + Math.PI / 2 + Math.sin(elapsed * 0.5 + wolves.indexOf(wolf)) * 0.3;
+            const desiredDist = 12 + Math.sin(elapsed * 0.3 + wolves.indexOf(wolf) * 2) * 4;
+            const stalkSpeed = WOLF_SPEED * 0.7;
+            // Circle motion
+            moveX = Math.sin(circleAngle) * stalkSpeed * dt;
+            moveZ = Math.cos(circleAngle) * stalkSpeed * dt;
+            // Adjust distance — drift toward desired distance
+            if (distToPlayer > desiredDist + 2) {
+              moveX += (dx / (distToPlayer || 1)) * stalkSpeed * 0.4 * dt;
+              moveZ += (dz / (distToPlayer || 1)) * stalkSpeed * 0.4 * dt;
+            } else if (distToPlayer < desiredDist - 2) {
+              moveX -= (dx / (distToPlayer || 1)) * stalkSpeed * 0.3 * dt;
+              moveZ -= (dz / (distToPlayer || 1)) * stalkSpeed * 0.3 * dt;
+            }
           } else if (wd.state === 'attack') {
-            // Deal damage
+            // Lunge and bite, then back off briefly
             wd.attackCooldown -= dt;
             if (wd.attackCooldown <= 0) {
               state.health -= WOLF_DAMAGE;
               state.health = Math.max(0, state.health);
-              wd.attackCooldown = 1;
+              wd.attackCooldown = 1.5; // pause between bites
+              // Small retreat after bite
+              const len = distToPlayer || 1;
+              wolf.position.x -= (dx / len) * 0.8;
+              wolf.position.z -= (dz / len) * 0.8;
             }
           } else if (wd.state === 'flee') {
             // Run away from nearest fire
@@ -2541,12 +2642,12 @@
               const fdx = wolf.position.x - obj.position.x;
               const fdz = wolf.position.z - obj.position.z;
               const fd = Math.sqrt(fdx*fdx+fdz*fdz) || 1;
-              moveX += (fdx/fd) * wolfSpeed * dt;
-              moveZ += (fdz/fd) * wolfSpeed * dt;
+              moveX += (fdx/fd) * WOLF_SPEED * 1.2 * dt;
+              moveZ += (fdz/fd) * WOLF_SPEED * 1.2 * dt;
               break;
             }
           } else {
-            // Roam
+            // Roam — wander naturally
             wd.roamTimer -= dt;
             if (wd.roamTimer <= 0) {
               wd.roamTarget.set(
@@ -2554,13 +2655,13 @@
                 0,
                 wolf.position.z + (Math.random()-0.5) * 40
               );
-              wd.roamTimer = 3 + Math.random() * 5;
+              wd.roamTimer = 5 + Math.random() * 8;
             }
             const rdx = wd.roamTarget.x - wolf.position.x;
             const rdz = wd.roamTarget.z - wolf.position.z;
             const rd = Math.sqrt(rdx*rdx+rdz*rdz) || 1;
-            moveX = (rdx/rd) * wolfSpeed * 0.5 * dt;
-            moveZ = (rdz/rd) * wolfSpeed * 0.5 * dt;
+            moveX = (rdx/rd) * WOLF_SPEED * 0.35 * dt;
+            moveZ = (rdz/rd) * WOLF_SPEED * 0.35 * dt;
           }
 
           wolf.position.x += moveX;
@@ -2581,8 +2682,8 @@
           wd.tail.rotation.x = -0.5 + Math.sin(elapsed * 4) * 0.3;
         }
 
-        // Respawn wolves that wandered too far or if count is low
-        if (state.started && wolves.length < 6 && Math.random() < dt * 0.1) {
+        // Respawn wolves occasionally if count drops
+        if (state.started && wolves.length < 3 && Math.random() < dt * 0.03) {
           const angle = Math.random() * Math.PI * 2;
           const dist = 40 + Math.random() * 50;
           const wx = playerGroup.position.x + Math.cos(angle) * dist;
@@ -2609,8 +2710,8 @@
             bd.beam.rotation.y = elapsed * 0.5;
           }
 
-          // Wolves get more aggressive when beacon is active — spawn extras
-          if (Math.random() < dt * 0.15 && wolves.length < 20) {
+          // Wolves drawn to beacon — spawn more during rescue countdown
+          if (Math.random() < dt * 0.08 && wolves.length < 10) {
             const angle = Math.random() * Math.PI * 2;
             const dist = 35 + Math.random() * 30;
             wolves.push(createWolf(
@@ -2695,7 +2796,7 @@
             const wx = cx + (wolf.position.x - playerGroup.position.x) * mapScale;
             const wz = cy + (wolf.position.z - playerGroup.position.z) * mapScale;
             if (wx < 0 || wx > mw || wz < 0 || wz > mh) continue;
-            mctx.fillStyle = wolf.userData.state === 'chase' ? '#ff2200' : '#cc4444';
+            mctx.fillStyle = wolf.userData.state === 'chase' || wolf.userData.state === 'attack' ? '#ff2200' : wolf.userData.state === 'stalk' ? '#ff8844' : '#884444';
             mctx.fillRect(wx - 2, wz - 2, 3, 3);
           }
 
