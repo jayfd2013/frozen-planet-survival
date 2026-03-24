@@ -140,6 +140,12 @@
       WASD - Move &nbsp;|&nbsp; Shift - Sprint &nbsp;|&nbsp; C - Crouch &nbsp;|&nbsp; Space - Jump
     </div>
 
+    <div id="death-screen" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:30; justify-content:center; align-items:center; flex-direction:column; text-align:center;">
+      <h1 style="font-size:52px; color:#88ccff; text-shadow:0 0 20px rgba(100,180,255,0.8); margin-bottom:16px;">YOU FROZE TO DEATH</h1>
+      <p style="font-size:20px; opacity:0.7; margin-bottom:8px;">Survived for <span id="death-score">0</span> points</p>
+      <p style="font-size:16px; opacity:0.5; margin-top:24px;">Press any key to try again</p>
+    </div>
+
     <canvas id="frost-overlay" width="512" height="512"></canvas>
 
     <div id="temp-bar-container">
@@ -162,6 +168,7 @@
       // ── Game State ──────────────────────────────────────
       const state = {
         started: false,
+        dead: false,
         health: 100,
         energy: 100,
         score: 0,
@@ -446,6 +453,7 @@
       window.addEventListener('keydown', (e) => {
         state.keys[e.key.toLowerCase()] = true;
         if (!state.started) startGame();
+        else if (state.dead) restartGame();
       });
       window.addEventListener('keyup', (e) => {
         state.keys[e.key.toLowerCase()] = false;
@@ -582,6 +590,21 @@
         document.getElementById('temp-bar-container').style.display = 'block';
       }
 
+      function restartGame() {
+        state.dead = false;
+        state.health = 100;
+        state.energy = 100;
+        state.bodyTemp = 37;
+        state.score = 0;
+        state.velocity.set(0, 0, 0);
+        state.onGround = true;
+        playerGroup.position.set(0, 0, 0);
+        playerGroup.rotation.y = 0;
+        document.getElementById('death-screen').style.display = 'none';
+        elapsed = 0;
+        clock.getDelta(); // reset clock
+      }
+
       // ── Game Loop ───────────────────────────────────────
       const clock = new THREE.Clock();
       let elapsed = 0;
@@ -620,7 +643,7 @@
         auroraMat.opacity = 0.1 + Math.sin(elapsed * 0.5) * 0.05;
 
         // Player movement
-        if (state.started) {
+        if (state.started && !state.dead) {
           const moveDir = new THREE.Vector3();
 
           // Turn left/right with A/D
@@ -775,13 +798,20 @@
           }
 
           // Clamp body temp
-          state.bodyTemp = Math.max(20, Math.min(37, state.bodyTemp));
+          state.bodyTemp = Math.min(37, state.bodyTemp);
 
           // Hypothermia damage: below 32°C start taking health damage
           if (state.bodyTemp < 32) {
             const severity = (32 - state.bodyTemp) / 12; // 0 at 32°C, 1 at 20°C
             state.health -= severity * 8 * dt;
             state.health = Math.max(0, state.health);
+          }
+
+          // Death check
+          if (state.health <= 0 && !state.dead) {
+            state.dead = true;
+            document.getElementById('death-score').textContent = state.score;
+            document.getElementById('death-screen').style.display = 'flex';
           }
 
           // Update HUD
@@ -793,7 +823,7 @@
           updateFrostOverlay(state.bodyTemp);
 
           // ── Body Temp Bar ──
-          const tempPercent = ((state.bodyTemp - 20) / 17) * 100; // 20-37 range
+          const tempPercent = Math.max(0, ((state.bodyTemp - 15) / 22) * 100); // 15-37 range
           const tempFill = document.getElementById('temp-bar-fill');
           tempFill.style.height = tempPercent + '%';
           if (state.bodyTemp > 34) {
