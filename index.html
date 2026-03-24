@@ -73,25 +73,78 @@
         opacity: 0;
         pointer-events: none;
       }
+
+      #frost-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 5;
+        opacity: 0;
+        transition: opacity 0.3s;
+      }
+
+      #temp-bar-container {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        width: 24px;
+        height: 200px;
+        background: rgba(0, 0, 0, 0.4);
+        border: 2px solid rgba(100, 180, 255, 0.4);
+        border-radius: 12px;
+        z-index: 10;
+        overflow: hidden;
+        display: none;
+      }
+
+      #temp-bar-fill {
+        position: absolute;
+        bottom: 0;
+        width: 100%;
+        height: 100%;
+        border-radius: 10px;
+        transition: height 0.3s, background 0.3s;
+      }
+
+      #temp-bar-label {
+        position: absolute;
+        top: -24px;
+        width: 100%;
+        text-align: center;
+        font-size: 11px;
+        text-shadow: 0 0 6px rgba(0, 150, 255, 0.6);
+        white-space: nowrap;
+        left: -10px;
+      }
     </style>
   </head>
   <body>
     <div id="title">
       <h1>Frozen Planet Survival</h1>
       <p>Press any key or click to begin</p>
-      <p style="margin-top: 12px; font-size: 13px; opacity: 0.5;">v0.3 - Sprint, Crouch &amp; Energy</p>
+      <p style="margin-top: 12px; font-size: 13px; opacity: 0.5;">v0.4 - Temperature &amp; Frost FX</p>
     </div>
 
     <div id="hud" style="display: none">
       <div>Health: <span id="health">100</span></div>
       <div>Energy: <span id="energy">100</span></div>
-      <div>Temperature: <span id="temp">-30</span>&deg;C</div>
+      <div>Body Temp: <span id="temp">37.0</span>&deg;C</div>
       <div>Score: <span id="score">0</span></div>
       <div id="status-msg" style="color: #ffaa44; display: none;"></div>
     </div>
 
     <div id="instructions" style="display: none">
       WASD - Move &nbsp;|&nbsp; Shift - Sprint &nbsp;|&nbsp; C - Crouch &nbsp;|&nbsp; Space - Jump
+    </div>
+
+    <canvas id="frost-overlay" width="512" height="512"></canvas>
+
+    <div id="temp-bar-container">
+      <div id="temp-bar-label">BODY</div>
+      <div id="temp-bar-fill"></div>
     </div>
 
     <script type="importmap">
@@ -113,12 +166,14 @@
         energy: 100,
         score: 0,
         temperature: -30,
+        bodyTemp: 37,          // core body temperature (°C)
         keys: {},
         mouse: { x: 0, y: 0 },
         velocity: new THREE.Vector3(),
         onGround: true,
         isSprinting: false,
         isCrouching: false,
+        windChill: 0,          // extra wind chill factor
       };
 
       // ── Scene Setup ─────────────────────────────────────
@@ -405,12 +460,126 @@
         renderer.setSize(window.innerWidth, window.innerHeight);
       });
 
+      // ── Frost FX Overlay ────────────────────────────────
+      const frostCanvas = document.getElementById('frost-overlay');
+      const frostCtx = frostCanvas.getContext('2d');
+
+      function resizeFrostCanvas() {
+        frostCanvas.width = window.innerWidth;
+        frostCanvas.height = window.innerHeight;
+      }
+      resizeFrostCanvas();
+      window.addEventListener('resize', resizeFrostCanvas);
+
+      // Pre-generate frost crystal positions for consistent pattern
+      const frostCrystals = [];
+      for (let i = 0; i < 120; i++) {
+        frostCrystals.push({
+          x: Math.random(),
+          y: Math.random(),
+          size: 20 + Math.random() * 80,
+          rotation: Math.random() * Math.PI * 2,
+          edge: Math.random() < 0.7, // 70% near edges
+          branches: 4 + Math.floor(Math.random() * 4),
+        });
+      }
+
+      function drawFrostCrystal(ctx, x, y, size, rotation, branches) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(rotation);
+        for (let i = 0; i < branches; i++) {
+          const angle = (i / branches) * Math.PI * 2;
+          ctx.save();
+          ctx.rotate(angle);
+          // Main branch
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(size, 0);
+          ctx.stroke();
+          // Sub-branches
+          for (let j = 1; j <= 3; j++) {
+            const pos = (j / 4) * size;
+            const subLen = size * 0.3 * (1 - j / 4);
+            ctx.beginPath();
+            ctx.moveTo(pos, 0);
+            ctx.lineTo(pos + subLen * 0.5, -subLen);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(pos, 0);
+            ctx.lineTo(pos + subLen * 0.5, subLen);
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
+        ctx.restore();
+      }
+
+      function updateFrostOverlay(bodyTemp) {
+        const w = frostCanvas.width;
+        const h = frostCanvas.height;
+        frostCtx.clearRect(0, 0, w, h);
+
+        // Frost intensity: 0 at 37°C, 1 at 20°C
+        const intensity = Math.max(0, (37 - bodyTemp) / 17);
+
+        if (intensity <= 0.02) {
+          frostCanvas.style.opacity = '0';
+          return;
+        }
+        frostCanvas.style.opacity = '1';
+
+        // Vignette frost around edges
+        const gradient = frostCtx.createRadialGradient(
+          w / 2, h / 2, Math.min(w, h) * 0.15,
+          w / 2, h / 2, Math.min(w, h) * 0.7
+        );
+        gradient.addColorStop(0, `rgba(180, 220, 255, 0)`);
+        gradient.addColorStop(0.5, `rgba(180, 220, 255, ${intensity * 0.15})`);
+        gradient.addColorStop(1, `rgba(180, 220, 255, ${intensity * 0.5})`);
+        frostCtx.fillStyle = gradient;
+        frostCtx.fillRect(0, 0, w, h);
+
+        // Ice crystal patterns on edges
+        frostCtx.strokeStyle = `rgba(200, 230, 255, ${intensity * 0.4})`;
+        frostCtx.lineWidth = 1.2;
+
+        for (const crystal of frostCrystals) {
+          let cx, cy;
+          if (crystal.edge) {
+            // Push toward edges using the stored random position
+            cx = crystal.x < 0.5 ? crystal.x * w * 0.3 : w - (1 - crystal.x) * w * 0.3;
+            cy = crystal.y < 0.5 ? crystal.y * h * 0.3 : h - (1 - crystal.y) * h * 0.3;
+          } else {
+            cx = crystal.x * w;
+            cy = crystal.y * h;
+          }
+
+          // Only draw crystals based on intensity (more appear as it gets colder)
+          const threshold = crystal.edge ? 0.05 : 0.4;
+          if (intensity > threshold) {
+            const alpha = Math.min(1, (intensity - threshold) / 0.3);
+            frostCtx.globalAlpha = alpha;
+            drawFrostCrystal(frostCtx, cx, cy, crystal.size * intensity, crystal.rotation, crystal.branches);
+          }
+        }
+        frostCtx.globalAlpha = 1;
+
+        // Heavy frost: add white overlay when critically cold
+        if (intensity > 0.7) {
+          const heavyAlpha = (intensity - 0.7) / 0.3 * 0.3;
+          frostCtx.fillStyle = `rgba(220, 240, 255, ${heavyAlpha})`;
+          frostCtx.fillRect(0, 0, w, h);
+        }
+      }
+
       // ── Start Game ──────────────────────────────────────
       function startGame() {
         state.started = true;
         document.getElementById('title').classList.add('hidden');
         document.getElementById('hud').style.display = 'block';
         document.getElementById('instructions').style.display = 'block';
+        document.getElementById('temp-bar-container').style.display = 'block';
       }
 
       // ── Game Loop ───────────────────────────────────────
@@ -528,9 +697,21 @@
           leftLeg.rotation.x = -swing;
           rightLeg.rotation.x = swing;
 
-          // Status message
+          // Status message (hypothermia takes priority)
           const statusEl = document.getElementById('status-msg');
-          if (state.isSprinting) {
+          if (state.bodyTemp < 26) {
+            statusEl.style.display = 'block';
+            statusEl.textContent = 'SEVERE HYPOTHERMIA';
+            statusEl.style.color = '#ff4444';
+          } else if (state.bodyTemp < 32) {
+            statusEl.style.display = 'block';
+            statusEl.textContent = 'HYPOTHERMIA';
+            statusEl.style.color = '#ffaa44';
+          } else if (state.bodyTemp < 35) {
+            statusEl.style.display = 'block';
+            statusEl.textContent = 'FREEZING';
+            statusEl.style.color = '#88ccff';
+          } else if (state.isSprinting) {
             statusEl.style.display = 'block';
             statusEl.textContent = 'SPRINTING';
             statusEl.style.color = '#ffaa44';
@@ -550,14 +731,80 @@
           state.score = Math.floor(elapsed * 10);
           document.getElementById('score').textContent = state.score;
 
-          // Temperature fluctuation (sprint increases heat loss)
-          const sprintHeatPenalty = state.isSprinting ? -3 : 0;
-          state.temperature = -30 + Math.sin(elapsed * 0.2) * 5 + sprintHeatPenalty;
-          document.getElementById('temp').textContent = state.temperature.toFixed(0);
+          // ── Temperature System with Heat Loss Multipliers ──
+
+          // Ambient temperature fluctuates over time
+          state.temperature = -30 + Math.sin(elapsed * 0.2) * 5;
+
+          // Wind gusts that come and go
+          state.windChill = Math.sin(elapsed * 0.07) * 3 + Math.sin(elapsed * 0.23) * 2;
+
+          // Base heat loss rate (°C per second)
+          let heatLoss = 0.8;
+
+          // Heat loss multipliers
+          let multiplier = 1.0;
+
+          // Sprinting: sweating makes you lose heat faster (1.6x)
+          if (state.isSprinting) multiplier *= 1.6;
+
+          // Standing still: body cools faster without movement generating warmth (1.2x)
+          if (!isMoving && !state.isCrouching) multiplier *= 1.2;
+
+          // Crouching: less body exposed to wind (0.6x — protective)
+          if (state.isCrouching) multiplier *= 0.6;
+
+          // Wind chill: stronger wind = faster heat loss
+          const windFactor = 1.0 + Math.max(0, state.windChill) * 0.1;
+          multiplier *= windFactor;
+
+          // Colder ambient temp = faster heat loss
+          const coldFactor = 1.0 + Math.abs(state.temperature + 25) * 0.02;
+          multiplier *= coldFactor;
+
+          // Higher elevation = colder (player Y position)
+          const elevationFactor = 1.0 + Math.max(0, playerGroup.position.y - 2) * 0.05;
+          multiplier *= elevationFactor;
+
+          // Apply heat loss
+          state.bodyTemp -= heatLoss * multiplier * dt;
+
+          // Natural body heat recovery (very slow, simulates shivering)
+          if (state.bodyTemp < 37) {
+            state.bodyTemp += 0.15 * dt;
+          }
+
+          // Clamp body temp
+          state.bodyTemp = Math.max(20, Math.min(37, state.bodyTemp));
+
+          // Hypothermia damage: below 32°C start taking health damage
+          if (state.bodyTemp < 32) {
+            const severity = (32 - state.bodyTemp) / 12; // 0 at 32°C, 1 at 20°C
+            state.health -= severity * 8 * dt;
+            state.health = Math.max(0, state.health);
+          }
 
           // Update HUD
+          document.getElementById('temp').textContent = state.bodyTemp.toFixed(1);
           document.getElementById('health').textContent = Math.floor(state.health);
           document.getElementById('energy').textContent = Math.floor(state.energy);
+
+          // ── Frost FX Overlay ──
+          updateFrostOverlay(state.bodyTemp);
+
+          // ── Body Temp Bar ──
+          const tempPercent = ((state.bodyTemp - 20) / 17) * 100; // 20-37 range
+          const tempFill = document.getElementById('temp-bar-fill');
+          tempFill.style.height = tempPercent + '%';
+          if (state.bodyTemp > 34) {
+            tempFill.style.background = 'linear-gradient(to top, #44aaff, #66ccff)';
+          } else if (state.bodyTemp > 30) {
+            tempFill.style.background = 'linear-gradient(to top, #4488cc, #6699dd)';
+          } else if (state.bodyTemp > 26) {
+            tempFill.style.background = 'linear-gradient(to top, #cc8844, #ffaa44)';
+          } else {
+            tempFill.style.background = 'linear-gradient(to top, #cc4444, #ff4444)';
+          }
         }
 
         // Camera orbits behind player (always looking at their back)
