@@ -125,7 +125,7 @@
     <div id="title">
       <h1>Frozen Planet Survival</h1>
       <p>Press any key or click to begin</p>
-      <p style="margin-top: 12px; font-size: 13px; opacity: 0.5;">v0.4 - Temperature &amp; Frost FX</p>
+      <p style="margin-top: 12px; font-size: 13px; opacity: 0.5;">v0.5 - Procedural Biome Terrain</p>
     </div>
 
     <div id="hud" style="display: none">
@@ -133,11 +133,12 @@
       <div>Energy: <span id="energy">100</span></div>
       <div>Body Temp: <span id="temp">37.0</span>&deg;C</div>
       <div>Score: <span id="score">0</span></div>
+      <div>Biome: <span id="biome-name">Tundra</span></div>
       <div id="status-msg" style="color: #ffaa44; display: none;"></div>
     </div>
 
     <div id="instructions" style="display: none">
-      WASD - Move &nbsp;|&nbsp; Shift - Sprint &nbsp;|&nbsp; C - Crouch &nbsp;|&nbsp; Space - Jump
+      W/S - Move &nbsp;|&nbsp; A/D - Turn &nbsp;|&nbsp; Shift - Sprint &nbsp;|&nbsp; C - Crouch &nbsp;|&nbsp; Space - Jump
     </div>
 
     <div id="death-screen" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:30; justify-content:center; align-items:center; flex-direction:column; text-align:center;">
@@ -186,7 +187,7 @@
       // ── Scene Setup ─────────────────────────────────────
       const scene = new THREE.Scene();
       scene.background = new THREE.Color(0x667fa5);
-      scene.fog = new THREE.FogExp2(0x667fa5, 0.008);
+      scene.fog = new THREE.FogExp2(0x667fa5, 0.006);
 
       const camera = new THREE.PerspectiveCamera(
         75,
@@ -222,24 +223,150 @@
       const hemiLight = new THREE.HemisphereLight(0xaaccff, 0x446688, 0.7);
       scene.add(hemiLight);
 
-      // ── Ground (Frozen Terrain) ─────────────────────────
-      const groundGeo = new THREE.PlaneGeometry(200, 200, 100, 100);
+      // ── Noise Functions ──────────────────────────────────
+      // Simple hash-based noise (no dependencies)
+      function hash(x, y) {
+        let n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+        return n - Math.floor(n);
+      }
+
+      function smoothNoise(x, y) {
+        const ix = Math.floor(x), iy = Math.floor(y);
+        const fx = x - ix, fy = y - iy;
+        const ux = fx * fx * (3 - 2 * fx), uy = fy * fy * (3 - 2 * fy);
+        const a = hash(ix, iy), b = hash(ix + 1, iy);
+        const c = hash(ix, iy + 1), d = hash(ix + 1, iy + 1);
+        return a + (b - a) * ux + (c - a) * uy + (a - b - c + d) * ux * uy;
+      }
+
+      function fbm(x, y, octaves = 5) {
+        let val = 0, amp = 0.5, freq = 1;
+        for (let i = 0; i < octaves; i++) {
+          val += amp * smoothNoise(x * freq, y * freq);
+          amp *= 0.5;
+          freq *= 2;
+        }
+        return val;
+      }
+
+      // ── Biome System ──────────────────────────────────────
+      // 5 biomes: Frozen Tundra, Ice Fields, Glacial Mountains, Frozen Forest, Crystal Caverns
+      const BIOMES = {
+        TUNDRA:     0, // flat, snowy, sparse
+        ICE_FIELDS: 1, // smooth ice, very flat, slippery-looking
+        MOUNTAINS:  2, // tall, jagged peaks
+        FOREST:     3, // rolling hills, dead frozen trees
+        CRYSTAL:    4, // glowing crystal formations, alien terrain
+      };
+
+      const biomeColors = [
+        new THREE.Color(0xc8d8e8), // Tundra: pale snow
+        new THREE.Color(0x99ccee), // Ice Fields: blue ice
+        new THREE.Color(0x8899aa), // Mountains: grey rock + snow
+        new THREE.Color(0xaabb99), // Forest: muted green-grey
+        new THREE.Color(0xaabbdd), // Crystal: pale blue-purple
+      ];
+
+      function getBiome(x, z) {
+        // Large-scale noise determines biome
+        const n1 = fbm(x * 0.003, z * 0.003, 3);
+        const n2 = fbm(x * 0.005 + 100, z * 0.005 + 100, 3);
+        if (n1 < 0.35) return n2 < 0.5 ? BIOMES.ICE_FIELDS : BIOMES.TUNDRA;
+        if (n1 < 0.55) return n2 < 0.45 ? BIOMES.FOREST : BIOMES.CRYSTAL;
+        return BIOMES.MOUNTAINS;
+      }
+
+      function getBiomeBlend(x, z) {
+        // Returns array of [biome, weight] for smooth blending
+        const step = 3;
+        const counts = [0, 0, 0, 0, 0];
+        const samples = 9;
+        for (let dx = -1; dx <= 1; dx++) {
+          for (let dz = -1; dz <= 1; dz++) {
+            counts[getBiome(x + dx * step, z + dz * step)]++;
+          }
+        }
+        const result = [];
+        for (let i = 0; i < 5; i++) {
+          if (counts[i] > 0) result.push([i, counts[i] / samples]);
+        }
+        return result;
+      }
+
+      function biomeHeight(x, z, biome) {
+        switch (biome) {
+          case BIOMES.TUNDRA:
+            return fbm(x * 0.02, z * 0.02, 4) * 3 - 1;
+          case BIOMES.ICE_FIELDS:
+            return fbm(x * 0.015, z * 0.015, 3) * 1.5 - 0.5;
+          case BIOMES.MOUNTAINS:
+            return fbm(x * 0.01, z * 0.01, 6) * 18 +
+                   Math.pow(fbm(x * 0.03, z * 0.03, 3), 2) * 10 - 3;
+          case BIOMES.FOREST:
+            return fbm(x * 0.02, z * 0.02, 4) * 5 - 1 +
+                   Math.sin(x * 0.05) * 0.8;
+          case BIOMES.CRYSTAL:
+            return fbm(x * 0.025, z * 0.025, 4) * 4 +
+                   Math.abs(Math.sin(x * 0.1) * Math.cos(z * 0.1)) * 2 - 1;
+          default: return 0;
+        }
+      }
+
+      function getProceduralHeight(x, z) {
+        const blend = getBiomeBlend(x, z);
+        let h = 0;
+        for (const [biome, weight] of blend) {
+          h += biomeHeight(x, z, biome) * weight;
+        }
+        return h;
+      }
+
+      function getProceduralColor(x, z) {
+        const blend = getBiomeBlend(x, z);
+        const color = new THREE.Color(0, 0, 0);
+        for (const [biome, weight] of blend) {
+          color.r += biomeColors[biome].r * weight;
+          color.g += biomeColors[biome].g * weight;
+          color.b += biomeColors[biome].b * weight;
+        }
+        // Add subtle noise variation
+        const variation = (fbm(x * 0.1, z * 0.1, 2) - 0.5) * 0.08;
+        color.r = Math.max(0, Math.min(1, color.r + variation));
+        color.g = Math.max(0, Math.min(1, color.g + variation));
+        color.b = Math.max(0, Math.min(1, color.b + variation));
+        return color;
+      }
+
+      // ── Ground (Procedural Biome Terrain) ─────────────────
+      const TERRAIN_SIZE = 300;
+      const TERRAIN_SEGMENTS = 200;
+      const groundGeo = new THREE.PlaneGeometry(TERRAIN_SIZE, TERRAIN_SIZE, TERRAIN_SEGMENTS, TERRAIN_SEGMENTS);
       const posAttr = groundGeo.attributes.position;
+
+      // Per-vertex colors for biome blending
+      const vertexColors = new Float32Array(posAttr.count * 3);
+
       for (let i = 0; i < posAttr.count; i++) {
         const x = posAttr.getX(i);
-        const y = posAttr.getY(i);
-        const height =
-          Math.sin(x * 0.05) * 1.5 +
-          Math.cos(y * 0.08) * 1.0 +
-          Math.sin(x * 0.15 + y * 0.1) * 0.5;
+        const z = posAttr.getY(i); // Y in plane space = Z in world
+        const height = getProceduralHeight(x, z);
         posAttr.setZ(i, height);
+
+        const col = getProceduralColor(x, z);
+        // Darken valleys, lighten peaks
+        const heightFactor = 1.0 + height * 0.015;
+        vertexColors[i * 3]     = Math.min(1, col.r * heightFactor);
+        vertexColors[i * 3 + 1] = Math.min(1, col.g * heightFactor);
+        vertexColors[i * 3 + 2] = Math.min(1, col.b * heightFactor);
       }
+
+      groundGeo.setAttribute('color', new THREE.BufferAttribute(vertexColors, 3));
       groundGeo.computeVertexNormals();
 
       const groundMat = new THREE.MeshStandardMaterial({
-        color: 0x99aabb,
-        roughness: 0.3,
-        metalness: 0.1,
+        vertexColors: true,
+        roughness: 0.4,
+        metalness: 0.05,
         flatShading: true,
       });
       const ground = new THREE.Mesh(groundGeo, groundMat);
@@ -247,7 +374,52 @@
       ground.receiveShadow = true;
       scene.add(ground);
 
-      // ── Ice Crystals ────────────────────────────────────
+      // ── Biome Decorations ─────────────────────────────────
+
+      // Frozen trees for Forest biome
+      function createFrozenTree(x, z, terrainY) {
+        const group = new THREE.Group();
+        const trunkH = 2 + Math.random() * 3;
+        const trunkGeo = new THREE.CylinderGeometry(0.08, 0.15, trunkH, 6);
+        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x665544, roughness: 0.9 });
+        const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+        trunk.position.y = trunkH / 2;
+        trunk.castShadow = true;
+        group.add(trunk);
+
+        // Bare frozen branches
+        for (let i = 0; i < 4; i++) {
+          const angle = (i / 4) * Math.PI * 2 + Math.random() * 0.5;
+          const branchLen = 0.8 + Math.random() * 1.2;
+          const branchGeo = new THREE.CylinderGeometry(0.02, 0.05, branchLen, 4);
+          const branch = new THREE.Mesh(branchGeo, trunkMat);
+          const branchY = trunkH * 0.5 + Math.random() * trunkH * 0.4;
+          branch.position.set(
+            Math.cos(angle) * 0.3,
+            branchY,
+            Math.sin(angle) * 0.3
+          );
+          branch.rotation.z = Math.cos(angle) * 0.8;
+          branch.rotation.x = Math.sin(angle) * 0.8;
+          branch.castShadow = true;
+          group.add(branch);
+
+          // Snow/ice on branches
+          const snowGeo = new THREE.SphereGeometry(0.15 + Math.random() * 0.15, 5, 4);
+          const snowMat = new THREE.MeshStandardMaterial({ color: 0xddeeff, roughness: 0.3 });
+          const snowClump = new THREE.Mesh(snowGeo, snowMat);
+          snowClump.position.set(
+            Math.cos(angle) * (0.3 + branchLen * 0.3),
+            branchY + 0.1,
+            Math.sin(angle) * (0.3 + branchLen * 0.3)
+          );
+          group.add(snowClump);
+        }
+        group.position.set(x, terrainY, z);
+        return group;
+      }
+
+      // Ice crystal clusters for Crystal biome
       const crystalGeo = new THREE.OctahedronGeometry(1, 0);
       const crystalMat = new THREE.MeshPhysicalMaterial({
         color: 0x88ccff,
@@ -258,26 +430,119 @@
         clearcoat: 1.0,
       });
 
+      // Rock spires for Mountains biome
+      function createRockSpire(x, z, terrainY) {
+        const h = 2 + Math.random() * 5;
+        const geo = new THREE.ConeGeometry(0.5 + Math.random() * 0.8, h, 5 + Math.floor(Math.random() * 3));
+        const mat = new THREE.MeshStandardMaterial({
+          color: new THREE.Color(0.35 + Math.random() * 0.1, 0.38 + Math.random() * 0.1, 0.42 + Math.random() * 0.1),
+          roughness: 0.85,
+          flatShading: true,
+        });
+        const spire = new THREE.Mesh(geo, mat);
+        spire.position.set(x, terrainY + h / 2, z);
+        spire.rotation.y = Math.random() * Math.PI;
+        spire.rotation.z = (Math.random() - 0.5) * 0.3;
+        spire.castShadow = true;
+        spire.receiveShadow = true;
+        return spire;
+      }
+
+      // Snow mound for Tundra biome
+      function createSnowMound(x, z, terrainY) {
+        const s = 0.8 + Math.random() * 1.5;
+        const geo = new THREE.SphereGeometry(s, 7, 5);
+        const mat = new THREE.MeshStandardMaterial({ color: 0xdde8f0, roughness: 0.5, flatShading: true });
+        const mound = new THREE.Mesh(geo, mat);
+        mound.position.set(x, terrainY + s * 0.25, z);
+        mound.scale.y = 0.4;
+        mound.receiveShadow = true;
+        return mound;
+      }
+
+      // Ice shard for Ice Fields biome
+      function createIceShard(x, z, terrainY) {
+        const h = 0.5 + Math.random() * 2;
+        const geo = new THREE.ConeGeometry(0.15 + Math.random() * 0.2, h, 4);
+        const mat = new THREE.MeshPhysicalMaterial({
+          color: 0xaaddff,
+          roughness: 0.05,
+          metalness: 0.2,
+          transmission: 0.4,
+          thickness: 0.3,
+        });
+        const shard = new THREE.Mesh(geo, mat);
+        shard.position.set(x, terrainY + h / 2, z);
+        shard.rotation.z = (Math.random() - 0.5) * 0.5;
+        shard.castShadow = true;
+        return shard;
+      }
+
+      // Place decorations across the terrain
       const crystals = [];
-      for (let i = 0; i < 40; i++) {
-        const crystal = new THREE.Mesh(crystalGeo, crystalMat);
-        const scale = 0.3 + Math.random() * 1.2;
-        crystal.scale.set(scale * 0.5, scale, scale * 0.5);
-        crystal.position.set(
-          (Math.random() - 0.5) * 80,
-          scale * 0.5,
-          (Math.random() - 0.5) * 80
-        );
-        crystal.rotation.y = Math.random() * Math.PI;
-        crystal.castShadow = true;
-        crystal.receiveShadow = true;
-        crystal.userData = {
-          baseY: crystal.position.y,
-          phase: Math.random() * Math.PI * 2,
-          speed: 0.5 + Math.random() * 0.5,
-        };
-        scene.add(crystal);
-        crystals.push(crystal);
+      const decorations = [];
+      const DECO_RANGE = 120;
+
+      for (let i = 0; i < 300; i++) {
+        const x = (Math.random() - 0.5) * DECO_RANGE * 2;
+        const z = (Math.random() - 0.5) * DECO_RANGE * 2;
+        const biome = getBiome(x, z);
+        const terrainY = getProceduralHeight(x, z);
+        let obj;
+
+        switch (biome) {
+          case BIOMES.FOREST:
+            if (Math.random() < 0.6) {
+              obj = createFrozenTree(x, z, terrainY);
+              scene.add(obj);
+              decorations.push(obj);
+            }
+            break;
+          case BIOMES.CRYSTAL:
+            if (Math.random() < 0.5) {
+              obj = new THREE.Mesh(crystalGeo, crystalMat);
+              const scale = 0.3 + Math.random() * 1.5;
+              obj.scale.set(scale * 0.5, scale, scale * 0.5);
+              obj.position.set(x, terrainY + scale * 0.5, z);
+              obj.rotation.y = Math.random() * Math.PI;
+              obj.castShadow = true;
+              obj.receiveShadow = true;
+              obj.userData = {
+                baseY: obj.position.y,
+                phase: Math.random() * Math.PI * 2,
+                speed: 0.5 + Math.random() * 0.5,
+              };
+              scene.add(obj);
+              crystals.push(obj);
+            }
+            break;
+          case BIOMES.MOUNTAINS:
+            if (Math.random() < 0.4) {
+              obj = createRockSpire(x, z, terrainY);
+              scene.add(obj);
+              decorations.push(obj);
+            }
+            break;
+          case BIOMES.TUNDRA:
+            if (Math.random() < 0.25) {
+              obj = createSnowMound(x, z, terrainY);
+              scene.add(obj);
+              decorations.push(obj);
+            }
+            break;
+          case BIOMES.ICE_FIELDS:
+            if (Math.random() < 0.2) {
+              obj = createIceShard(x, z, terrainY);
+              scene.add(obj);
+              decorations.push(obj);
+            }
+            break;
+        }
+      }
+
+      // Also expose biome at player position for gameplay hooks
+      function getBiomeAtPlayer() {
+        return getBiome(playerGroup.position.x, playerGroup.position.z);
       }
 
       // ── Snow Particles ──────────────────────────────────
@@ -305,14 +570,8 @@
       scene.add(snow);
 
       // ── Terrain Height Helper ────────────────────────────
-      const raycaster = new THREE.Raycaster();
-      const downDir = new THREE.Vector3(0, -1, 0);
-
       function getTerrainHeight(x, z) {
-        raycaster.set(new THREE.Vector3(x, 50, z), downDir);
-        const hits = raycaster.intersectObject(ground);
-        if (hits.length > 0) return hits[0].point.y;
-        return 0;
+        return getProceduralHeight(x, z);
       }
 
       // ── Player (Humanoid) ──────────────────────────────
@@ -754,6 +1013,14 @@
           state.score = Math.floor(elapsed * 10);
           document.getElementById('score').textContent = state.score;
 
+          // Update biome display
+          const biomeNames = ['Frozen Tundra', 'Ice Fields', 'Glacial Mountains', 'Frozen Forest', 'Crystal Caverns'];
+          const currentBiome = getBiomeAtPlayer();
+          document.getElementById('biome-name').textContent = biomeNames[currentBiome];
+
+          // Biome affects heat loss
+          state.currentBiome = currentBiome;
+
           // ── Temperature System with Heat Loss Multipliers ──
 
           // Ambient temperature fluctuates over time
@@ -788,6 +1055,10 @@
           // Higher elevation = colder (player Y position)
           const elevationFactor = 1.0 + Math.max(0, playerGroup.position.y - 2) * 0.05;
           multiplier *= elevationFactor;
+
+          // Biome multiplier: some biomes are harsher than others
+          const biomeHeatMultiplier = [1.0, 1.3, 1.5, 0.7, 0.9]; // tundra, ice, mountains, forest, crystal
+          multiplier *= biomeHeatMultiplier[state.currentBiome] || 1.0;
 
           // Apply heat loss
           state.bodyTemp -= heatLoss * multiplier * dt;
