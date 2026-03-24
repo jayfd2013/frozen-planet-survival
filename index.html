@@ -79,7 +79,7 @@
     <div id="title">
       <h1>Frozen Planet Survival</h1>
       <p>Press any key or click to begin</p>
-      <p style="margin-top: 12px; font-size: 13px; opacity: 0.5;">v0.1 - GitHub Pages Test</p>
+      <p style="margin-top: 12px; font-size: 13px; opacity: 0.5;">v0.2 - Humanoid Player</p>
     </div>
 
     <div id="hud" style="display: none">
@@ -237,30 +237,108 @@
       const snow = new THREE.Points(snowGeo, snowMat);
       scene.add(snow);
 
-      // ── Player (Simple Capsule) ─────────────────────────
-      const playerGroup = new THREE.Group();
+      // ── Terrain Height Helper ────────────────────────────
+      const raycaster = new THREE.Raycaster();
+      const downDir = new THREE.Vector3(0, -1, 0);
 
-      const bodyGeo = new THREE.CapsuleGeometry(0.3, 0.8, 8, 16);
-      const bodyMat = new THREE.MeshStandardMaterial({
-        color: 0xcc4444,
-        roughness: 0.6,
-      });
-      const body = new THREE.Mesh(bodyGeo, bodyMat);
-      body.position.y = 0.7;
-      body.castShadow = true;
-      playerGroup.add(body);
+      function getTerrainHeight(x, z) {
+        raycaster.set(new THREE.Vector3(x, 50, z), downDir);
+        const hits = raycaster.intersectObject(ground);
+        if (hits.length > 0) return hits[0].point.y;
+        return 0;
+      }
+
+      // ── Player (Humanoid) ──────────────────────────────
+      const playerGroup = new THREE.Group();
+      const suitColor = 0xcc4444;
+      const suitDark = 0x992222;
+      const bootColor = 0x333333;
+      const skinColor = 0xddaa88;
+      const visorColor = 0x44aaff;
+
+      const suitMat = new THREE.MeshStandardMaterial({ color: suitColor, roughness: 0.6 });
+      const suitDarkMat = new THREE.MeshStandardMaterial({ color: suitDark, roughness: 0.7 });
+      const bootMat = new THREE.MeshStandardMaterial({ color: bootColor, roughness: 0.8 });
+      const visorMat = new THREE.MeshPhysicalMaterial({ color: visorColor, roughness: 0.05, metalness: 0.8 });
+
+      // Torso
+      const torsoGeo = new THREE.BoxGeometry(0.5, 0.6, 0.3);
+      const torso = new THREE.Mesh(torsoGeo, suitMat);
+      torso.position.y = 1.0;
+      torso.castShadow = true;
+      playerGroup.add(torso);
+
+      // Belt
+      const beltGeo = new THREE.BoxGeometry(0.52, 0.08, 0.32);
+      const belt = new THREE.Mesh(beltGeo, bootMat);
+      belt.position.y = 0.72;
+      playerGroup.add(belt);
+
+      // Head
+      const headGeo = new THREE.SphereGeometry(0.18, 12, 10);
+      const head = new THREE.Mesh(headGeo, suitMat);
+      head.position.y = 1.52;
+      head.castShadow = true;
+      playerGroup.add(head);
+
+      // Helmet (slightly larger sphere around head)
+      const helmetGeo = new THREE.SphereGeometry(0.22, 12, 10);
+      const helmetMat = new THREE.MeshStandardMaterial({ color: suitDark, roughness: 0.4 });
+      const helmet = new THREE.Mesh(helmetGeo, helmetMat);
+      helmet.position.y = 1.52;
+      helmet.castShadow = true;
+      playerGroup.add(helmet);
 
       // Visor
-      const visorGeo = new THREE.SphereGeometry(0.2, 16, 8, 0, Math.PI);
-      const visorMat = new THREE.MeshPhysicalMaterial({
-        color: 0x44aaff,
-        roughness: 0.05,
-        metalness: 0.8,
-      });
+      const visorGeo = new THREE.SphereGeometry(0.17, 12, 8, 0, Math.PI, 0, Math.PI * 0.6);
       const visor = new THREE.Mesh(visorGeo, visorMat);
-      visor.position.set(0, 1.05, 0.15);
-      visor.rotation.x = -Math.PI / 4;
+      visor.position.set(0, 1.55, 0.08);
+      visor.rotation.x = -0.3;
       playerGroup.add(visor);
+
+      // Left arm
+      const armGeo = new THREE.CapsuleGeometry(0.07, 0.45, 6, 8);
+      const leftArm = new THREE.Mesh(armGeo, suitMat);
+      leftArm.position.set(-0.35, 1.0, 0);
+      leftArm.castShadow = true;
+      playerGroup.add(leftArm);
+
+      // Right arm
+      const rightArm = new THREE.Mesh(armGeo, suitMat);
+      rightArm.position.set(0.35, 1.0, 0);
+      rightArm.castShadow = true;
+      playerGroup.add(rightArm);
+
+      // Left leg
+      const legGeo = new THREE.CapsuleGeometry(0.08, 0.4, 6, 8);
+      const leftLeg = new THREE.Mesh(legGeo, suitDarkMat);
+      leftLeg.position.set(-0.13, 0.45, 0);
+      leftLeg.castShadow = true;
+      playerGroup.add(leftLeg);
+
+      // Right leg
+      const rightLeg = new THREE.Mesh(legGeo, suitDarkMat);
+      rightLeg.position.set(0.13, 0.45, 0);
+      rightLeg.castShadow = true;
+      playerGroup.add(rightLeg);
+
+      // Left boot
+      const bootGeo = new THREE.BoxGeometry(0.12, 0.1, 0.2);
+      const leftBoot = new THREE.Mesh(bootGeo, bootMat);
+      leftBoot.position.set(-0.13, 0.18, 0.03);
+      playerGroup.add(leftBoot);
+
+      // Right boot
+      const rightBoot = new THREE.Mesh(bootGeo, bootMat);
+      rightBoot.position.set(0.13, 0.18, 0.03);
+      playerGroup.add(rightBoot);
+
+      // Backpack
+      const backpackGeo = new THREE.BoxGeometry(0.3, 0.35, 0.15);
+      const backpack = new THREE.Mesh(backpackGeo, suitDarkMat);
+      backpack.position.set(0, 1.05, -0.22);
+      backpack.castShadow = true;
+      playerGroup.add(backpack);
 
       playerGroup.position.set(0, 0, 0);
       scene.add(playerGroup);
@@ -389,6 +467,9 @@
             playerGroup.rotation.y += angleDiff * 5 * dt;
           }
 
+          // Get terrain height at player position
+          const terrainY = getTerrainHeight(playerGroup.position.x, playerGroup.position.z);
+
           // Simple jump
           if (state.keys[' '] && state.onGround) {
             state.velocity.y = 6;
@@ -399,14 +480,20 @@
           state.velocity.y -= 15 * dt;
           playerGroup.position.y += state.velocity.y * dt;
 
-          if (playerGroup.position.y <= 0) {
-            playerGroup.position.y = 0;
+          if (playerGroup.position.y <= terrainY) {
+            playerGroup.position.y = terrainY;
             state.velocity.y = 0;
             state.onGround = true;
           }
 
-          // Player bobbing
-          body.position.y = 0.7 + Math.sin(elapsed * 8) * (moveDir.length() > 0 ? 0.05 : 0);
+          // Animate limbs when walking
+          const isMoving = moveDir.length() > 0;
+          const walkCycle = elapsed * 8;
+          const swing = isMoving ? Math.sin(walkCycle) * 0.5 : 0;
+          leftArm.rotation.x = swing;
+          rightArm.rotation.x = -swing;
+          leftLeg.rotation.x = -swing;
+          rightLeg.rotation.x = swing;
 
           // Score ticks up over time
           state.score = Math.floor(elapsed * 10);
