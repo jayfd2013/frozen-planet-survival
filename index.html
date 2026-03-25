@@ -1371,7 +1371,7 @@
         return a + (b - a) * ux + (c - a) * uy + (a - b - c + d) * ux * uy;
       }
 
-      function fbm(x, y, octaves = 5) {
+      function fbm(x, y, octaves = 3) {
         let val = 0, amp = 0.5, freq = 1;
         for (let i = 0; i < octaves; i++) {
           val += amp * smoothNoise(x * freq, y * freq);
@@ -1409,15 +1409,15 @@
       }
 
       function getBiomeBlend(x, z) {
-        // Returns array of [biome, weight] for smooth blending
-        const step = 3;
+        // Returns array of [biome, weight] for smooth blending (5 samples for perf)
+        const step = 4;
         const counts = [0, 0, 0, 0, 0];
-        const samples = 9;
-        for (let dx = -1; dx <= 1; dx++) {
-          for (let dz = -1; dz <= 1; dz++) {
-            counts[getBiome(x + dx * step, z + dz * step)]++;
-          }
-        }
+        const samples = 5;
+        counts[getBiome(x, z)]++;
+        counts[getBiome(x - step, z)]++;
+        counts[getBiome(x + step, z)]++;
+        counts[getBiome(x, z - step)]++;
+        counts[getBiome(x, z + step)]++;
         const result = [];
         for (let i = 0; i < 5; i++) {
           if (counts[i] > 0) result.push([i, counts[i] / samples]);
@@ -1471,7 +1471,7 @@
 
       // ── Ground (Procedural Biome Terrain) ─────────────────
       const TERRAIN_SIZE = 300;
-      const TERRAIN_SEGMENTS = 200;
+      const TERRAIN_SEGMENTS = 120;
       const groundGeo = new THREE.PlaneGeometry(TERRAIN_SIZE, TERRAIN_SIZE, TERRAIN_SEGMENTS, TERRAIN_SEGMENTS);
       const posAttr = groundGeo.attributes.position;
 
@@ -1615,7 +1615,7 @@
       const decorations = [];
       const DECO_RANGE = 120;
 
-      for (let i = 0; i < 300; i++) {
+      for (let i = 0; i < 150; i++) {
         const x = (Math.random() - 0.5) * DECO_RANGE * 2;
         const z = (Math.random() - 0.5) * DECO_RANGE * 2;
         const biome = getBiome(x, z);
@@ -1785,7 +1785,7 @@
 
       // Spawn resource nodes across the map
       const resourceNodes = [];
-      const RESOURCE_COUNT = 250;
+      const RESOURCE_COUNT = 120;
 
       // Guarantee wood near spawn so player can craft early
       const NEAR_WOOD_COUNT = 8;
@@ -2202,7 +2202,7 @@
       const placedObjects = [];
 
       // Spawn campfires around the world so player can survive early
-      const SPAWN_CAMPFIRE_COUNT = 15;
+      const SPAWN_CAMPFIRE_COUNT = 8;
       for (let i = 0; i < SPAWN_CAMPFIRE_COUNT; i++) {
         const angle = (i / SPAWN_CAMPFIRE_COUNT) * Math.PI * 2;
         const radius = 15 + Math.random() * 80;
@@ -2666,7 +2666,7 @@
       }
 
       // ── Snow Particles (scaled for weather system) ─────
-      const snowCount = 12000;
+      const snowCount = 5000;
       const snowGeo = new THREE.BufferGeometry();
       const snowPos = new Float32Array(snowCount * 3);
       const snowVel = new Float32Array(snowCount);
