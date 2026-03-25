@@ -427,7 +427,7 @@
     </div>
 
     <div id="instructions" style="display: none">
-      W/S - Move &nbsp;|&nbsp; A/D - Turn &nbsp;|&nbsp; Shift - Sprint &nbsp;|&nbsp; C - Crouch &nbsp;|&nbsp; Space - Jump &nbsp;|&nbsp; E - Gather &nbsp;|&nbsp; Tab - Craft &nbsp;|&nbsp; F - Place &nbsp;|&nbsp; Click - Attack &nbsp;|&nbsp; Q - Cook &nbsp;|&nbsp; R - Eat &nbsp;|&nbsp; G - Drop &nbsp;|&nbsp; T - Chat &nbsp;|&nbsp; Esc - Pause
+      W/S - Move &nbsp;|&nbsp; A/D - Turn &nbsp;|&nbsp; Shift - Sprint &nbsp;|&nbsp; C - Crouch &nbsp;|&nbsp; Space - Jump &nbsp;|&nbsp; E - Gather &nbsp;|&nbsp; Tab - Craft &nbsp;|&nbsp; K - Skills &nbsp;|&nbsp; F - Place &nbsp;|&nbsp; Click - Attack &nbsp;|&nbsp; Q - Cook &nbsp;|&nbsp; R - Eat &nbsp;|&nbsp; G - Drop &nbsp;|&nbsp; T - Chat &nbsp;|&nbsp; Esc - Pause
     </div>
 
     <div id="craft-menu">
@@ -1857,6 +1857,18 @@
           id: 'fishing_rod', name: 'Fishing Rod', desc: 'Fish at ice holes for food',
           cost: { wood: 2, cloth: 1 }, placeable: false,
         },
+        {
+          id: 'signal_fire', name: 'Signal Fire', desc: 'Light on a mountain peak (y>10) for rescue',
+          cost: { wood: 8, fuel: 4, cloth: 2 }, placeable: true,
+        },
+        {
+          id: 'wall', name: 'Snow Wall', desc: 'Blocks wind, place to build a shelter',
+          cost: { stone: 2, wood: 1 }, placeable: true,
+        },
+        {
+          id: 'door', name: 'Wooden Door', desc: 'A door for your base',
+          cost: { wood: 3, metal: 1 }, placeable: true,
+        },
       ];
 
       function canCraft(recipe) {
@@ -1907,6 +1919,44 @@
 
       function costString(cost) {
         return Object.entries(cost).map(([r, a]) => `${a} ${r}`).join(', ');
+      }
+
+      const SKILL_DEFS = {
+        coldResist:  { name: 'Cold Resistance', maxLevel: 3, desc: '-15% heat loss per level' },
+        gatherSpeed: { name: 'Quick Hands', maxLevel: 3, desc: '+20% gather speed per level' },
+        wolfFighter: { name: 'Wolf Fighter', maxLevel: 3, desc: '+5 attack damage per level' },
+        sprinter:    { name: 'Endurance', maxLevel: 2, desc: '-15% sprint energy drain per level' },
+        hunter:      { name: 'Master Hunter', maxLevel: 2, desc: '+1 meat from animals per level' },
+      };
+
+      function updateSkillMenu() {
+        document.getElementById('skill-points-display').textContent = `Points: ${state.skillPoints}`;
+        const list = document.getElementById('skill-list');
+        list.innerHTML = '';
+        for (const [id, def] of Object.entries(SKILL_DEFS)) {
+          const level = state.skills[id];
+          const maxed = level >= def.maxLevel;
+          const canBuy = state.skillPoints > 0 && !maxed;
+          const div = document.createElement('div');
+          div.className = 'skill-item';
+          div.innerHTML = `
+            <div>
+              <div class="skill-name">${def.name}</div>
+              <div class="skill-desc">${def.desc}</div>
+              <div class="skill-level">Level ${level}/${def.maxLevel}</div>
+            </div>
+            <button class="skill-btn" ${canBuy ? '' : 'disabled'}>${maxed ? 'MAX' : 'Upgrade'}</button>
+          `;
+          if (canBuy) {
+            div.querySelector('.skill-btn').addEventListener('click', () => {
+              state.skillPoints--;
+              state.skills[id]++;
+              if (typeof playCraftSound === 'function') playCraftSound();
+              updateSkillMenu();
+            });
+          }
+          list.appendChild(div);
+        }
       }
 
       function updateCraftMenu() {
@@ -2113,6 +2163,39 @@
         return group;
       }
 
+      function createWall(x, z) {
+        const terrainY = getTerrainHeight(x, z);
+        const geo = new THREE.BoxGeometry(2.5, 2, 0.3);
+        const mat = new THREE.MeshStandardMaterial({ color: 0xccddee, roughness: 0.6 });
+        const wall = new THREE.Mesh(geo, mat);
+        wall.position.set(x, terrainY + 1, z);
+        wall.castShadow = true;
+        wall.receiveShadow = true;
+        wall.userData = { type: 'wall', shelterRange: 2.5, heatReduction: 0.5 };
+        scene.add(wall);
+        return wall;
+      }
+
+      function createDoor(x, z) {
+        const terrainY = getTerrainHeight(x, z);
+        const group = new THREE.Group();
+        const frameGeo = new THREE.BoxGeometry(1.2, 2, 0.15);
+        const frameMat = new THREE.MeshStandardMaterial({ color: 0x886644, roughness: 0.8 });
+        const frame = new THREE.Mesh(frameGeo, frameMat);
+        frame.position.y = 1;
+        frame.castShadow = true;
+        group.add(frame);
+        const handleGeo = new THREE.SphereGeometry(0.05, 6, 6);
+        const handleMat = new THREE.MeshStandardMaterial({ color: 0xccaa44, metalness: 0.5 });
+        const handle = new THREE.Mesh(handleGeo, handleMat);
+        handle.position.set(0.4, 1, 0.1);
+        group.add(handle);
+        group.position.set(x, terrainY, z);
+        group.userData = { type: 'door', shelterRange: 1.5, heatReduction: 0.4 };
+        scene.add(group);
+        return group;
+      }
+
       // Placed world items
       const placedObjects = [];
 
@@ -2132,6 +2215,52 @@
       const startFire = createCampfire(5, -4);
       startFire.userData.fuel = 200;
       placedObjects.push(startFire);
+
+      // ── Journal Pages / Artifacts ─────────────────────
+      const JOURNAL_ENTRIES = [
+        "Day 1: The ship crashed on the northern ridge. I'm the only survivor...",
+        "Day 3: Found wolf tracks near camp. They're watching me at night.",
+        "Day 7: Discovered crystals in the caves. They pulse with strange energy.",
+        "Day 12: The blizzards are getting worse. I've built a shelter near the forest.",
+        "Day 18: Radio is broken. Need metal parts to build a beacon.",
+        "Day 25: Saw lights in the sky last night. The aurora here is unlike anything on Earth.",
+        "Day 30: Food is running low. The deer are hard to catch in this snow.",
+        "Day 41: Found an old campsite. Someone else was here before me...",
+        "Day 55: The wolves have a den in the mountains. Stay clear of the eastern ridge.",
+        "Day 72: If anyone finds these pages... the beacon frequency is 142.7 MHz. Send help.",
+      ];
+
+      const journalPages = [];
+      const collectedPages = [];
+
+      function createJournalPage(x, z, index) {
+        const terrainY = getProceduralHeight(x, z);
+        const group = new THREE.Group();
+        const paperGeo = new THREE.PlaneGeometry(0.3, 0.4);
+        const paperMat = new THREE.MeshStandardMaterial({
+          color: 0xeedd99, roughness: 0.8, side: THREE.DoubleSide, emissive: 0xeedd99, emissiveIntensity: 0.2
+        });
+        const paper = new THREE.Mesh(paperGeo, paperMat);
+        paper.position.y = 0.5;
+        paper.rotation.x = -0.3;
+        paper.rotation.y = Math.random() * Math.PI * 2;
+        group.add(paper);
+        const glowLight = new THREE.PointLight(0xffdd44, 0.8, 5);
+        glowLight.position.y = 0.5;
+        group.add(glowLight);
+        group.position.set(x, terrainY, z);
+        group.userData = { type: 'journal', index, collected: false };
+        scene.add(group);
+        return group;
+      }
+
+      for (let i = 0; i < 10; i++) {
+        const angle = (i / 10) * Math.PI * 2 + Math.random() * 0.5;
+        const dist = 20 + Math.random() * 80;
+        const jx = Math.cos(angle) * dist;
+        const jz = Math.sin(angle) * dist;
+        journalPages.push(createJournalPage(jx, jz, i));
+      }
 
       // ── Rescue Beacon ────────────────────────────────────
       function createBeacon(x, z) {
@@ -2845,6 +2974,16 @@
           document.getElementById('craft-menu').style.display = state.craftMenuOpen ? 'block' : 'none';
           if (state.craftMenuOpen) updateCraftMenu();
         }
+        else if (e.key.toLowerCase() === 'k') {
+          e.preventDefault();
+          state.skillMenuOpen = !state.skillMenuOpen;
+          document.getElementById('skill-menu').style.display = state.skillMenuOpen ? 'block' : 'none';
+          if (state.skillMenuOpen) updateSkillMenu();
+          if (state.skillMenuOpen) {
+            state.craftMenuOpen = false;
+            document.getElementById('craft-menu').style.display = 'none';
+          }
+        }
         else if (e.key.toLowerCase() === 'f' && state.pendingPlace) {
           // Place item in front of player
           const px = playerGroup.position.x - Math.sin(playerGroup.rotation.y) * 2;
@@ -2860,12 +2999,30 @@
             state.beaconTimer = 0;
             showStatus('BEACON ACTIVE! Survive 2 minutes for rescue!', '#ff44ff');
             addChatMessage('System', 'RESCUE BEACON ACTIVATED!', '#ff44ff');
+          } else if (state.pendingPlace === 'signal_fire') {
+            const ty = getTerrainHeight(px, pz);
+            if (ty < 10) {
+              showStatus('Must place Signal Fire on a mountain peak! (higher elevation)', '#ff4444');
+              return;
+            }
+            obj = createCampfire(px, pz);
+            obj.userData.type = 'signal_fire';
+            obj.userData.fuel = 999;
+            state.beaconActive = true;
+            state.beaconTimer = 0;
+            state.beaconRequired = 90;
+            showStatus('SIGNAL FIRE LIT! Survive 90 seconds on the peak!', '#ff8844');
+          } else if (state.pendingPlace === 'wall') {
+            obj = createWall(px, pz);
+          } else if (state.pendingPlace === 'door') {
+            obj = createDoor(px, pz);
           }
           if (obj) {
             obj.rotation.y = playerGroup.rotation.y;
             placedObjects.push(obj);
-            if (state.pendingPlace !== 'beacon') {
-              showStatus(`${state.pendingPlace === 'campfire' ? 'Campfire' : 'Shelter'} placed!`, '#44ff88');
+            if (state.pendingPlace !== 'beacon' && state.pendingPlace !== 'signal_fire') {
+              const placeNames = { campfire: 'Campfire', shelter: 'Shelter', wall: 'Snow Wall', door: 'Wooden Door' };
+              showStatus(`${placeNames[state.pendingPlace] || state.pendingPlace} placed!`, '#44ff88');
             }
             // Broadcast placement to other players
             if (state.isMultiplayer) {
@@ -2922,7 +3079,7 @@
           }
         }
         if (closest) {
-          const dmg = state.hasIcePick ? 20 : 10;
+          const dmg = (state.hasIcePick ? 20 : 10) + state.skills.wolfFighter * 5;
           closest.userData.health -= dmg;
           closest.userData.hitFlash = 0.15;
           closest.userData.body.material = wolfHitMat;
@@ -2969,7 +3126,7 @@
             }
           }
           if (closestAnimal) {
-            const admg = state.hasIcePick ? 20 : 10;
+            const admg = (state.hasIcePick ? 20 : 10) + state.skills.wolfFighter * 5;
             closestAnimal.animal.userData.health -= admg;
             closestAnimal.animal.userData.hitFlash = 0.15;
             closestAnimal.animal.userData.body.material = closestAnimal.hitMat;
@@ -2981,7 +3138,7 @@
             closestAnimal.animal.position.x += (adx2/alen) * 1.5;
             closestAnimal.animal.position.z += (adz2/alen) * 1.5;
             if (closestAnimal.animal.userData.health <= 0) {
-              const meatAmt = closestAnimal.animal.userData.meatDrop;
+              const meatAmt = closestAnimal.animal.userData.meatDrop + state.skills.hunter;
               state.meat += meatAmt;
               scene.remove(closestAnimal.animal);
               closestAnimal.arr.splice(closestAnimal.arr.indexOf(closestAnimal.animal), 1);
@@ -3181,7 +3338,12 @@
         state.paused = false;
         state.beaconActive = false;
         state.beaconTimer = 0;
+        state.beaconRequired = 120;
         state.rescued = false;
+        state.skillPoints = 0;
+        state.skills = { coldResist: 0, gatherSpeed: 0, wolfFighter: 0, sprinter: 0, hunter: 0 };
+        state.skillMenuOpen = false;
+        document.getElementById('skill-menu').style.display = 'none';
         state.inCave = false;
         state.caveReturnPos = null;
         caveRoom.visible = false;
@@ -3212,6 +3374,13 @@
         const sf = createCampfire(5, -4);
         sf.userData.fuel = 200;
         placedObjects.push(sf);
+        // Reset journal pages
+        for (const p of journalPages) { p.userData.collected = false; p.visible = true; }
+        collectedPages.length = 0;
+        // Reset win screen text
+        document.getElementById('win-screen').querySelector('h1').textContent = 'RESCUED!';
+        document.getElementById('win-screen').querySelector('h1').style.color = '#44ff88';
+        document.getElementById('win-screen').querySelector('p').textContent = 'You survived the frozen planet!';
         // Restore all resource nodes
         for (const node of resourceNodes) {
           node.userData.depleted = false;
@@ -3461,7 +3630,11 @@
         const timeEl = document.getElementById('time-display');
         if (timeEl) {
           // Track day count (increment when crossing midnight)
-          if (t < 0.02 && state._lastTimeOfDay > 0.98) state.dayCount++;
+          if (t < 0.02 && state._lastTimeOfDay > 0.98) {
+            state.dayCount++;
+            state.skillPoints++;
+            if (typeof addChatMessage === 'function') addChatMessage('System', 'New day! +1 skill point (K to open skills)', '#bb88ff');
+          }
           state._lastTimeOfDay = t;
           timeEl.textContent = `Day ${state.dayCount} ${timeStr}`;
           timeEl.style.color = state.isDay ? '#ffdd88' : '#8899cc';
@@ -3891,6 +4064,10 @@
             if (dist < obj.userData.shelterRange) {
               state.insideShelter = true;
             }
+          } else if (obj.userData.type === 'wall' || obj.userData.type === 'door') {
+            if (dist < obj.userData.shelterRange) {
+              state.insideShelter = true;
+            }
           }
         }
 
@@ -3968,7 +4145,7 @@
 
           // Energy drain/recovery
           if (state.isSprinting) {
-            state.energy = Math.max(0, state.energy - 15 * dt); // drains in ~7 seconds
+            state.energy = Math.max(0, state.energy - 15 * (1 - state.skills.sprinter * 0.15) * dt); // drains in ~7 seconds
           } else if (isMoving) {
             state.energy = Math.min(100, state.energy + 3 * dt); // slow recovery while walking
           } else {
@@ -4135,7 +4312,7 @@
                 state.gatherProgress = 0;
               }
               state.gathering = true;
-              const gatherSpeed = state.hasIcePick ? 2 : 1;
+              const gatherSpeed = (state.hasIcePick ? 2 : 1) * (1 + state.skills.gatherSpeed * 0.2);
               state.gatherProgress += (dt * gatherSpeed) / resInfo.gatherTime;
               gatherLabel.textContent = `Gathering ${resInfo.name}...`;
               gatherBar.style.width = Math.min(100, state.gatherProgress * 100) + '%';
@@ -4316,6 +4493,9 @@
 
             // Torch provides small warmth bonus
             if (state.heldItem === 'torch') multiplier *= 0.85;
+
+            // Cold resistance skill
+            multiplier *= (1 - state.skills.coldResist * 0.15);
 
             // Apply heat loss
             state.bodyTemp -= heatLoss * multiplier * dt;
@@ -4668,6 +4848,44 @@
           }
         }
 
+        // Journal page pickup
+        for (const page of journalPages) {
+          if (page.userData.collected) continue;
+          const dx = page.position.x - playerGroup.position.x;
+          const dz = page.position.z - playerGroup.position.z;
+          if (Math.sqrt(dx*dx + dz*dz) < 2) {
+            page.userData.collected = true;
+            page.visible = false;
+            collectedPages.push(page.userData.index);
+            const popup = document.getElementById('journal-popup');
+            document.getElementById('journal-text').textContent = JOURNAL_ENTRIES[page.userData.index];
+            document.getElementById('journal-count').textContent = `${collectedPages.length}/10`;
+            popup.style.display = 'block';
+            setTimeout(() => popup.style.display = 'none', 6000);
+            state.score += 100;
+            showStatus(`Journal page found! (${collectedPages.length}/10) +100 pts`, '#eedd66');
+            if (typeof addChatMessage === 'function') addChatMessage('System', `Found journal page ${collectedPages.length}/10`, '#eedd66');
+            // Win condition: all 10 pages
+            if (collectedPages.length >= 10) {
+              state.rescued = true;
+              state.score += 1000;
+              document.getElementById('win-screen').querySelector('h1').textContent = 'MYSTERY SOLVED!';
+              document.getElementById('win-screen').querySelector('h1').style.color = '#eedd44';
+              document.getElementById('win-screen').querySelector('p').textContent = 'You found all the journal pages and uncovered the truth!';
+              document.getElementById('win-score').textContent = state.score;
+              const winEl = document.getElementById('win-screen');
+              winEl.style.display = 'flex';
+              winEl.style.opacity = '0';
+              requestAnimationFrame(() => winEl.style.opacity = '1');
+              if (typeof addChatMessage === 'function') addChatMessage('System', 'ALL PAGES FOUND! Mystery solved!', '#eedd44');
+            }
+          }
+          if (!page.userData.collected) {
+            page.children[0].position.y = 0.5 + Math.sin(elapsed * 2 + page.userData.index) * 0.1;
+            page.children[0].rotation.y += dt * 0.5;
+          }
+        }
+
         // ── Beacon Timer & Win Condition ──────────────────
         if (state.beaconActive && !state.rescued && !state.dead) {
           state.beaconTimer += dt;
@@ -4795,6 +5013,18 @@
             if (deerX < 0 || deerX > mw || deerZ < 0 || deerZ > mh) continue;
             mctx.fillStyle = '#886644';
             mctx.fillRect(deerX - 1, deerZ - 1, 3, 3);
+          }
+
+          // Journal pages (yellow dots)
+          for (const page of journalPages) {
+            if (page.userData.collected) continue;
+            const jx = cx + (page.position.x - playerGroup.position.x) * mapScale;
+            const jz = cy + (page.position.z - playerGroup.position.z) * mapScale;
+            if (jx < 0 || jx > mw || jz < 0 || jz > mh) continue;
+            mctx.fillStyle = '#ffdd44';
+            mctx.beginPath();
+            mctx.arc(jx, jz, 2, 0, Math.PI * 2);
+            mctx.fill();
           }
 
           // Draw fishing spots (blue dots)
