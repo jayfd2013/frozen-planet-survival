@@ -1331,8 +1331,8 @@
       const sunLight = new THREE.DirectionalLight(0xffeedd, 0.5);
       sunLight.position.set(30, 50, 20);
       sunLight.castShadow = true;
-      sunLight.shadow.mapSize.width = 2048;
-      sunLight.shadow.mapSize.height = 2048;
+      sunLight.shadow.mapSize.width = 1024;
+      sunLight.shadow.mapSize.height = 1024;
       sunLight.shadow.camera.far = 100;
       sunLight.shadow.camera.left = -30;
       sunLight.shadow.camera.right = 30;
@@ -1343,8 +1343,8 @@
       const moonLight = new THREE.DirectionalLight(0xccddeeff, 1.5);
       moonLight.position.set(20, 40, -20);
       moonLight.castShadow = true;
-      moonLight.shadow.mapSize.width = 2048;
-      moonLight.shadow.mapSize.height = 2048;
+      moonLight.shadow.mapSize.width = 1024;
+      moonLight.shadow.mapSize.height = 1024;
       moonLight.shadow.camera.far = 100;
       moonLight.shadow.camera.left = -30;
       moonLight.shadow.camera.right = 30;
@@ -1428,50 +1428,52 @@
       function biomeHeight(x, z, biome) {
         switch (biome) {
           case BIOMES.TUNDRA:
-            return fbm(x * 0.02, z * 0.02, 4) * 3 - 1;
+            return smoothNoise(x * 0.02, z * 0.02) * 3 - 1;
           case BIOMES.ICE_FIELDS:
-            return fbm(x * 0.015, z * 0.015, 3) * 1.5 - 0.5;
+            return smoothNoise(x * 0.015, z * 0.015) * 1.5 - 0.5;
           case BIOMES.MOUNTAINS:
-            return fbm(x * 0.01, z * 0.01, 6) * 18 +
-                   Math.pow(fbm(x * 0.03, z * 0.03, 3), 2) * 10 - 3;
+            return fbm(x * 0.01, z * 0.01, 2) * 18 +
+                   Math.pow(smoothNoise(x * 0.03, z * 0.03), 2) * 10 - 3;
           case BIOMES.FOREST:
-            return fbm(x * 0.02, z * 0.02, 4) * 5 - 1 +
+            return smoothNoise(x * 0.02, z * 0.02) * 5 - 1 +
                    Math.sin(x * 0.05) * 0.8;
           case BIOMES.CRYSTAL:
-            return fbm(x * 0.025, z * 0.025, 4) * 4 +
+            return smoothNoise(x * 0.025, z * 0.025) * 4 +
                    Math.abs(Math.sin(x * 0.1) * Math.cos(z * 0.1)) * 2 - 1;
           default: return 0;
         }
       }
 
+      // Biome cache for fast lookups
+      const _biomeCache = new Map();
+      function getBiomeCached(x, z) {
+        const kx = Math.round(x / 4) * 4;
+        const kz = Math.round(z / 4) * 4;
+        const key = kx * 10000 + kz;
+        let b = _biomeCache.get(key);
+        if (b === undefined) { b = getBiome(kx, kz); _biomeCache.set(key, b); }
+        return b;
+      }
+
       function getProceduralHeight(x, z) {
-        const blend = getBiomeBlend(x, z);
-        let h = 0;
-        for (const [biome, weight] of blend) {
-          h += biomeHeight(x, z, biome) * weight;
-        }
-        return h;
+        const biome = getBiomeCached(x, z);
+        return biomeHeight(x, z, biome);
       }
 
       function getProceduralColor(x, z) {
-        const blend = getBiomeBlend(x, z);
-        const color = new THREE.Color(0, 0, 0);
-        for (const [biome, weight] of blend) {
-          color.r += biomeColors[biome].r * weight;
-          color.g += biomeColors[biome].g * weight;
-          color.b += biomeColors[biome].b * weight;
-        }
-        // Add subtle noise variation
-        const variation = (fbm(x * 0.1, z * 0.1, 2) - 0.5) * 0.08;
-        color.r = Math.max(0, Math.min(1, color.r + variation));
-        color.g = Math.max(0, Math.min(1, color.g + variation));
-        color.b = Math.max(0, Math.min(1, color.b + variation));
-        return color;
+        const biome = getBiomeCached(x, z);
+        const col = biomeColors[biome];
+        const variation = (smoothNoise(x * 0.1, z * 0.1) - 0.5) * 0.08;
+        return new THREE.Color(
+          Math.max(0, Math.min(1, col.r + variation)),
+          Math.max(0, Math.min(1, col.g + variation)),
+          Math.max(0, Math.min(1, col.b + variation))
+        );
       }
 
       // ── Ground (Procedural Biome Terrain) ─────────────────
       const TERRAIN_SIZE = 300;
-      const TERRAIN_SEGMENTS = 120;
+      const TERRAIN_SEGMENTS = 80;
       const groundGeo = new THREE.PlaneGeometry(TERRAIN_SIZE, TERRAIN_SIZE, TERRAIN_SEGMENTS, TERRAIN_SEGMENTS);
       const posAttr = groundGeo.attributes.position;
 
@@ -1788,7 +1790,7 @@
       const RESOURCE_COUNT = 120;
 
       // Guarantee wood near spawn so player can craft early
-      const NEAR_WOOD_COUNT = 8;
+      const NEAR_WOOD_COUNT = 5;
       for (let i = 0; i < NEAR_WOOD_COUNT; i++) {
         const angle = (i / NEAR_WOOD_COUNT) * Math.PI * 2 + Math.random() * 0.5;
         const dist = 6 + Math.random() * 12;
@@ -2516,33 +2518,27 @@
         return group;
       }
 
-      // Spawn rabbits and deer
-      for (let i = 0; i < 12; i++) {
+      // Spawn rabbits and deer (no infinite retry)
+      for (let i = 0; i < 8; i++) {
         const rx = (Math.random() - 0.5) * DECO_RANGE * 2;
         const rz = (Math.random() - 0.5) * DECO_RANGE * 2;
-        const biome = getBiome(rx, rz);
-        if (biome === BIOMES.FOREST || biome === BIOMES.TUNDRA) {
-          const r = createRabbit(rx, rz);
-          r._netId = i;
-          rabbits.push(r);
-        } else { i--; }
+        const r = createRabbit(rx, rz);
+        r._netId = i;
+        rabbits.push(r);
       }
-      for (let i = 0; i < 6; i++) {
+      for (let i = 0; i < 4; i++) {
         const dx = (Math.random() - 0.5) * DECO_RANGE * 2;
         const dz = (Math.random() - 0.5) * DECO_RANGE * 2;
-        const biome = getBiome(dx, dz);
-        if (biome === BIOMES.FOREST || biome === BIOMES.TUNDRA) {
-          const d = createDeer(dx, dz);
-          d._netId = i;
-          deer.push(d);
-        } else { i--; }
+        const d = createDeer(dx, dz);
+        d._netId = i;
+        deer.push(d);
       }
 
       // ── Fishing Spots ─────────────────────────────────────
       const fishingSpots = [];
-      for (let i = 0; i < 10; i++) {
+      for (let i = 0; i < 5; i++) {
         let fx, fz;
-        for (let attempt = 0; attempt < 20; attempt++) {
+        for (let attempt = 0; attempt < 10; attempt++) {
           fx = (Math.random() - 0.5) * DECO_RANGE * 2;
           fz = (Math.random() - 0.5) * DECO_RANGE * 2;
           if (getBiome(fx, fz) === BIOMES.ICE_FIELDS) break;
@@ -2628,7 +2624,7 @@
       caveCeiling.rotation.x = Math.PI / 2;
       caveCeiling.position.y = -42;
       caveRoom.add(caveCeiling);
-      for (let i = 0; i < 15; i++) {
+      for (let i = 0; i < 8; i++) {
         const cg = new THREE.Mesh(crystalGeo, new THREE.MeshPhysicalMaterial({
           color: 0x8844ff, roughness: 0.05, emissive: 0x4422aa, emissiveIntensity: 0.5,
           transmission: 0.4, thickness: 0.5,
@@ -2877,7 +2873,7 @@
       scene.add(playerGroup);
 
       // ── Stars ───────────────────────────────────────────
-      const starCount = 2000;
+      const starCount = 800;
       const starGeo = new THREE.BufferGeometry();
       const starPos = new Float32Array(starCount * 3);
       for (let i = 0; i < starCount; i++) {
