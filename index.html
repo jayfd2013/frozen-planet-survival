@@ -102,6 +102,10 @@
         transition: opacity 0.3s;
       }
 
+      #death-screen, #win-screen {
+        transition: opacity 0.5s ease;
+      }
+
       #temp-bar-container {
         position: absolute;
         top: 20px;
@@ -315,6 +319,13 @@
     </style>
   </head>
   <body>
+    <div id="loading-screen" style="position:fixed; top:0; left:0; width:100%; height:100%; background:#0a0a1a; z-index:100; display:flex; justify-content:center; align-items:center; flex-direction:column; transition:opacity 0.5s;">
+      <h1 style="font-size:36px; color:#88ccff; text-shadow:0 0 20px rgba(100,180,255,0.6);">Frozen Planet Survival</h1>
+      <p style="margin-top:16px; font-size:14px; opacity:0.5;">Loading world...</p>
+      <div style="margin-top:20px; width:200px; height:4px; background:rgba(255,255,255,0.1); border-radius:2px; overflow:hidden;">
+        <div id="load-bar" style="width:0%; height:100%; background:linear-gradient(to right,#4488cc,#88ddff); border-radius:2px; transition:width 0.3s;"></div>
+      </div>
+    </div>
     <div id="title">
       <h1>Frozen Planet Survival</h1>
       <p style="margin-top: 8px; font-size: 14px; opacity: 0.6;">Multiplayer Survival</p>
@@ -364,13 +375,25 @@
     </div>
 
     <div id="hud" style="display: none">
-      <div>Health: <span id="health">100</span></div>
-      <div>Energy: <span id="energy">100</span></div>
-      <div>Body Temp: <span id="temp">37.0</span>&deg;C</div>
+      <div style="margin-bottom:10px;">
+        <div style="font-size:12px; opacity:0.6; margin-bottom:2px;">HP</div>
+        <div style="width:180px; height:10px; background:rgba(0,0,0,0.5); border-radius:5px; overflow:hidden; border:1px solid rgba(255,100,100,0.3);">
+          <div id="health-bar" style="height:100%; width:100%; background:linear-gradient(to right,#cc4444,#ff6666); border-radius:5px; transition:width 0.3s;"></div>
+        </div>
+        <div style="font-size:11px; opacity:0.5; margin-top:1px;"><span id="health">100</span>/100</div>
+      </div>
+      <div style="margin-bottom:10px;">
+        <div style="font-size:12px; opacity:0.6; margin-bottom:2px;">Energy</div>
+        <div style="width:180px; height:10px; background:rgba(0,0,0,0.5); border-radius:5px; overflow:hidden; border:1px solid rgba(255,200,50,0.3);">
+          <div id="energy-bar" style="height:100%; width:100%; background:linear-gradient(to right,#cc8800,#ffcc44); border-radius:5px; transition:width 0.3s;"></div>
+        </div>
+        <div style="font-size:11px; opacity:0.5; margin-top:1px;"><span id="energy">100</span>/100</div>
+      </div>
+      <div style="font-size:14px;">Body Temp: <span id="temp">37.0</span>&deg;C</div>
       <div>Score: <span id="score">0</span></div>
       <div>Biome: <span id="biome-name">Tundra</span></div>
       <div>Weather: <span id="weather-name">Clear</span></div>
-      <div id="time-display" style="color: #ffdd88;">Day 06:00</div>
+      <div id="time-display" style="color: #ffdd88;">Day 1 06:00</div>
       <div id="status-msg" style="color: #ffaa44; display: none;"></div>
       <div style="margin-top: 12px; font-size: 14px; opacity: 0.7;">
         <span id="inv-wood">Wood: 0</span> &nbsp;
@@ -435,6 +458,7 @@
 
     <canvas id="wind-overlay" width="512" height="512"></canvas>
     <canvas id="frost-overlay" width="512" height="512"></canvas>
+    <div id="damage-flash" style="position:fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:6; background:radial-gradient(ellipse at center, rgba(255,0,0,0) 40%, rgba(200,0,0,0.6) 100%); opacity:0; transition:opacity 0.1s;"></div>
 
     <div id="temp-bar-container">
       <div id="temp-bar-label">BODY</div>
@@ -495,6 +519,8 @@
         timeOfDay: 0.25,       // 0-1, 0=midnight, 0.25=sunrise, 0.5=noon, 0.75=sunset
         dayDuration: 240,      // full day cycle in seconds (4 minutes)
         isDay: false,
+        dayCount: 1,
+        _lastTimeOfDay: 0.25,
         // State management
         paused: false,
         // Enemies
@@ -1776,6 +1802,7 @@
 
       function doCraft(recipe) {
         if (!canCraft(recipe)) return;
+        playCraftSound();
         for (const [res, amt] of Object.entries(recipe.cost)) {
           state.inventory[res] -= amt;
         }
@@ -2146,6 +2173,9 @@
         return group;
       }
 
+      const wolfHitMat = new THREE.MeshBasicMaterial({ color: 0xff4444 });
+      const wolfNormalMat = new THREE.MeshStandardMaterial({ color: 0x99aacc, roughness: 0.7 });
+
       function spawnWolves() {
         for (const w of wolves) scene.remove(w);
         wolves.length = 0;
@@ -2482,7 +2512,8 @@
           const dmg = state.hasIcePick ? 20 : 10;
           closest.userData.health -= dmg;
           closest.userData.hitFlash = 0.15;
-          closest.userData.body.material = new THREE.MeshBasicMaterial({ color: 0xff4444 });
+          closest.userData.body.material = wolfHitMat;
+          playHitSound();
           showStatus(`Hit wolf! (${Math.max(0, closest.userData.health)} HP)`, '#ff8844');
           // Knockback
           const dx = closest.position.x - playerGroup.position.x;
@@ -2682,6 +2713,8 @@
         state.nearCampfire = false;
         state.insideShelter = false;
         state.timeOfDay = 0.25; // restart at sunrise
+        state.dayCount = 1;
+        state._lastTimeOfDay = 0.25;
         state.paused = false;
         state.beaconActive = false;
         state.beaconTimer = 0;
@@ -2957,7 +2990,10 @@
         const timeStr = `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
         const timeEl = document.getElementById('time-display');
         if (timeEl) {
-          timeEl.textContent = `${state.isDay ? 'Day' : 'Night'} ${timeStr}`;
+          // Track day count (increment when crossing midnight)
+          if (t < 0.02 && state._lastTimeOfDay > 0.98) state.dayCount++;
+          state._lastTimeOfDay = t;
+          timeEl.textContent = `Day ${state.dayCount} ${timeStr}`;
           timeEl.style.color = state.isDay ? '#ffdd88' : '#8899cc';
         }
       }
@@ -2965,6 +3001,134 @@
       // ── Game Loop ───────────────────────────────────────
       const clock = new THREE.Clock();
       let elapsed = 0;
+
+      // ── Audio System (Web Audio API) ────────────────────
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      let audioUnlocked = false;
+      function unlockAudio() {
+        if (audioUnlocked) return;
+        audioCtx.resume();
+        audioUnlocked = true;
+        document.removeEventListener('click', unlockAudio);
+        document.removeEventListener('keydown', unlockAudio);
+      }
+      document.addEventListener('click', unlockAudio);
+      document.addEventListener('keydown', unlockAudio);
+
+      // Wind noise generator (filtered white noise)
+      function createWindNoise() {
+        const bufferSize = audioCtx.sampleRate * 2;
+        const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+        const source = audioCtx.createBufferSource();
+        source.buffer = buffer;
+        source.loop = true;
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 300;
+        const gain = audioCtx.createGain();
+        gain.gain.value = 0;
+        source.connect(filter);
+        filter.connect(gain);
+        gain.connect(audioCtx.destination);
+        source.start();
+        return { filter, gain };
+      }
+      const windAudio = createWindNoise();
+
+      // Footstep sound (short noise burst)
+      let lastFootstepTime = 0;
+      function playFootstep() {
+        if (!audioUnlocked) return;
+        const now = audioCtx.currentTime;
+        if (now - lastFootstepTime < 0.3) return;
+        lastFootstepTime = now;
+        const osc = audioCtx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.value = 80 + Math.random() * 40;
+        const noiseGain = audioCtx.createGain();
+        noiseGain.gain.setValueAtTime(0.06, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+        osc.connect(noiseGain);
+        noiseGain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.1);
+      }
+
+      // Wolf growl
+      function playWolfGrowl() {
+        if (!audioUnlocked) return;
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(60, now);
+        osc.frequency.linearRampToValueAtTime(40, now + 0.5);
+        const gain = audioCtx.createGain();
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 200;
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.6);
+      }
+
+      // Gather complete sound
+      function playGatherSound() {
+        if (!audioUnlocked) return;
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(440, now);
+        osc.frequency.linearRampToValueAtTime(880, now + 0.15);
+        const gain = audioCtx.createGain();
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.25);
+      }
+
+      // Craft sound
+      function playCraftSound() {
+        if (!audioUnlocked) return;
+        const now = audioCtx.currentTime;
+        for (let i = 0; i < 3; i++) {
+          const osc = audioCtx.createOscillator();
+          osc.type = 'sine';
+          osc.frequency.value = 330 + i * 220;
+          const gain = audioCtx.createGain();
+          gain.gain.setValueAtTime(0, now + i * 0.08);
+          gain.gain.linearRampToValueAtTime(0.06, now + i * 0.08 + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.08 + 0.15);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(now + i * 0.08);
+          osc.stop(now + i * 0.08 + 0.2);
+        }
+      }
+
+      // Hit sound (when attacking wolf)
+      function playHitSound() {
+        if (!audioUnlocked) return;
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(200, now);
+        osc.frequency.exponentialRampToValueAtTime(80, now + 0.1);
+        const gain = audioCtx.createGain();
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.2);
+      }
 
       function animate() {
         requestAnimationFrame(animate);
@@ -3010,6 +3174,12 @@
         // Wind overlay (blizzard streaks)
         const windAngle = Math.atan2(windDir.z, windDir.x);
         updateWindOverlay(state.weatherIntensity, windAngle);
+
+        // Update wind audio
+        if (audioUnlocked) {
+          windAudio.gain.gain.value += (state.weatherIntensity * 0.15 + 0.02 - windAudio.gain.gain.value) * 2 * dt;
+          windAudio.filter.frequency.value = 200 + state.weatherIntensity * 400;
+        }
 
         // Crystal hover animation
         for (const crystal of crystals) {
@@ -3127,6 +3297,7 @@
           if (state.isCrouching) speed = 3;
 
           if (isMoving) {
+            playFootstep();
             moveDir.normalize();
             // Move relative to player's facing direction
             const sin = Math.sin(playerGroup.rotation.y);
@@ -3177,6 +3348,17 @@
           rightArm.rotation.x = -swing;
           leftLeg.rotation.x = -swing;
           rightLeg.rotation.x = swing;
+          // Idle breathing animation
+          if (!isMoving) {
+            const breath = Math.sin(elapsed * 2) * 0.015;
+            torso.scale.y = 1 + breath;
+            torso.scale.x = 1 - breath * 0.5;
+            leftArm.rotation.z = Math.sin(elapsed * 1.5) * 0.02;
+            rightArm.rotation.z = -Math.sin(elapsed * 1.5) * 0.02;
+          } else {
+            torso.scale.y = 1;
+            torso.scale.x = 1;
+          }
 
           // Status message (hypothermia takes priority)
           const statusEl = document.getElementById('status-msg');
@@ -3263,6 +3445,7 @@
 
               if (state.gatherProgress >= 1) {
                 // Gather complete
+                playGatherSound();
                 const [minAmt, maxAmt] = resInfo.amount;
                 const amt = minAmt + Math.floor(Math.random() * (maxAmt - minAmt + 1));
                 state.inventory[resType] += amt;
@@ -3419,13 +3602,18 @@
           if (state.health <= 0 && !state.dead) {
             state.dead = true;
             document.getElementById('death-score').textContent = state.score;
-            document.getElementById('death-screen').style.display = 'flex';
+            const deathEl = document.getElementById('death-screen');
+            deathEl.style.display = 'flex';
+            deathEl.style.opacity = '0';
+            requestAnimationFrame(() => deathEl.style.opacity = '1');
           }
 
           // Update HUD
           document.getElementById('temp').textContent = state.bodyTemp.toFixed(1);
           document.getElementById('health').textContent = Math.floor(state.health);
+          document.getElementById('health-bar').style.width = state.health + '%';
           document.getElementById('energy').textContent = Math.floor(state.energy);
+          document.getElementById('energy-bar').style.width = state.energy + '%';
 
           // ── Frost FX Overlay ──
           updateFrostOverlay(state.bodyTemp);
@@ -3453,7 +3641,7 @@
           if (wd.hitFlash > 0) {
             wd.hitFlash -= dt;
             if (wd.hitFlash <= 0) {
-              wd.body.material = new THREE.MeshStandardMaterial({ color: 0x99aacc, roughness: 0.7 });
+              wd.body.material = wolfNormalMat;
             }
           }
           if (!runWolfAI) {
@@ -3528,6 +3716,11 @@
             if (wd.attackCooldown <= 0) {
               state.health -= WOLF_DAMAGE;
               state.health = Math.max(0, state.health);
+              // Damage flash
+              const dmgFlash = document.getElementById('damage-flash');
+              dmgFlash.style.opacity = '1';
+              setTimeout(() => { dmgFlash.style.opacity = '0'; }, 200);
+              playWolfGrowl();
               wd.attackCooldown = 1.5; // pause between bites
               // Small retreat after bite
               const len = distToPlayer || 1;
@@ -3623,7 +3816,10 @@
             state.rescued = true;
             state.score += 500;
             document.getElementById('win-score').textContent = state.score;
-            document.getElementById('win-screen').style.display = 'flex';
+            const winEl = document.getElementById('win-screen');
+            winEl.style.display = 'flex';
+            winEl.style.opacity = '0';
+            requestAnimationFrame(() => winEl.style.opacity = '1');
             document.getElementById('beacon-timer-hud').style.display = 'none';
           }
         }
@@ -3735,9 +3931,17 @@
         // Camera orbits behind player (always looking at their back)
         const camDist = 6;
         const camHeight = 3;
+        // Walking camera bob
+        let camBobY = 0, camBobX = 0;
+        if (state.started && !state.dead && (state.keys['w'] || state.keys['s'])) {
+          const bobSpeed = state.isSprinting ? 14 : 8;
+          const bobAmount = state.isSprinting ? 0.08 : 0.04;
+          camBobY = Math.sin(elapsed * bobSpeed) * bobAmount;
+          camBobX = Math.cos(elapsed * bobSpeed * 0.5) * bobAmount * 0.5;
+        }
         const cameraTarget = new THREE.Vector3(
-          playerGroup.position.x + Math.sin(playerGroup.rotation.y + Math.PI) * camDist,
-          playerGroup.position.y + camHeight,
+          playerGroup.position.x + Math.sin(playerGroup.rotation.y + Math.PI) * camDist + camBobX,
+          playerGroup.position.y + camHeight + camBobY,
           playerGroup.position.z + Math.cos(playerGroup.rotation.y + Math.PI) * camDist
         );
         camera.position.lerp(cameraTarget, 3 * dt);
@@ -3756,6 +3960,14 @@
 
         renderer.render(scene, camera);
       }
+
+      // Hide loading screen
+      const loadScreen = document.getElementById('loading-screen');
+      document.getElementById('load-bar').style.width = '100%';
+      setTimeout(() => {
+        loadScreen.style.opacity = '0';
+        setTimeout(() => loadScreen.style.display = 'none', 500);
+      }, 300);
 
       animate();
     </script>
