@@ -733,6 +733,14 @@
           state.myColor = data.colorIndex || 0;
           startGame();
         }
+        else if (data.type === 'chat') {
+          addChatMessage(data.name, data.msg, '#aaddff');
+          if (state.isHost) {
+            for (const [cid, conn] of Object.entries(connections)) {
+              if (cid !== peerId && conn.open) conn.send(JSON.stringify(data));
+            }
+          }
+        }
         else if (data.type === 'player-joined') {
           // Another player joined (client gets notified)
           createRemotePlayer(data.peerId, data.colorIndex);
@@ -2820,6 +2828,7 @@
             state.beaconActive = true;
             state.beaconTimer = 0;
             showStatus('BEACON ACTIVE! Survive 2 minutes for rescue!', '#ff44ff');
+            addChatMessage('System', 'RESCUE BEACON ACTIVATED!', '#ff44ff');
           }
           if (obj) {
             obj.rotation.y = playerGroup.rotation.y;
@@ -2845,6 +2854,22 @@
           state.cookedMeat--;
           state.health = Math.min(100, state.health + 25);
           showStatus('+25 Health!', '#44ff88');
+        }
+        else if (e.key.toLowerCase() === 'g' && state.started && !state.dead) {
+          let maxRes = null, maxAmt = 0;
+          for (const [res, amt] of Object.entries(state.inventory)) {
+            if (amt > maxAmt) { maxAmt = amt; maxRes = res; }
+          }
+          if (state.meat > maxAmt) { maxRes = 'meat'; maxAmt = state.meat; }
+          if (maxRes && maxAmt > 0) {
+            if (maxRes === 'meat') state.meat--;
+            else state.inventory[maxRes]--;
+            const px = playerGroup.position.x - Math.sin(playerGroup.rotation.y) * 1.5;
+            const pz = playerGroup.position.z - Math.cos(playerGroup.rotation.y) * 1.5;
+            const py = state.inCave ? -50 : getTerrainHeight(px, pz);
+            createDroppedItem(maxRes, 1, px, py, pz);
+            showStatus(`Dropped 1 ${maxRes}`, '#ffcc44');
+          }
         }
       });
       window.addEventListener('keyup', (e) => {
@@ -2887,6 +2912,7 @@
             wolves.splice(wolves.indexOf(closest), 1);
             state.score += 50;
             showStatus('Wolf killed! +50 pts', '#44ff88');
+            addChatMessage('System', `${state.playerName} killed a wolf!`, '#ff8844');
           }
         }
         // Attack rabbits
@@ -3057,6 +3083,9 @@
       // ── Start Game ──────────────────────────────────────
       function startGame() {
         state.started = true;
+        state.playerName = document.getElementById('player-name').value.trim() || 'Player';
+        document.getElementById('player-name-hud').textContent = state.playerName;
+        startMusic();
         // Apply initial day/night lighting immediately (avoid slow lerp from dark)
         const t = state.timeOfDay; // 0.25 = sunrise
         if (t > 0.25 && t < 0.75) {
@@ -3090,6 +3119,8 @@
           const count = Object.keys(remotePlayers).length + 1;
           showStatus(`Game started! ${count} players`, '#44ff88');
         }
+        document.getElementById('chat-container').style.display = 'block';
+        addChatMessage('System', 'Survive the frozen planet! Press T to chat.', '#888');
       }
 
       function restartGame() {
@@ -3538,6 +3569,174 @@
         osc.stop(now + 0.2);
       }
 
+      // ── Footprint System ────────────────────────────────
+      const MAX_FOOTPRINTS = 200;
+      const footprintGeo = new THREE.PlaneGeometry(0.12, 0.18);
+      const footprintMat = new THREE.MeshBasicMaterial({
+        color: 0x8899aa, transparent: true, opacity: 0.4, depthWrite: false, side: THREE.DoubleSide
+      });
+      const footprints = [];
+      let lastFootprintTime = 0;
+      const FOOTPRINT_INTERVAL = 0.25;
+
+      function addFootprint(x, y, z, rotY) {
+        if (footprints.length >= MAX_FOOTPRINTS) {
+          const old = footprints.shift();
+          scene.remove(old.mesh);
+        }
+        const side = footprints.length % 2 === 0 ? -1 : 1;
+        const fp = new THREE.Mesh(footprintGeo, footprintMat.clone());
+        fp.rotation.x = -Math.PI / 2;
+        fp.rotation.z = rotY;
+        fp.position.set(
+          x + Math.cos(rotY) * 0.1 * side,
+          y + 0.02,
+          z + Math.sin(rotY) * 0.1 * side
+        );
+        scene.add(fp);
+        footprints.push({ mesh: fp, age: 0, maxAge: 30 });
+      }
+
+      function updateFootprints(dt) {
+        for (let i = footprints.length - 1; i >= 0; i--) {
+          footprints[i].age += dt;
+          const fade = 1 - footprints[i].age / footprints[i].maxAge;
+          if (fade <= 0) {
+            scene.remove(footprints[i].mesh);
+            footprints.splice(i, 1);
+          } else {
+            footprints[i].mesh.material.opacity = fade * 0.4;
+          }
+        }
+      }
+
+      // ── Dynamic Music System ────────────────────────────
+      let musicPlaying = false;
+      let musicOscillators = [];
+      let musicGain = null;
+      let currentMood = 'calm';
+      let musicBeatTimer = 0;
+
+      const MUSIC_SCALES = {
+        calm: [261.63, 293.66, 329.63, 392.00, 440.00, 523.25],
+        tension: [261.63, 277.18, 329.63, 349.23, 415.30, 466.16],
+        danger: [246.94, 261.63, 293.66, 329.63, 369.99, 415.30],
+      };
+
+      function startMusic() {
+        if (musicPlaying || !audioUnlocked) return;
+        musicPlaying = true;
+        musicGain = audioCtx.createGain();
+        musicGain.gain.value = 0.03;
+        musicGain.connect(audioCtx.destination);
+      }
+
+      function updateMusic(dt) {
+        if (!audioUnlocked || !musicPlaying) return;
+
+        let targetMood = 'calm';
+        let targetVol = 0.03;
+
+        let wolfNear = false;
+        for (const wolf of wolves) {
+          const dx = wolf.position.x - playerGroup.position.x;
+          const dz = wolf.position.z - playerGroup.position.z;
+          const dist = Math.sqrt(dx*dx + dz*dz);
+          if (dist < 20 && (wolf.userData.state === 'chase' || wolf.userData.state === 'attack')) {
+            wolfNear = true;
+            break;
+          }
+          if (dist < 30 && wolf.userData.state === 'stalk') {
+            targetMood = 'tension';
+            targetVol = 0.04;
+          }
+        }
+        if (wolfNear) {
+          targetMood = 'danger';
+          targetVol = 0.05;
+        }
+        if (state.beaconActive && !state.rescued) {
+          targetMood = 'tension';
+          targetVol = 0.045;
+        }
+
+        currentMood = targetMood;
+        if (musicGain) {
+          musicGain.gain.value += (targetVol - musicGain.gain.value) * dt;
+        }
+
+        musicBeatTimer -= dt;
+        if (musicBeatTimer <= 0) {
+          const beatInterval = targetMood === 'danger' ? 0.3 : targetMood === 'tension' ? 0.6 : 1.2;
+          musicBeatTimer = beatInterval;
+
+          const scale = MUSIC_SCALES[currentMood];
+          const note = scale[Math.floor(Math.random() * scale.length)];
+          const now = audioCtx.currentTime;
+
+          const osc = audioCtx.createOscillator();
+          osc.type = targetMood === 'danger' ? 'sawtooth' : 'sine';
+          osc.frequency.setValueAtTime(note * (Math.random() < 0.3 ? 0.5 : 1), now);
+
+          const noteGain = audioCtx.createGain();
+          const noteDuration = beatInterval * 0.8;
+          noteGain.gain.setValueAtTime(0, now);
+          noteGain.gain.linearRampToValueAtTime(0.08, now + 0.05);
+          noteGain.gain.exponentialRampToValueAtTime(0.001, now + noteDuration);
+
+          const filter = audioCtx.createBiquadFilter();
+          filter.type = 'lowpass';
+          filter.frequency.value = targetMood === 'danger' ? 800 : 2000;
+
+          osc.connect(filter);
+          filter.connect(noteGain);
+          noteGain.connect(musicGain);
+          osc.start(now);
+          osc.stop(now + noteDuration + 0.1);
+
+          if (Math.random() < 0.3) {
+            const bassOsc = audioCtx.createOscillator();
+            bassOsc.type = 'sine';
+            bassOsc.frequency.value = note * 0.25;
+            const bassGain = audioCtx.createGain();
+            bassGain.gain.setValueAtTime(0.06, now);
+            bassGain.gain.exponentialRampToValueAtTime(0.001, now + noteDuration * 1.5);
+            bassOsc.connect(bassGain);
+            bassGain.connect(musicGain);
+            bassOsc.start(now);
+            bassOsc.stop(now + noteDuration * 1.5 + 0.1);
+          }
+        }
+      }
+
+      // ── Chat System ───────────────────────────────────
+      function addChatMessage(name, msg, color) {
+        const log = document.getElementById('chat-log');
+        const div = document.createElement('div');
+        div.style.marginBottom = '3px';
+        div.style.textShadow = '0 0 6px rgba(0,0,0,0.8)';
+        div.innerHTML = `<span style="color:${color || '#88ccff'}">${name}:</span> ${msg}`;
+        log.appendChild(div);
+        log.scrollTop = log.scrollHeight;
+        setTimeout(() => { div.style.opacity = '0.3'; }, 8000);
+      }
+
+      let chatOpen = false;
+
+      // ── Dropped Items System ──────────────────────────
+      const droppedItems = [];
+
+      function createDroppedItem(type, amount, x, y, z) {
+        const colors = { wood: 0x886644, stone: 0x888888, metal: 0x8899aa, cloth: 0xccbbaa, fuel: 0xddaa33, meat: 0xcc4444 };
+        const geo = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+        const mat = new THREE.MeshStandardMaterial({ color: colors[type] || 0xffffff, emissive: colors[type] || 0xffffff, emissiveIntensity: 0.3 });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(x, y + 0.3, z);
+        scene.add(mesh);
+        droppedItems.push({ mesh, type, amount, age: 0 });
+        return mesh;
+      }
+
       function animate() {
         requestAnimationFrame(animate);
         const rawDt = Math.min(clock.getDelta(), 0.1);
@@ -3556,6 +3755,8 @@
 
         // Weather update
         const weatherCfg = state.started ? updateWeather(dt) : weatherConfig.clear;
+
+        updateMusic(dt);
 
         // Snow animation (driven by weather)
         const snowSpeedMult = weatherCfg.snowSpeed;
@@ -3596,6 +3797,8 @@
             d.baseY + Math.sin(elapsed * d.speed + d.phase) * 0.2;
           crystal.rotation.y += dt * 0.3;
         }
+
+        updateFootprints(dt);
 
         // Resource node ring pulse
         for (const node of resourceNodes) {
@@ -3660,8 +3863,17 @@
           }
         }
 
-        // Aurora pulse (only visible at night)
-        auroraMat.opacity = state.isDay ? 0 : 0.1 + Math.sin(elapsed * 0.5) * 0.05;
+        // Aurora animation (multi-ribbon)
+        for (const ribbon of auroraRibbons) {
+          const baseOpacity = state.isDay ? 0 : 0.08 + Math.sin(elapsed * ribbon.speed + ribbon.phase) * 0.04;
+          ribbon.mat.opacity = baseOpacity;
+          const hueShift = Math.sin(elapsed * 0.2 + ribbon.phase) * 0.1;
+          ribbon.mat.color.setHSL(
+            (ribbon.baseColor.getHSL({}).h + hueShift) % 1,
+            0.7,
+            0.5
+          );
+        }
 
         // Torch visibility & animation
         torchGroup.visible = state.heldItem === 'torch';
@@ -3712,6 +3924,15 @@
             const cos = Math.cos(playerGroup.rotation.y);
             playerGroup.position.x -= moveDir.z * sin * speed * dt;
             playerGroup.position.z -= moveDir.z * cos * speed * dt;
+          }
+
+          // Footprints
+          if (isMoving && !state.inCave) {
+            lastFootprintTime += dt;
+            if (lastFootprintTime >= FOOTPRINT_INTERVAL) {
+              lastFootprintTime = 0;
+              addFootprint(playerGroup.position.x, getTerrainHeight(playerGroup.position.x, playerGroup.position.z), playerGroup.position.z, playerGroup.rotation.y);
+            }
           }
 
           // Energy drain/recovery
@@ -4394,6 +4615,28 @@
           }
         }
 
+        // Dropped items
+        for (let i = droppedItems.length - 1; i >= 0; i--) {
+          const item = droppedItems[i];
+          item.age += dt;
+          item.mesh.rotation.y += dt * 2;
+          item.mesh.position.y += Math.sin(elapsed * 3 + i) * 0.002;
+          const dx = item.mesh.position.x - playerGroup.position.x;
+          const dz = item.mesh.position.z - playerGroup.position.z;
+          if (Math.sqrt(dx*dx + dz*dz) < 1.5) {
+            if (item.type === 'meat') state.meat += item.amount;
+            else state.inventory[item.type] = (state.inventory[item.type] || 0) + item.amount;
+            showStatus(`Picked up ${item.amount} ${item.type}`, '#44ff88');
+            scene.remove(item.mesh);
+            droppedItems.splice(i, 1);
+            continue;
+          }
+          if (item.age > 60) {
+            scene.remove(item.mesh);
+            droppedItems.splice(i, 1);
+          }
+        }
+
         // ── Beacon Timer & Win Condition ──────────────────
         if (state.beaconActive && !state.rescued && !state.dead) {
           state.beaconTimer += dt;
@@ -4426,6 +4669,7 @@
           if (state.beaconTimer >= state.beaconRequired) {
             state.rescued = true;
             state.score += 500;
+            addChatMessage('System', 'RESCUE SHIP ARRIVED!', '#44ff88');
             document.getElementById('win-score').textContent = state.score;
             const winEl = document.getElementById('win-screen');
             winEl.style.display = 'flex';
