@@ -332,6 +332,10 @@
       <div id="lobby" style="margin-top: 24px;">
         <div id="customize-panel">
           <h3>CUSTOMIZE CHARACTER</h3>
+          <div style="margin-bottom:12px;">
+            <input id="player-name" type="text" maxlength="16" placeholder="Enter your name" value=""
+              style="background:rgba(30,40,60,0.8); border:2px solid rgba(100,180,255,0.3); border-radius:8px; color:white; font-size:14px; padding:8px 12px; text-align:center; width:180px; outline:none; font-family:inherit;" />
+          </div>
           <canvas id="char-preview" width="160" height="220"></canvas>
           <div class="color-row">
             <label>Parka</label>
@@ -394,6 +398,7 @@
       <div>Biome: <span id="biome-name">Tundra</span></div>
       <div>Weather: <span id="weather-name">Clear</span></div>
       <div id="time-display" style="color: #ffdd88;">Day 1 06:00</div>
+      <div id="player-name-hud" style="font-size:12px; opacity:0.5;"></div>
       <div id="status-msg" style="color: #ffaa44; display: none;"></div>
       <div style="margin-top: 12px; font-size: 14px; opacity: 0.7;">
         <span id="inv-wood">Wood: 0</span> &nbsp;
@@ -414,7 +419,7 @@
     </div>
 
     <div id="instructions" style="display: none">
-      W/S - Move &nbsp;|&nbsp; A/D - Turn &nbsp;|&nbsp; Shift - Sprint &nbsp;|&nbsp; C - Crouch &nbsp;|&nbsp; Space - Jump &nbsp;|&nbsp; E - Gather &nbsp;|&nbsp; Tab - Craft &nbsp;|&nbsp; F - Place &nbsp;|&nbsp; Click - Attack &nbsp;|&nbsp; Q - Cook &nbsp;|&nbsp; R - Eat &nbsp;|&nbsp; Esc - Pause
+      W/S - Move &nbsp;|&nbsp; A/D - Turn &nbsp;|&nbsp; Shift - Sprint &nbsp;|&nbsp; C - Crouch &nbsp;|&nbsp; Space - Jump &nbsp;|&nbsp; E - Gather &nbsp;|&nbsp; Tab - Craft &nbsp;|&nbsp; F - Place &nbsp;|&nbsp; Click - Attack &nbsp;|&nbsp; Q - Cook &nbsp;|&nbsp; R - Eat &nbsp;|&nbsp; G - Drop &nbsp;|&nbsp; T - Chat &nbsp;|&nbsp; Esc - Pause
     </div>
 
     <div id="craft-menu">
@@ -468,6 +473,12 @@
     </div>
 
     <canvas id="minimap" width="180" height="180"></canvas>
+
+    <div id="chat-container" style="display:none; position:absolute; bottom:70px; left:20px; width:300px; z-index:15;">
+      <div id="chat-log" style="max-height:150px; overflow-y:auto; font-size:12px; opacity:0.7; margin-bottom:6px; pointer-events:none;"></div>
+      <input id="chat-input" type="text" maxlength="100" placeholder="Press T to chat..."
+        style="display:none; width:100%; background:rgba(10,15,30,0.8); border:1px solid rgba(100,180,255,0.3); border-radius:6px; color:white; font-size:13px; padding:6px 10px; outline:none; font-family:inherit;" />
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js"></script>
 
@@ -532,6 +543,7 @@
         beaconTimer: 0,
         beaconRequired: 120,
         rescued: false,
+        playerName: 'Player',
         // Hunting & cooking
         meat: 0,
         cookedMeat: 0,
@@ -2716,26 +2728,65 @@
       const stars = new THREE.Points(starGeo, starMat);
       scene.add(stars);
 
-      // ── Aurora Borealis (simple ribbon) ─────────────────
-      const auroraCurve = new THREE.CatmullRomCurve3([
-        new THREE.Vector3(-60, 50, -80),
-        new THREE.Vector3(-20, 55, -70),
-        new THREE.Vector3(20, 48, -75),
-        new THREE.Vector3(60, 52, -80),
-      ]);
-      const auroraGeo = new THREE.TubeGeometry(auroraCurve, 64, 3, 8, false);
-      const auroraMat = new THREE.MeshBasicMaterial({
-        color: 0x44ff88,
-        transparent: true,
-        opacity: 0.15,
-        side: THREE.DoubleSide,
-      });
-      const aurora = new THREE.Mesh(auroraGeo, auroraMat);
-      scene.add(aurora);
+      // ── Aurora Borealis (animated multi-ribbon) ─────────
+      const auroraRibbons = [];
+      const auroraColors = [0x44ff88, 0x4488ff, 0x8844ff, 0x44ffcc];
+      for (let r = 0; r < 4; r++) {
+        const points = [];
+        for (let i = 0; i < 8; i++) {
+          points.push(new THREE.Vector3(
+            -80 + i * 22 + (Math.random() - 0.5) * 10,
+            45 + Math.random() * 15,
+            -70 + r * 8 + (Math.random() - 0.5) * 10
+          ));
+        }
+        const curve = new THREE.CatmullRomCurve3(points);
+        const geo = new THREE.TubeGeometry(curve, 64, 1.5 + Math.random() * 2, 6, false);
+        const mat = new THREE.MeshBasicMaterial({
+          color: auroraColors[r],
+          transparent: true,
+          opacity: 0.12,
+          side: THREE.DoubleSide,
+        });
+        const ribbon = new THREE.Mesh(geo, mat);
+        scene.add(ribbon);
+        auroraRibbons.push({ mesh: ribbon, mat, points, curve, phase: Math.random() * Math.PI * 2, speed: 0.3 + Math.random() * 0.4, baseColor: new THREE.Color(auroraColors[r]) });
+      }
 
       // ── Input ───────────────────────────────────────────
       window.addEventListener('keydown', (e) => {
         state.keys[e.key.toLowerCase()] = true;
+        // Chat toggle
+        if (e.key.toLowerCase() === 't' && state.started && !state.dead && !state.paused && !state.craftMenuOpen && !chatOpen) {
+          e.preventDefault();
+          chatOpen = true;
+          const chatInput = document.getElementById('chat-input');
+          chatInput.style.display = 'block';
+          chatInput.focus();
+          return;
+        }
+        if (e.key === 'Enter' && chatOpen) {
+          const chatInput = document.getElementById('chat-input');
+          const msg = chatInput.value.trim();
+          if (msg) {
+            addChatMessage(state.playerName, msg, '#44ff88');
+            if (state.isMultiplayer) {
+              const chatMsg = { type: 'chat', name: state.playerName, msg };
+              if (state.isHost) broadcastToAll(chatMsg); else sendToHost(chatMsg);
+            }
+          }
+          chatInput.value = '';
+          chatInput.style.display = 'none';
+          chatOpen = false;
+          return;
+        }
+        if (e.key === 'Escape' && chatOpen) {
+          document.getElementById('chat-input').style.display = 'none';
+          document.getElementById('chat-input').value = '';
+          chatOpen = false;
+          return;
+        }
+        if (chatOpen && e.key !== 'Enter' && e.key !== 'Escape') return;
         if (!state.started) return; // lobby handles start
         if (state.dead || state.rescued) { restartGame(); return; }
         else if (e.key === 'Escape') {
