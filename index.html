@@ -400,7 +400,9 @@
         <span id="inv-stone">Stone: 0</span> &nbsp;
         <span id="inv-metal">Metal: 0</span> &nbsp;
         <span id="inv-cloth">Cloth: 0</span> &nbsp;
-        <span id="inv-fuel">Fuel: 0</span>
+        <span id="inv-fuel">Fuel: 0</span> &nbsp;
+        <span id="inv-meat">Meat: 0</span> &nbsp;
+        <span id="inv-cooked">Cooked: 0</span>
       </div>
     </div>
 
@@ -412,7 +414,7 @@
     </div>
 
     <div id="instructions" style="display: none">
-      W/S - Move &nbsp;|&nbsp; A/D - Turn &nbsp;|&nbsp; Shift - Sprint &nbsp;|&nbsp; C - Crouch &nbsp;|&nbsp; Space - Jump &nbsp;|&nbsp; E - Gather &nbsp;|&nbsp; Tab - Craft &nbsp;|&nbsp; F - Place &nbsp;|&nbsp; Click - Attack &nbsp;|&nbsp; Esc - Pause
+      W/S - Move &nbsp;|&nbsp; A/D - Turn &nbsp;|&nbsp; Shift - Sprint &nbsp;|&nbsp; C - Crouch &nbsp;|&nbsp; Space - Jump &nbsp;|&nbsp; E - Gather &nbsp;|&nbsp; Tab - Craft &nbsp;|&nbsp; F - Place &nbsp;|&nbsp; Click - Attack &nbsp;|&nbsp; Q - Cook &nbsp;|&nbsp; R - Eat &nbsp;|&nbsp; Esc - Pause
     </div>
 
     <div id="craft-menu">
@@ -530,6 +532,15 @@
         beaconTimer: 0,
         beaconRequired: 120,
         rescued: false,
+        // Hunting & cooking
+        meat: 0,
+        cookedMeat: 0,
+        // Fishing
+        hasFishingRod: false,
+        nearFishingSpot: null,
+        // Caves
+        inCave: false,
+        caveReturnPos: null,
         // Multiplayer
         isMultiplayer: false,
         isHost: false,
