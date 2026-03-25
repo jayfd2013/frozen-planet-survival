@@ -363,7 +363,8 @@
           </div>
         </div>
         <div style="margin-top: 16px;">
-        <button id="btn-solo" class="lobby-btn">Solo Play</button>
+        <button id="btn-solo" class="lobby-btn">Survival</button>
+        <button id="btn-sandbox" class="lobby-btn" style="background:rgba(60,80,40,0.6); border-color:rgba(140,220,80,0.3);">Sandbox</button>
         </div>
         <div style="margin: 16px 0; font-size: 13px; opacity: 0.4;">── or play with friends ──</div>
         <button id="btn-host" class="lobby-btn">Create Room</button>
@@ -407,6 +408,7 @@
       <div>Weather: <span id="weather-name">Clear</span></div>
       <div id="time-display" style="color: #ffdd88;">Day 1 06:00</div>
       <div id="player-name-hud" style="font-size:12px; opacity:0.5;"></div>
+      <div id="sandbox-badge" style="display:none; margin-top:4px; font-size:13px; color:#88dd44; text-shadow:0 0 8px rgba(136,221,68,0.5); letter-spacing:2px;">SANDBOX MODE</div>
       <div id="status-msg" style="color: #ffaa44; display: none;"></div>
       <div style="margin-top: 12px; font-size: 14px; opacity: 0.7;">
         <span id="inv-wood">Wood: 0</span> &nbsp;
@@ -567,6 +569,7 @@
         beaconRequired: 120,
         rescued: false,
         playerName: 'Player',
+        sandboxMode: false,
         // Hunting & cooking
         meat: 0,
         cookedMeat: 0,
@@ -913,6 +916,23 @@
         state.isMultiplayer = false;
         state.isHost = false;
         state.myColor = 0;
+        state.sandboxMode = false;
+        startGame();
+      });
+
+      document.getElementById('btn-sandbox').addEventListener('click', () => {
+        state.isMultiplayer = false;
+        state.isHost = false;
+        state.myColor = 0;
+        state.sandboxMode = true;
+        // Give unlimited resources
+        state.inventory = { wood: 999, stone: 999, metal: 999, cloth: 999, fuel: 999 };
+        state.meat = 99;
+        state.cookedMeat = 99;
+        state.health = 100;
+        state.hasIcePick = true;
+        state.hasFishingRod = true;
+        state.skillPoints = 20;
         startGame();
       });
 
@@ -3305,6 +3325,10 @@
         state.started = true;
         state.playerName = document.getElementById('player-name').value.trim() || 'Player';
         document.getElementById('player-name-hud').textContent = state.playerName;
+        document.getElementById('sandbox-badge').style.display = state.sandboxMode ? 'block' : 'none';
+        if (state.sandboxMode) {
+          addChatMessage('System', 'Sandbox mode! Unlimited resources, no damage. Build freely!', '#88dd44');
+        }
         startMusic();
         // Apply initial day/night lighting immediately (avoid slow lerp from dark)
         const t = state.timeOfDay; // 0.25 = sunrise
@@ -3354,7 +3378,9 @@
         state.weather = 'clear';
         state.weatherIntensity = 0;
         state.weatherTimer = 0;
-        state.inventory = { wood: 0, stone: 0, metal: 0, cloth: 0, fuel: 0 };
+        state.inventory = state.sandboxMode
+          ? { wood: 999, stone: 999, metal: 999, cloth: 999, fuel: 999 }
+          : { wood: 0, stone: 0, metal: 0, cloth: 0, fuel: 0 };
         state.gathering = false;
         state.gatherProgress = 0;
         state.gatherTarget = null;
@@ -3379,9 +3405,9 @@
         state.inCave = false;
         state.caveReturnPos = null;
         caveRoom.visible = false;
-        state.hasFishingRod = false;
-        state.meat = 0;
-        state.cookedMeat = 0;
+        state.hasFishingRod = state.sandboxMode;
+        state.meat = state.sandboxMode ? 99 : 0;
+        state.cookedMeat = state.sandboxMode ? 99 : 0;
         state.nearFishingSpot = null;
         document.getElementById('beacon-timer-hud').style.display = 'none';
         document.getElementById('win-screen').style.display = 'none';
@@ -4354,10 +4380,12 @@
                 state.inventory[resType] += amt;
                 state.score += amt * 5;
 
-                // Deplete the node
-                state.nearestResource.userData.depleted = true;
-                state.nearestResource.userData.respawnTimer = RESPAWN_TIME;
-                state.nearestResource.visible = false;
+                // Deplete the node (not in sandbox)
+                if (!state.sandboxMode) {
+                  state.nearestResource.userData.depleted = true;
+                  state.nearestResource.userData.respawnTimer = RESPAWN_TIME;
+                  state.nearestResource.visible = false;
+                }
 
                 // Broadcast depletion
                 if (state.isMultiplayer) {
@@ -4527,7 +4555,7 @@
             multiplier *= (1 - state.skills.coldResist * 0.15);
 
             // Apply heat loss
-            state.bodyTemp -= heatLoss * multiplier * dt;
+            if (!state.sandboxMode) state.bodyTemp -= heatLoss * multiplier * dt;
 
             // Campfire warmth: actively heats player
             if (state.nearCampfire && state.campfireWarmth) {
@@ -4544,7 +4572,7 @@
           state.bodyTemp = Math.min(37, state.bodyTemp);
 
           // Hypothermia damage: below 32°C start taking health damage
-          if (state.bodyTemp < 32) {
+          if (state.bodyTemp < 32 && !state.sandboxMode) {
             const severity = (32 - state.bodyTemp) / 12; // 0 at 32°C, 1 at 20°C
             state.health -= severity * 8 * dt;
             state.health = Math.max(0, state.health);
@@ -4666,11 +4694,13 @@
             // Lunge and bite, then back off briefly
             wd.attackCooldown -= dt;
             if (wd.attackCooldown <= 0) {
-              state.health -= WOLF_DAMAGE;
-              state.health = Math.max(0, state.health);
+              if (!state.sandboxMode) {
+                state.health -= WOLF_DAMAGE;
+                state.health = Math.max(0, state.health);
+              }
               // Damage flash
               const dmgFlash = document.getElementById('damage-flash');
-              dmgFlash.style.opacity = '1';
+              if (!state.sandboxMode) dmgFlash.style.opacity = '1';
               setTimeout(() => { dmgFlash.style.opacity = '0'; }, 200);
               playWolfGrowl();
               wd.attackCooldown = 1.5; // pause between bites
