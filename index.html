@@ -653,6 +653,7 @@
           if (!remotePlayers[peerId]) return;
           remotePlayers[peerId].data = data;
           remotePlayers[peerId].lastUpdate = performance.now();
+          if (data.name) updateRemotePlayerName(peerId, data.name);
         }
         else if (data.type === 'host-state') {
           // Client receives authoritative state from host
@@ -707,6 +708,7 @@
             if (!remotePlayers[pid]) continue;
             remotePlayers[pid].data = pdata;
             remotePlayers[pid].lastUpdate = performance.now();
+            if (pdata.name) updateRemotePlayerName(pid, pdata.name);
           }
         }
         else if (data.type === 'place-object') {
@@ -878,8 +880,24 @@
         remotePlayers[peerId] = {
           group, colorIndex, lastUpdate: 0,
           data: null,
-          lArm, rArm, lLeg, rLeg,
+          lArm, rArm, lLeg, rLeg, tag, tagCanvas: canvas, tagTex: tex,
+          displayName: null,
         };
+      }
+
+      function updateRemotePlayerName(peerId, name) {
+        const rp = remotePlayers[peerId];
+        if (!rp || rp.displayName === name) return;
+        rp.displayName = name;
+        const ctx = rp.tagCanvas.getContext('2d');
+        ctx.clearRect(0, 0, 256, 64);
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.roundRect(0, 0, 256, 64, 8); ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 28px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(name, 128, 42);
+        rp.tagTex.needsUpdate = true;
       }
 
       function removeRemotePlayer(peerId) {
@@ -1206,6 +1224,7 @@
           crouching: state.isCrouching,
           heldItem: state.heldItem,
           health: state.health,
+          name: state.playerName,
         };
 
         if (state.isHost) {
@@ -1252,6 +1271,7 @@
           crouching: state.isCrouching,
           heldItem: state.heldItem,
           health: state.health,
+          name: state.playerName,
         };
         // Remote player data (from their updates)
         for (const [pid, rp] of Object.entries(remotePlayers)) {
@@ -2565,22 +2585,34 @@
       function createCaveEntrance(x, z) {
         const group = new THREE.Group();
         const ty = getProceduralHeight(x, z);
-        const archGeo = new THREE.TorusGeometry(1.5, 0.4, 8, 12, Math.PI);
-        const archMat = new THREE.MeshStandardMaterial({ color: 0x444455, roughness: 0.9 });
-        const arch = new THREE.Mesh(archGeo, archMat);
-        arch.position.y = 1.5;
-        arch.rotation.z = Math.PI;
-        group.add(arch);
-        const interiorGeo = new THREE.CircleGeometry(1.5, 12, 0, Math.PI);
-        const interiorMat = new THREE.MeshBasicMaterial({ color: 0x111122, side: THREE.DoubleSide });
-        const interior = new THREE.Mesh(interiorGeo, interiorMat);
-        interior.position.set(0, 1.5, -0.3);
-        interior.rotation.x = Math.PI;
-        interior.rotation.z = Math.PI;
-        group.add(interior);
-        const caveLight = new THREE.PointLight(0x6644aa, 1, 8);
-        caveLight.position.set(0, 1.5, -0.5);
+        const rockMat = new THREE.MeshStandardMaterial({ color: 0x555566, roughness: 0.9, flatShading: true });
+        const darkRockMat = new THREE.MeshStandardMaterial({ color: 0x333344, roughness: 0.9, flatShading: true });
+        // Rock mound around entrance
+        const moundGeo = new THREE.SphereGeometry(3, 8, 6, 0, Math.PI * 2, 0, Math.PI * 0.5);
+        const mound = new THREE.Mesh(moundGeo, rockMat);
+        mound.scale.set(1.2, 1, 1.5);
+        mound.castShadow = true;
+        group.add(mound);
+        // Dark opening hole (front face)
+        const holeGeo = new THREE.CircleGeometry(1.3, 10);
+        const holeMat = new THREE.MeshBasicMaterial({ color: 0x0a0a15 });
+        const hole = new THREE.Mesh(holeGeo, holeMat);
+        hole.position.set(0, 0.8, -1.8);
+        group.add(hole);
+        // Rock frame around opening
+        for (let i = 0; i < 8; i++) {
+          const angle = (i / 8) * Math.PI + Math.random() * 0.2;
+          const rockGeo = new THREE.DodecahedronGeometry(0.3 + Math.random() * 0.3, 0);
+          const rock = new THREE.Mesh(rockGeo, darkRockMat);
+          rock.position.set(Math.cos(angle) * 1.4, Math.sin(angle) * 1.2 + 0.8, -1.7);
+          rock.castShadow = true;
+          group.add(rock);
+        }
+        // Purple glow from inside
+        const caveLight = new THREE.PointLight(0x6644aa, 1.5, 10);
+        caveLight.position.set(0, 1, -2);
         group.add(caveLight);
+        // "CAVE" label floating above
         const canvas = document.createElement('canvas');
         canvas.width = 256; canvas.height = 64;
         const caveLabelCtx = canvas.getContext('2d');
@@ -2591,7 +2623,7 @@
         const tex = new THREE.CanvasTexture(canvas);
         const labelMat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
         const label = new THREE.Sprite(labelMat);
-        label.position.y = 3.5;
+        label.position.y = 4;
         label.scale.set(2, 0.5, 1);
         group.add(label);
         group.position.set(x, ty, z);
