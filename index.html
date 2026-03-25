@@ -605,6 +605,8 @@
       const connections = {}; // peerId -> DataConnection
       const remotePlayers = {}; // peerId -> { group, color, lastUpdate, data }
       let lobbyReady = false;
+      let chatOpen = false;
+      const droppedItems = [];
 
       function generateRoomCode() {
         const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -3925,10 +3927,7 @@
         setTimeout(() => { div.style.opacity = '0.3'; }, 8000);
       }
 
-      let chatOpen = false;
-
       // ── Dropped Items System ──────────────────────────
-      const droppedItems = [];
 
       function createDroppedItem(type, amount, x, y, z) {
         const colors = { wood: 0x886644, stone: 0x888888, metal: 0x8899aa, cloth: 0xccbbaa, fuel: 0xddaa33, meat: 0xcc4444 };
