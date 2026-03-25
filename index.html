@@ -316,6 +316,14 @@
         opacity: 0.3;
         pointer-events: none;
       }
+      .skill-item { display:flex; justify-content:space-between; align-items:center; padding:10px 12px; margin-bottom:8px; background:rgba(60,40,90,0.4); border:1px solid rgba(180,130,255,0.15); border-radius:8px; }
+      .skill-item:hover { background:rgba(80,50,120,0.5); }
+      .skill-name { font-size:15px; font-weight:bold; color:#ddbbff; }
+      .skill-desc { font-size:11px; opacity:0.5; margin-top:2px; }
+      .skill-level { font-size:13px; color:#bb88ff; }
+      .skill-btn { padding:6px 14px; background:rgba(140,100,220,0.3); border:1px solid rgba(180,130,255,0.4); border-radius:6px; color:white; font-size:13px; cursor:pointer; }
+      .skill-btn:hover { background:rgba(140,100,220,0.5); }
+      .skill-btn:disabled { opacity:0.3; cursor:default; }
     </style>
   </head>
   <body>
@@ -426,6 +434,19 @@
       <h2>Crafting</h2>
       <div id="craft-list"></div>
       <p style="text-align:center; font-size:12px; opacity:0.4; margin-top:12px;">Tab to close</p>
+    </div>
+
+    <div id="skill-menu" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:rgba(10,15,30,0.92); border:2px solid rgba(180,130,255,0.3); border-radius:12px; padding:24px 32px; z-index:25; min-width:380px; backdrop-filter:blur(6px);">
+      <h2 style="text-align:center; font-size:22px; margin-bottom:6px; color:#bb88ff; text-shadow:0 0 12px rgba(180,130,255,0.6);">Skills</h2>
+      <div id="skill-points-display" style="text-align:center; font-size:14px; margin-bottom:16px; color:#ddbbff;">Points: 0</div>
+      <div id="skill-list"></div>
+      <p style="text-align:center; font-size:12px; opacity:0.4; margin-top:12px;">K to close</p>
+    </div>
+
+    <div id="journal-popup" style="display:none; position:fixed; bottom:200px; left:50%; transform:translateX(-50%); background:rgba(40,35,20,0.92); border:2px solid rgba(238,221,100,0.4); border-radius:10px; padding:20px 28px; z-index:25; max-width:400px; text-align:center; backdrop-filter:blur(4px);">
+      <div style="font-size:12px; color:#eedd66; margin-bottom:8px; letter-spacing:1px;">JOURNAL PAGE FOUND</div>
+      <div id="journal-text" style="font-size:14px; color:#ddc; line-height:1.5; font-style:italic;"></div>
+      <div style="font-size:11px; opacity:0.4; margin-top:10px;" id="journal-count">1/10</div>
     </div>
 
     <div id="death-screen" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:30; justify-content:center; align-items:center; flex-direction:column; text-align:center;">
@@ -566,6 +587,16 @@
           scarf: 0xcc3333,
           pack: 0x556633,
         },
+        // Skill tree
+        skillPoints: 0,
+        skills: {
+          coldResist: 0,
+          gatherSpeed: 0,
+          wolfFighter: 0,
+          sprinter: 0,
+          hunter: 0,
+        },
+        skillMenuOpen: false,
       };
 
       // ── Multiplayer System ────────────────────────────────
