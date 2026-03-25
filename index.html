@@ -1802,6 +1802,10 @@
           id: 'beacon', name: 'Rescue Beacon', desc: 'Signal for rescue! Survive 2 min to win',
           cost: { metal: 5, fuel: 3, stone: 3 }, placeable: true,
         },
+        {
+          id: 'fishing_rod', name: 'Fishing Rod', desc: 'Fish at ice holes for food',
+          cost: { wood: 2, cloth: 1 }, placeable: false,
+        },
       ];
 
       function canCraft(recipe) {
@@ -1829,6 +1833,9 @@
         } else if (recipe.id === 'ice_pick') {
           state.hasIcePick = true;
           showStatus('Ice Pick crafted! Gather 2x faster', '#aaddff');
+        } else if (recipe.id === 'fishing_rod') {
+          state.hasFishingRod = true;
+          showStatus('Fishing Rod crafted! Find ice holes to fish', '#88ccff');
         } else if (recipe.id === 'beacon') {
           state.pendingPlace = 'beacon';
           state.craftMenuOpen = false;
@@ -1861,6 +1868,8 @@
           if (recipe.id === 'torch' && state.heldItem === 'torch') continue;
           // Hide beacon if already active
           if (recipe.id === 'beacon' && state.beaconActive) continue;
+          // Hide fishing rod if already crafted
+          if (recipe.id === 'fishing_rod' && state.hasFishingRod) continue;
 
           const ok = canCraft(recipe);
           const div = document.createElement('div');
@@ -2199,6 +2208,281 @@
         }
       }
 
+      // ── Huntable Animals (Rabbits + Deer) ─────────────────
+      const rabbitHitMat = new THREE.MeshBasicMaterial({ color: 0xff4444 });
+      const rabbitNormalMat = new THREE.MeshStandardMaterial({ color: 0xddddee, roughness: 0.7 });
+      const deerHitMat = new THREE.MeshBasicMaterial({ color: 0xff4444 });
+      const deerNormalMat = new THREE.MeshStandardMaterial({ color: 0x886644, roughness: 0.7 });
+
+      const rabbits = [];
+      const deer = [];
+
+      function createRabbit(x, z) {
+        const group = new THREE.Group();
+        const mat = new THREE.MeshStandardMaterial({ color: 0xddddee, roughness: 0.7 });
+        // Body
+        const bodyGeo = new THREE.SphereGeometry(0.2, 8, 6);
+        const body = new THREE.Mesh(bodyGeo, mat);
+        body.position.y = 0.25;
+        body.scale.set(1, 0.8, 1.2);
+        group.add(body);
+        // Head
+        const headGeo = new THREE.SphereGeometry(0.12, 8, 6);
+        const head = new THREE.Mesh(headGeo, mat);
+        head.position.set(0, 0.35, -0.2);
+        group.add(head);
+        // Ears
+        const earGeo = new THREE.BoxGeometry(0.04, 0.18, 0.02);
+        const earL = new THREE.Mesh(earGeo, mat);
+        earL.position.set(-0.05, 0.5, -0.18);
+        earL.rotation.x = -0.2;
+        group.add(earL);
+        const earR = new THREE.Mesh(earGeo, mat);
+        earR.position.set(0.05, 0.5, -0.18);
+        earR.rotation.x = -0.2;
+        group.add(earR);
+        // Legs
+        const legGeo = new THREE.BoxGeometry(0.05, 0.12, 0.05);
+        const legMat = new THREE.MeshStandardMaterial({ color: 0xccccdd, roughness: 0.7 });
+        const legPositions = [[-0.08, 0.08, -0.1], [0.08, 0.08, -0.1], [-0.08, 0.08, 0.1], [0.08, 0.08, 0.1]];
+        for (const [lx, ly, lz] of legPositions) {
+          const leg = new THREE.Mesh(legGeo, legMat);
+          leg.position.set(lx, ly, lz);
+          group.add(leg);
+        }
+
+        const terrainY = getProceduralHeight(x, z);
+        group.position.set(x, terrainY, z);
+        group.userData = {
+          health: 10,
+          state: 'wander',
+          roamTarget: new THREE.Vector3(x + (Math.random()-0.5)*20, 0, z + (Math.random()-0.5)*20),
+          roamTimer: Math.random() * 3,
+          hitFlash: 0,
+          body,
+          meatDrop: 1,
+        };
+        scene.add(group);
+        return group;
+      }
+
+      function createDeer(x, z) {
+        const group = new THREE.Group();
+        const mat = new THREE.MeshStandardMaterial({ color: 0x886644, roughness: 0.7 });
+        const darkMat = new THREE.MeshStandardMaterial({ color: 0x664422, roughness: 0.8 });
+        // Body
+        const bodyGeo = new THREE.BoxGeometry(0.4, 0.5, 0.8);
+        const body = new THREE.Mesh(bodyGeo, mat);
+        body.position.y = 0.7;
+        group.add(body);
+        // Head
+        const headGeo = new THREE.BoxGeometry(0.2, 0.25, 0.3);
+        const head = new THREE.Mesh(headGeo, mat);
+        head.position.set(0, 0.9, -0.55);
+        group.add(head);
+        // Antlers
+        const antlerMat = new THREE.MeshStandardMaterial({ color: 0x776655, roughness: 0.9 });
+        const antlerGeo = new THREE.CylinderGeometry(0.015, 0.02, 0.35, 4);
+        const antlerL = new THREE.Mesh(antlerGeo, antlerMat);
+        antlerL.position.set(-0.08, 1.15, -0.5);
+        antlerL.rotation.z = 0.3;
+        group.add(antlerL);
+        const antlerR = new THREE.Mesh(antlerGeo, antlerMat);
+        antlerR.position.set(0.08, 1.15, -0.5);
+        antlerR.rotation.z = -0.3;
+        group.add(antlerR);
+        // Antler branches
+        const branchGeo = new THREE.CylinderGeometry(0.01, 0.015, 0.18, 4);
+        const brL = new THREE.Mesh(branchGeo, antlerMat);
+        brL.position.set(-0.15, 1.28, -0.5);
+        brL.rotation.z = 0.8;
+        group.add(brL);
+        const brR = new THREE.Mesh(branchGeo, antlerMat);
+        brR.position.set(0.15, 1.28, -0.5);
+        brR.rotation.z = -0.8;
+        group.add(brR);
+        // Legs (thin cylinders)
+        const legGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.5, 5);
+        const legs = [];
+        const legPositions = [[-0.12, 0.25, -0.25], [0.12, 0.25, -0.25], [-0.12, 0.25, 0.25], [0.12, 0.25, 0.25]];
+        for (const [lx, ly, lz] of legPositions) {
+          const leg = new THREE.Mesh(legGeo, darkMat);
+          leg.position.set(lx, ly, lz);
+          group.add(leg);
+          legs.push(leg);
+        }
+        // Tail
+        const tailGeo = new THREE.SphereGeometry(0.06, 5, 4);
+        const tailMat = new THREE.MeshStandardMaterial({ color: 0xddccbb, roughness: 0.7 });
+        const tail = new THREE.Mesh(tailGeo, tailMat);
+        tail.position.set(0, 0.75, 0.42);
+        group.add(tail);
+
+        const terrainY = getProceduralHeight(x, z);
+        group.position.set(x, terrainY, z);
+        group.userData = {
+          health: 25,
+          state: 'graze',
+          roamTarget: new THREE.Vector3(x + (Math.random()-0.5)*30, 0, z + (Math.random()-0.5)*30),
+          roamTimer: Math.random() * 5,
+          hitFlash: 0,
+          body,
+          legs,
+          meatDrop: 2,
+        };
+        scene.add(group);
+        return group;
+      }
+
+      // Spawn rabbits and deer
+      for (let i = 0; i < 12; i++) {
+        const rx = (Math.random() - 0.5) * DECO_RANGE * 2;
+        const rz = (Math.random() - 0.5) * DECO_RANGE * 2;
+        const biome = getBiome(rx, rz);
+        if (biome === BIOMES.FOREST || biome === BIOMES.TUNDRA) {
+          const r = createRabbit(rx, rz);
+          r._netId = i;
+          rabbits.push(r);
+        } else { i--; }
+      }
+      for (let i = 0; i < 6; i++) {
+        const dx = (Math.random() - 0.5) * DECO_RANGE * 2;
+        const dz = (Math.random() - 0.5) * DECO_RANGE * 2;
+        const biome = getBiome(dx, dz);
+        if (biome === BIOMES.FOREST || biome === BIOMES.TUNDRA) {
+          const d = createDeer(dx, dz);
+          d._netId = i;
+          deer.push(d);
+        } else { i--; }
+      }
+
+      // ── Fishing Spots ─────────────────────────────────────
+      const fishingSpots = [];
+      for (let i = 0; i < 10; i++) {
+        let fx, fz;
+        for (let attempt = 0; attempt < 20; attempt++) {
+          fx = (Math.random() - 0.5) * DECO_RANGE * 2;
+          fz = (Math.random() - 0.5) * DECO_RANGE * 2;
+          if (getBiome(fx, fz) === BIOMES.ICE_FIELDS) break;
+        }
+        const fy = getProceduralHeight(fx, fz);
+        const holeGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.05, 16);
+        const holeMat = new THREE.MeshStandardMaterial({ color: 0x224466, roughness: 0.1, metalness: 0.3 });
+        const hole = new THREE.Mesh(holeGeo, holeMat);
+        hole.position.set(fx, fy + 0.03, fz);
+        const ringGeo = new THREE.TorusGeometry(0.55, 0.04, 8, 16);
+        const ringMat = new THREE.MeshBasicMaterial({ color: 0x88ccff, transparent: true, opacity: 0.4 });
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.rotation.x = -Math.PI / 2;
+        ring.position.set(fx, fy + 0.05, fz);
+        scene.add(hole);
+        scene.add(ring);
+        fishingSpots.push({ mesh: hole, ring: ring, x: fx, z: fz });
+      }
+
+      // ── Cave System ─────────────────────────────────────────
+      const caveEntrances = [];
+      function createCaveEntrance(x, z) {
+        const group = new THREE.Group();
+        const ty = getProceduralHeight(x, z);
+        const archGeo = new THREE.TorusGeometry(1.5, 0.4, 8, 12, Math.PI);
+        const archMat = new THREE.MeshStandardMaterial({ color: 0x444455, roughness: 0.9 });
+        const arch = new THREE.Mesh(archGeo, archMat);
+        arch.position.y = 1.5;
+        arch.rotation.z = Math.PI;
+        group.add(arch);
+        const interiorGeo = new THREE.CircleGeometry(1.5, 12, 0, Math.PI);
+        const interiorMat = new THREE.MeshBasicMaterial({ color: 0x111122, side: THREE.DoubleSide });
+        const interior = new THREE.Mesh(interiorGeo, interiorMat);
+        interior.position.set(0, 1.5, -0.3);
+        interior.rotation.x = Math.PI;
+        interior.rotation.z = Math.PI;
+        group.add(interior);
+        const caveLight = new THREE.PointLight(0x6644aa, 1, 8);
+        caveLight.position.set(0, 1.5, -0.5);
+        group.add(caveLight);
+        const canvas = document.createElement('canvas');
+        canvas.width = 256; canvas.height = 64;
+        const caveLabelCtx = canvas.getContext('2d');
+        caveLabelCtx.fillStyle = '#6644aa';
+        caveLabelCtx.font = 'bold 24px sans-serif';
+        caveLabelCtx.textAlign = 'center';
+        caveLabelCtx.fillText('CAVE', 128, 42);
+        const tex = new THREE.CanvasTexture(canvas);
+        const labelMat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+        const label = new THREE.Sprite(labelMat);
+        label.position.y = 3.5;
+        label.scale.set(2, 0.5, 1);
+        group.add(label);
+        group.position.set(x, ty, z);
+        scene.add(group);
+        return { group: group, x: x, z: z, ty: ty };
+      }
+
+      for (let i = 0; i < 3; i++) {
+        let cx, cz;
+        for (let attempt = 0; attempt < 50; attempt++) {
+          cx = (Math.random() - 0.5) * DECO_RANGE * 1.5;
+          cz = (Math.random() - 0.5) * DECO_RANGE * 1.5;
+          if (getBiome(cx, cz) === BIOMES.MOUNTAINS) break;
+        }
+        caveEntrances.push(createCaveEntrance(cx, cz));
+      }
+
+      // Underground cave room
+      const caveRoom = new THREE.Group();
+      caveRoom.visible = false;
+      const caveFloor = new THREE.Mesh(
+        new THREE.PlaneGeometry(40, 40),
+        new THREE.MeshStandardMaterial({ color: 0x333344, roughness: 0.9 })
+      );
+      caveFloor.rotation.x = -Math.PI / 2;
+      caveFloor.position.y = -50;
+      caveRoom.add(caveFloor);
+      const caveCeiling = new THREE.Mesh(
+        new THREE.PlaneGeometry(40, 40),
+        new THREE.MeshStandardMaterial({ color: 0x222233, roughness: 0.9, side: THREE.DoubleSide })
+      );
+      caveCeiling.rotation.x = Math.PI / 2;
+      caveCeiling.position.y = -42;
+      caveRoom.add(caveCeiling);
+      for (let i = 0; i < 15; i++) {
+        const cg = new THREE.Mesh(crystalGeo, new THREE.MeshPhysicalMaterial({
+          color: 0x8844ff, roughness: 0.05, emissive: 0x4422aa, emissiveIntensity: 0.5,
+          transmission: 0.4, thickness: 0.5,
+        }));
+        const s = 0.3 + Math.random() * 0.8;
+        cg.scale.set(s * 0.5, s, s * 0.5);
+        cg.position.set((Math.random()-0.5)*30, -50 + s*0.5, (Math.random()-0.5)*30);
+        cg.rotation.y = Math.random() * Math.PI;
+        caveRoom.add(cg);
+      }
+      const cavePurpleLight = new THREE.PointLight(0x6644ff, 3, 30);
+      cavePurpleLight.position.set(0, -45, 0);
+      caveRoom.add(cavePurpleLight);
+      const portalGeo = new THREE.TorusGeometry(1.2, 0.15, 8, 16);
+      const portalMat = new THREE.MeshBasicMaterial({ color: 0x44ffaa, transparent: true, opacity: 0.6 });
+      const exitPortal = new THREE.Mesh(portalGeo, portalMat);
+      exitPortal.position.set(0, -48.5, 15);
+      exitPortal.rotation.x = Math.PI / 2;
+      caveRoom.add(exitPortal);
+      const portalLight = new THREE.PointLight(0x44ffaa, 2, 10);
+      portalLight.position.set(0, -48, 15);
+      caveRoom.add(portalLight);
+      scene.add(caveRoom);
+
+      // Cave resource nodes (high-value metal and fuel)
+      const caveResources = [];
+      for (let i = 0; i < 8; i++) {
+        const caveResType = Math.random() < 0.5 ? 'metal' : 'fuel';
+        const crx = (Math.random() - 0.5) * 25;
+        const crz = (Math.random() - 0.5) * 25;
+        const node = createResourceNode(caveResType, crx, crz, -50);
+        node.userData.caveNode = true;
+        caveResources.push(node);
+        resourceNodes.push(node);
+      }
+
       // ── Snow Particles (scaled for weather system) ─────
       const snowCount = 12000;
       const snowGeo = new THREE.BufferGeometry();
@@ -2500,6 +2784,17 @@
           }
           state.pendingPlace = null;
         }
+        else if (e.key.toLowerCase() === 'q' && state.nearCampfire && state.meat > 0) {
+          state.meat--;
+          state.cookedMeat++;
+          showStatus('Cooked meat! Press R to eat', '#ff8844');
+          if (typeof playCraftSound === 'function') playCraftSound();
+        }
+        else if (e.key.toLowerCase() === 'r' && state.cookedMeat > 0) {
+          state.cookedMeat--;
+          state.health = Math.min(100, state.health + 25);
+          showStatus('+25 Health!', '#44ff88');
+        }
       });
       window.addEventListener('keyup', (e) => {
         state.keys[e.key.toLowerCase()] = false;
@@ -2541,6 +2836,50 @@
             wolves.splice(wolves.indexOf(closest), 1);
             state.score += 50;
             showStatus('Wolf killed! +50 pts', '#44ff88');
+          }
+        }
+        // Attack rabbits
+        if (!closest) {
+          let closestAnimal = null;
+          let closestAnimalDist = attackRange;
+          for (const rabbit of rabbits) {
+            const adx = rabbit.position.x - playerGroup.position.x;
+            const adz = rabbit.position.z - playerGroup.position.z;
+            const adist = Math.sqrt(adx * adx + adz * adz);
+            if (adist < closestAnimalDist) {
+              closestAnimalDist = adist;
+              closestAnimal = { animal: rabbit, arr: rabbits, name: 'Rabbit', mat: rabbitNormalMat, hitMat: rabbitHitMat };
+            }
+          }
+          for (const d of deer) {
+            const adx = d.position.x - playerGroup.position.x;
+            const adz = d.position.z - playerGroup.position.z;
+            const adist = Math.sqrt(adx * adx + adz * adz);
+            if (adist < closestAnimalDist) {
+              closestAnimalDist = adist;
+              closestAnimal = { animal: d, arr: deer, name: 'Deer', mat: deerNormalMat, hitMat: deerHitMat };
+            }
+          }
+          if (closestAnimal) {
+            const admg = state.hasIcePick ? 20 : 10;
+            closestAnimal.animal.userData.health -= admg;
+            closestAnimal.animal.userData.hitFlash = 0.15;
+            closestAnimal.animal.userData.body.material = closestAnimal.hitMat;
+            playHitSound();
+            showStatus(`Hit ${closestAnimal.name}! (${Math.max(0, closestAnimal.animal.userData.health)} HP)`, '#ff8844');
+            const adx2 = closestAnimal.animal.position.x - playerGroup.position.x;
+            const adz2 = closestAnimal.animal.position.z - playerGroup.position.z;
+            const alen = Math.sqrt(adx2*adx2+adz2*adz2) || 1;
+            closestAnimal.animal.position.x += (adx2/alen) * 1.5;
+            closestAnimal.animal.position.z += (adz2/alen) * 1.5;
+            if (closestAnimal.animal.userData.health <= 0) {
+              const meatAmt = closestAnimal.animal.userData.meatDrop;
+              state.meat += meatAmt;
+              scene.remove(closestAnimal.animal);
+              closestAnimal.arr.splice(closestAnimal.arr.indexOf(closestAnimal.animal), 1);
+              state.score += 25;
+              showStatus(`+${meatAmt} Meat`, '#44ff88');
+            }
           }
         }
       });
@@ -2730,6 +3069,13 @@
         state.beaconActive = false;
         state.beaconTimer = 0;
         state.rescued = false;
+        state.inCave = false;
+        state.caveReturnPos = null;
+        caveRoom.visible = false;
+        state.hasFishingRod = false;
+        state.meat = 0;
+        state.cookedMeat = 0;
+        state.nearFishingSpot = null;
         document.getElementById('beacon-timer-hud').style.display = 'none';
         document.getElementById('win-screen').style.display = 'none';
         torchGroup.visible = false;
@@ -3331,7 +3677,7 @@
           playerGroup.scale.y += (targetScale - playerGroup.scale.y) * 8 * dt;
 
           // Get terrain height at player position
-          const terrainY = getTerrainHeight(playerGroup.position.x, playerGroup.position.z);
+          const terrainY = state.inCave ? -50 : getTerrainHeight(playerGroup.position.x, playerGroup.position.z);
 
           // Jump (can't jump while crouching)
           if (state.keys[' '] && state.onGround && !state.isCrouching) {
@@ -3348,6 +3694,39 @@
             playerGroup.position.y = terrainY;
             state.velocity.y = 0;
             state.onGround = true;
+          }
+
+          // Cave entrance check
+          if (!state.inCave) {
+            for (const cave of caveEntrances) {
+              const cdx = cave.x - playerGroup.position.x;
+              const cdz = cave.z - playerGroup.position.z;
+              if (Math.sqrt(cdx*cdx + cdz*cdz) < 2) {
+                state.inCave = true;
+                state.caveReturnPos = playerGroup.position.clone();
+                playerGroup.position.set(0, -50, -10);
+                caveRoom.visible = true;
+                showStatus('Entered cave! Find rare resources. Use the portal to exit.', '#aa88ff');
+                break;
+              }
+            }
+          } else {
+            // Check exit portal
+            const pdx = 0 - playerGroup.position.x;
+            const pdz = 15 - playerGroup.position.z;
+            if (Math.sqrt(pdx*pdx + pdz*pdz) < 2 && playerGroup.position.y < -40) {
+              state.inCave = false;
+              playerGroup.position.copy(state.caveReturnPos);
+              playerGroup.position.y += 2;
+              caveRoom.visible = false;
+              showStatus('Exited cave', '#44ffaa');
+            }
+            // Force floor in cave
+            if (playerGroup.position.y < -50) {
+              playerGroup.position.y = -50;
+              state.velocity.y = 0;
+              state.onGround = true;
+            }
           }
 
           // Animate limbs — faster cycle when sprinting
@@ -3385,9 +3764,13 @@
             statusEl.style.display = 'block';
             statusEl.textContent = 'FREEZING';
             statusEl.style.color = '#88ccff';
+          } else if (state.nearCampfire && state.meat > 0) {
+            statusEl.style.display = 'block';
+            statusEl.textContent = 'Q: Cook Meat | R: Eat';
+            statusEl.style.color = '#ff8844';
           } else if (state.nearCampfire) {
             statusEl.style.display = 'block';
-            statusEl.textContent = 'WARMING UP';
+            statusEl.textContent = state.cookedMeat > 0 ? 'WARMING UP | R: Eat' : 'WARMING UP';
             statusEl.style.color = '#ff8844';
           } else if (state.insideShelter) {
             statusEl.style.display = 'block';
@@ -3494,10 +3877,54 @@
               gatherBar.style.width = '0%';
             }
           } else {
-            gatherPrompt.style.display = 'none';
-            state.gathering = false;
-            state.gatherProgress = 0;
-            state.gatherTarget = null;
+            // Check fishing spots
+            state.nearFishingSpot = null;
+            if (state.hasFishingRod) {
+              for (const spot of fishingSpots) {
+                const fdx = spot.x - playerGroup.position.x;
+                const fdz = spot.z - playerGroup.position.z;
+                const fdist = Math.sqrt(fdx * fdx + fdz * fdz);
+                if (fdist < 2.5) {
+                  state.nearFishingSpot = spot;
+                  break;
+                }
+              }
+            }
+
+            if (state.nearFishingSpot) {
+              gatherPrompt.style.display = 'block';
+              if (state.keys['e']) {
+                if (state.gatherTarget !== state.nearFishingSpot) {
+                  state.gatherTarget = state.nearFishingSpot;
+                  state.gatherProgress = 0;
+                }
+                state.gathering = true;
+                state.gatherProgress += dt / 3.0;
+                gatherLabel.textContent = 'Fishing...';
+                gatherBar.style.width = Math.min(100, state.gatherProgress * 100) + '%';
+                if (state.gatherProgress >= 1) {
+                  playGatherSound();
+                  const fishAmt = 1 + Math.floor(Math.random() * 2);
+                  state.meat += fishAmt;
+                  state.score += fishAmt * 10;
+                  showStatus(`Caught ${fishAmt} fish! (+${fishAmt} Meat)`, '#88ccff');
+                  state.gathering = false;
+                  state.gatherProgress = 0;
+                  state.gatherTarget = null;
+                }
+              } else {
+                state.gathering = false;
+                state.gatherProgress = 0;
+                state.gatherTarget = null;
+                gatherLabel.textContent = '[E] Fish';
+                gatherBar.style.width = '0%';
+              }
+            } else {
+              gatherPrompt.style.display = 'none';
+              state.gathering = false;
+              state.gatherProgress = 0;
+              state.gatherTarget = null;
+            }
           }
 
           // Resource node respawn
@@ -3516,6 +3943,8 @@
           document.getElementById('inv-metal').textContent = `Metal: ${state.inventory.metal}`;
           document.getElementById('inv-cloth').textContent = `Cloth: ${state.inventory.cloth}`;
           document.getElementById('inv-fuel').textContent = `Fuel: ${state.inventory.fuel}`;
+          document.getElementById('inv-meat').textContent = `Meat: ${state.meat}`;
+          document.getElementById('inv-cooked').textContent = `Cooked: ${state.cookedMeat}`;
 
           // Update biome display
           const biomeNames = ['Frozen Tundra', 'Ice Fields', 'Glacial Mountains', 'Frozen Forest', 'Crystal Caverns'];
@@ -3794,6 +4223,126 @@
           wolves.push(createWolf(wx, wz));
         }
 
+        // ── Rabbit AI ──────────────────────────────────────
+        for (let ri = rabbits.length - 1; ri >= 0; ri--) {
+          const rabbit = rabbits[ri];
+          const rd = rabbit.userData;
+          // Hit flash
+          if (rd.hitFlash > 0) {
+            rd.hitFlash -= dt;
+            if (rd.hitFlash <= 0) rd.body.material = rabbitNormalMat;
+          }
+          const rdx = playerGroup.position.x - rabbit.position.x;
+          const rdz = playerGroup.position.z - rabbit.position.z;
+          const rDistToPlayer = Math.sqrt(rdx * rdx + rdz * rdz);
+          let rmoveX = 0, rmoveZ = 0;
+          if (rDistToPlayer < 12 && state.started && !state.dead) {
+            // Flee
+            const rlen = rDistToPlayer || 1;
+            rmoveX = -(rdx / rlen) * 5 * dt;
+            rmoveZ = -(rdz / rlen) * 5 * dt;
+          } else {
+            // Wander (hop)
+            rd.roamTimer -= dt;
+            if (rd.roamTimer <= 0) {
+              rd.roamTarget.set(
+                rabbit.position.x + (Math.random()-0.5) * 20,
+                0,
+                rabbit.position.z + (Math.random()-0.5) * 20
+              );
+              rd.roamTimer = 2 + Math.random() * 4;
+            }
+            const rtdx = rd.roamTarget.x - rabbit.position.x;
+            const rtdz = rd.roamTarget.z - rabbit.position.z;
+            const rtd = Math.sqrt(rtdx*rtdx+rtdz*rtdz) || 1;
+            rmoveX = (rtdx/rtd) * 1.5 * dt;
+            rmoveZ = (rtdz/rtd) * 1.5 * dt;
+          }
+          rabbit.position.x += rmoveX;
+          rabbit.position.z += rmoveZ;
+          rabbit.position.y = getProceduralHeight(rabbit.position.x, rabbit.position.z);
+          if (Math.abs(rmoveX) > 0.001 || Math.abs(rmoveZ) > 0.001) {
+            rabbit.rotation.y = Math.atan2(rmoveX, rmoveZ);
+          }
+        }
+        // Respawn rabbits
+        if (state.started && rabbits.length < 8 && Math.random() < dt * 0.02) {
+          const rAngle = Math.random() * Math.PI * 2;
+          const rDist = 40 + Math.random() * 60;
+          const rnx = playerGroup.position.x + Math.cos(rAngle) * rDist;
+          const rnz = playerGroup.position.z + Math.sin(rAngle) * rDist;
+          const rBiome = getBiome(rnx, rnz);
+          if (rBiome === BIOMES.FOREST || rBiome === BIOMES.TUNDRA) {
+            const nr = createRabbit(rnx, rnz);
+            nr._netId = rabbits.length + 100;
+            rabbits.push(nr);
+          }
+        }
+
+        // ── Deer AI ──────────────────────────────────────
+        for (let di = deer.length - 1; di >= 0; di--) {
+          const deerAnimal = deer[di];
+          const dd = deerAnimal.userData;
+          // Hit flash
+          if (dd.hitFlash > 0) {
+            dd.hitFlash -= dt;
+            if (dd.hitFlash <= 0) dd.body.material = deerNormalMat;
+          }
+          const ddx = playerGroup.position.x - deerAnimal.position.x;
+          const ddz = playerGroup.position.z - deerAnimal.position.z;
+          const dDistToPlayer = Math.sqrt(ddx * ddx + ddz * ddz);
+          let dmoveX = 0, dmoveZ = 0;
+          if (dDistToPlayer < 15 && state.started && !state.dead) {
+            // Flee
+            const dlen = dDistToPlayer || 1;
+            dmoveX = -(ddx / dlen) * 4 * dt;
+            dmoveZ = -(ddz / dlen) * 4 * dt;
+          } else {
+            // Graze
+            dd.roamTimer -= dt;
+            if (dd.roamTimer <= 0) {
+              dd.roamTarget.set(
+                deerAnimal.position.x + (Math.random()-0.5) * 30,
+                0,
+                deerAnimal.position.z + (Math.random()-0.5) * 30
+              );
+              dd.roamTimer = 4 + Math.random() * 6;
+            }
+            const dtdx = dd.roamTarget.x - deerAnimal.position.x;
+            const dtdz = dd.roamTarget.z - deerAnimal.position.z;
+            const dtd = Math.sqrt(dtdx*dtdx+dtdz*dtdz) || 1;
+            dmoveX = (dtdx/dtd) * 1.0 * dt;
+            dmoveZ = (dtdz/dtd) * 1.0 * dt;
+          }
+          deerAnimal.position.x += dmoveX;
+          deerAnimal.position.z += dmoveZ;
+          deerAnimal.position.y = getProceduralHeight(deerAnimal.position.x, deerAnimal.position.z);
+          if (Math.abs(dmoveX) > 0.001 || Math.abs(dmoveZ) > 0.001) {
+            deerAnimal.rotation.y = Math.atan2(dmoveX, dmoveZ);
+          }
+          // Animate legs
+          if (dd.legs) {
+            const dLegSwing = Math.sin(elapsed * 6) * 0.3;
+            dd.legs[0].position.y = 0.25 + Math.abs(dLegSwing) * 0.03;
+            dd.legs[1].position.y = 0.25 + Math.abs(-dLegSwing) * 0.03;
+            dd.legs[2].position.y = 0.25 + Math.abs(-dLegSwing) * 0.03;
+            dd.legs[3].position.y = 0.25 + Math.abs(dLegSwing) * 0.03;
+          }
+        }
+        // Respawn deer
+        if (state.started && deer.length < 4 && Math.random() < dt * 0.01) {
+          const dAngle = Math.random() * Math.PI * 2;
+          const dDist = 50 + Math.random() * 60;
+          const dnx = playerGroup.position.x + Math.cos(dAngle) * dDist;
+          const dnz = playerGroup.position.z + Math.sin(dAngle) * dDist;
+          const dBiome = getBiome(dnx, dnz);
+          if (dBiome === BIOMES.FOREST || dBiome === BIOMES.TUNDRA) {
+            const nd = createDeer(dnx, dnz);
+            nd._netId = deer.length + 200;
+            deer.push(nd);
+          }
+        }
+
         // ── Beacon Timer & Win Condition ──────────────────
         if (state.beaconActive && !state.rescued && !state.dead) {
           state.beaconTimer += dt;
@@ -3904,6 +4453,48 @@
             if (wx < 0 || wx > mw || wz < 0 || wz > mh) continue;
             mctx.fillStyle = wolf.userData.state === 'chase' || wolf.userData.state === 'attack' ? '#ff2200' : wolf.userData.state === 'stalk' ? '#ff8844' : '#884444';
             mctx.fillRect(wx - 2, wz - 2, 3, 3);
+          }
+
+          // Draw rabbits & deer (small dots)
+          for (const rabbit of rabbits) {
+            const rabX = cx + (rabbit.position.x - playerGroup.position.x) * mapScale;
+            const rabZ = cy + (rabbit.position.z - playerGroup.position.z) * mapScale;
+            if (rabX < 0 || rabX > mw || rabZ < 0 || rabZ > mh) continue;
+            mctx.fillStyle = '#ddddee';
+            mctx.fillRect(rabX - 1, rabZ - 1, 2, 2);
+          }
+          for (const deerA of deer) {
+            const deerX = cx + (deerA.position.x - playerGroup.position.x) * mapScale;
+            const deerZ = cy + (deerA.position.z - playerGroup.position.z) * mapScale;
+            if (deerX < 0 || deerX > mw || deerZ < 0 || deerZ > mh) continue;
+            mctx.fillStyle = '#886644';
+            mctx.fillRect(deerX - 1, deerZ - 1, 3, 3);
+          }
+
+          // Draw fishing spots (blue dots)
+          for (const fspot of fishingSpots) {
+            const fsx = cx + (fspot.x - playerGroup.position.x) * mapScale;
+            const fsz = cy + (fspot.z - playerGroup.position.z) * mapScale;
+            if (fsx < 0 || fsx > mw || fsz < 0 || fsz > mh) continue;
+            mctx.fillStyle = '#88ccff';
+            mctx.beginPath();
+            mctx.arc(fsx, fsz, 2, 0, Math.PI * 2);
+            mctx.fill();
+          }
+
+          // Draw cave entrances (purple diamonds)
+          for (const cave of caveEntrances) {
+            const cavX = cx + (cave.x - playerGroup.position.x) * mapScale;
+            const cavZ = cy + (cave.z - playerGroup.position.z) * mapScale;
+            if (cavX < 0 || cavX > mw || cavZ < 0 || cavZ > mh) continue;
+            mctx.fillStyle = '#aa66ff';
+            mctx.beginPath();
+            mctx.moveTo(cavX, cavZ - 4);
+            mctx.lineTo(cavX + 3, cavZ);
+            mctx.lineTo(cavX, cavZ + 4);
+            mctx.lineTo(cavX - 3, cavZ);
+            mctx.closePath();
+            mctx.fill();
           }
 
           // Remote players (colored dots)
