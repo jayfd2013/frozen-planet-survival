@@ -522,6 +522,10 @@
 
     <script type="module">
       import * as THREE from 'three';
+      import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+      import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+      import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+      import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 
       // ── Game State ──────────────────────────────────────
       const state = {
@@ -1372,6 +1376,51 @@
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       document.body.appendChild(renderer.domElement);
 
+      // ── Post-Processing ──────────────────────────────
+      const composer = new EffectComposer(renderer);
+      composer.addPass(new RenderPass(scene, camera));
+
+      // Bloom for glowing effects (fire, crystals, aurora)
+      const bloomPass = new UnrealBloomPass(
+        new THREE.Vector2(window.innerWidth, window.innerHeight),
+        0.4,   // strength
+        0.6,   // radius
+        0.85   // threshold
+      );
+      composer.addPass(bloomPass);
+
+      // Vignette + color grading shader
+      const vignetteShader = {
+        uniforms: {
+          tDiffuse: { value: null },
+          darkness: { value: 0.5 },
+          offset: { value: 1.2 },
+          tint: { value: new THREE.Vector3(0.9, 0.95, 1.1) }, // cold blue tint
+        },
+        vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+        fragmentShader: `
+          uniform sampler2D tDiffuse;
+          uniform float darkness;
+          uniform float offset;
+          uniform vec3 tint;
+          varying vec2 vUv;
+          void main() {
+            vec4 color = texture2D(tDiffuse, vUv);
+            // Color grading - cold tint
+            color.rgb *= tint;
+            // Slight contrast boost
+            color.rgb = pow(color.rgb, vec3(1.05));
+            // Vignette
+            vec2 uv = (vUv - vec2(0.5)) * vec2(offset);
+            float vig = clamp(1.0 - dot(uv, uv), 0.0, 1.0);
+            color.rgb *= mix(1.0 - darkness, 1.0, vig);
+            gl_FragColor = color;
+          }
+        `,
+      };
+      const vignettePass = new ShaderPass(vignetteShader);
+      composer.addPass(vignettePass);
+
       // ── Lighting ────────────────────────────────────────
       const ambientLight = new THREE.AmbientLight(0x8899cc, 0.8);
       scene.add(ambientLight);
@@ -1548,10 +1597,40 @@
 
       const groundMat = new THREE.MeshStandardMaterial({
         vertexColors: true,
-        roughness: 0.4,
-        metalness: 0.05,
+        roughness: 0.55,
+        metalness: 0.1,
         flatShading: true,
+        envMapIntensity: 0.5,
       });
+      // Add subtle sparkle/snow effect to terrain
+      groundMat.onBeforeCompile = (shader) => {
+        shader.uniforms.time = { value: 0 };
+        shader.vertexShader = shader.vertexShader.replace(
+          '#include <common>',
+          `#include <common>
+          varying vec3 vWorldPos;`
+        );
+        shader.vertexShader = shader.vertexShader.replace(
+          '#include <begin_vertex>',
+          `#include <begin_vertex>
+          vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;`
+        );
+        shader.fragmentShader = shader.fragmentShader.replace(
+          '#include <common>',
+          `#include <common>
+          uniform float time;
+          varying vec3 vWorldPos;`
+        );
+        shader.fragmentShader = shader.fragmentShader.replace(
+          '#include <dithering_fragment>',
+          `#include <dithering_fragment>
+          // Snow sparkle
+          float sparkle = fract(sin(dot(vWorldPos.xz * 10.0, vec2(12.9898, 78.233))) * 43758.5453);
+          float sparkleAnim = step(0.995, fract(sparkle + time * 0.3));
+          gl_FragColor.rgb += sparkleAnim * 0.5;`
+        );
+        groundMat.userData.shader = shader;
+      };
       const ground = new THREE.Mesh(groundGeo, groundMat);
       ground.rotation.x = -Math.PI / 2;
       ground.receiveShadow = true;
@@ -1611,6 +1690,8 @@
         transmission: 0.6,
         thickness: 0.5,
         clearcoat: 1.0,
+        emissive: 0x2244aa,
+        emissiveIntensity: 0.3,
       });
 
       // Rock spires for Mountains biome
@@ -2112,6 +2193,22 @@
         const embers = new THREE.Points(emberGeo, emberMat);
         group.add(embers);
 
+        // Smoke particles above fire
+        const smokeCount = 10;
+        const smokeGeo = new THREE.BufferGeometry();
+        const smokePos = new Float32Array(smokeCount * 3);
+        for (let i = 0; i < smokeCount; i++) {
+          smokePos[i * 3] = (Math.random() - 0.5) * 0.2;
+          smokePos[i * 3 + 1] = 1 + Math.random() * 2;
+          smokePos[i * 3 + 2] = (Math.random() - 0.5) * 0.2;
+        }
+        smokeGeo.setAttribute('position', new THREE.BufferAttribute(smokePos, 3));
+        const smokeMat = new THREE.PointsMaterial({
+          color: 0x666677, size: 0.2, transparent: true, opacity: 0.15, depthWrite: false
+        });
+        const smoke = new THREE.Points(smokeGeo, smokeMat);
+        group.add(smoke);
+
         group.position.set(x, terrainY, z);
 
         group.userData = {
@@ -2122,6 +2219,7 @@
           fireLight,
           flames,
           embers,
+          smoke,
         };
 
         scene.add(group);
@@ -2392,6 +2490,9 @@
         const eyeR = new THREE.Mesh(eyeGeo, eyeMat);
         eyeR.position.set(0.12, 0.65, -0.75);
         group.add(eyeR);
+        const eyeGlow = new THREE.PointLight(0xff2200, 0.5, 3);
+        eyeGlow.position.set(0, 0.65, -0.8);
+        group.add(eyeGlow);
         // Legs
         const legGeo = new THREE.BoxGeometry(0.12, 0.35, 0.12);
         const positions = [[-0.15, 0.175, -0.35], [0.15, 0.175, -0.35], [-0.15, 0.175, 0.35], [0.15, 0.175, 0.35]];
@@ -2934,6 +3035,34 @@
       playerGroup.position.set(0, 0, 0);
       scene.add(playerGroup);
 
+      // ── Breath Vapor ──────────────────────────────────
+      const breathCount = 20;
+      const breathGeo = new THREE.BufferGeometry();
+      const breathPositions = new Float32Array(breathCount * 3);
+      const breathAlphas = new Float32Array(breathCount);
+      const breathSizes = new Float32Array(breathCount);
+      for (let i = 0; i < breathCount; i++) {
+        breathPositions[i * 3] = 0;
+        breathPositions[i * 3 + 1] = -100; // hidden
+        breathPositions[i * 3 + 2] = 0;
+        breathAlphas[i] = 0;
+        breathSizes[i] = 0.05;
+      }
+      breathGeo.setAttribute('position', new THREE.BufferAttribute(breathPositions, 3));
+      const breathMat = new THREE.PointsMaterial({
+        color: 0xddeeff,
+        size: 0.12,
+        transparent: true,
+        opacity: 0.4,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      });
+      const breathParticles = new THREE.Points(breathGeo, breathMat);
+      scene.add(breathParticles);
+
+      let breathTimer = 0;
+      let nextBreathIdx = 0;
+
       // ── Stars ───────────────────────────────────────────
       const starCount = 800;
       const starGeo = new THREE.BufferGeometry();
@@ -3213,6 +3342,7 @@
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
         renderer.setSize(window.innerWidth, window.innerHeight);
+        composer.setSize(window.innerWidth, window.innerHeight);
       });
 
       // ── Frost FX Overlay ────────────────────────────────
@@ -3614,10 +3744,10 @@
 
       // ── Day/Night Cycle Colors ─────────────────────────
       const skyColors = {
-        night:   new THREE.Color(0x0a0a2a),
-        dawn:    new THREE.Color(0x886655),
-        day:     new THREE.Color(0x88bbdd),
-        dusk:    new THREE.Color(0x995533),
+        night:   new THREE.Color(0x050515),
+        dawn:    new THREE.Color(0xcc7755),
+        day:     new THREE.Color(0x7aadd4),
+        dusk:    new THREE.Color(0xcc6633),
       };
 
       function updateDayNight(dt) {
@@ -4010,12 +4140,13 @@
 
         // When paused, still render but don't advance game time
         if (state.paused) {
-          renderer.render(scene, camera);
+          composer.render();
           return;
         }
 
         const dt = rawDt;
         elapsed += dt;
+        if (groundMat.userData.shader) groundMat.userData.shader.uniforms.time.value = elapsed;
 
         // Day/night cycle
         if (state.started) updateDayNight(dt);
@@ -4117,6 +4248,18 @@
               ePos.setX(j, ePos.getX(j) + Math.sin(elapsed * 3 + j) * 0.003);
             }
             ePos.needsUpdate = true;
+
+            // Animate smoke
+            if (data.smoke) {
+              const sPos = data.smoke.geometry.attributes.position;
+              for (let j = 0; j < sPos.count; j++) {
+                let sy = sPos.getY(j) + dt * 0.5;
+                if (sy > 3) { sy = 1; sPos.setX(j, (Math.random()-0.5)*0.2); sPos.setZ(j, (Math.random()-0.5)*0.2); }
+                sPos.setY(j, sy);
+                sPos.setX(j, sPos.getX(j) + Math.sin(elapsed + j) * dt * 0.05);
+              }
+              sPos.needsUpdate = true;
+            }
 
             // Warmth check
             if (dist < data.warmthRange) {
@@ -5183,7 +5326,7 @@
           updateRemotePlayers(dt);
         }
 
-        renderer.render(scene, camera);
+        composer.render();
       }
 
       // Hide loading screen
