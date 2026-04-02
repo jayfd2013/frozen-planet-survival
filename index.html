@@ -346,6 +346,10 @@
           </div>
           <canvas id="char-preview" width="160" height="220"></canvas>
           <div class="color-row">
+            <label>Skin</label>
+            <div id="swatch-skin" class="swatch-group"></div>
+          </div>
+          <div class="color-row">
             <label>Parka</label>
             <div id="swatch-parka" class="swatch-group"></div>
           </div>
@@ -591,6 +595,7 @@
           beanie: 0x883322,
           scarf: 0xcc3333,
           pack: 0x556633,
+          skin: 0xddaa88,
         },
         // Skill tree
         skillPoints: 0,
@@ -1050,7 +1055,8 @@
 
       // ── Character Customization ───────────────────────────
       const CUSTOM_COLORS = {
-        parka: [0x2266aa, 0xcc3333, 0x33aa44, 0xdd8811, 0x8833cc, 0xcc3388, 0x44cccc, 0xeeeeee, 0x222222],
+        skin:   [0xf5d0a9, 0xddaa88, 0xc68642, 0xa0724a, 0x8d5524, 0x6b3a1f, 0x4a2511, 0x3b1a0a],
+        parka:  [0x2266aa, 0xcc3333, 0x33aa44, 0xdd8811, 0x8833cc, 0xcc3388, 0x44cccc, 0xeeeeee, 0x222222],
         beanie: [0x883322, 0xcc3333, 0x2255aa, 0x222222, 0xeeeeee, 0x33aa44, 0xdd8811, 0x8833cc],
         scarf:  [0xcc3333, 0x2266aa, 0x33aa44, 0xdd8811, 0xeeeeee, 0x8833cc, 0xcc3388, 0x222222],
         pack:   [0x556633, 0x664422, 0x883322, 0x335566, 0x444444, 0x222222, 0x886633],
@@ -1150,7 +1156,7 @@
         ctx.fillRect(cx + 8, baseY - 128, 8, 18);
 
         // Head (skin)
-        ctx.fillStyle = '#ddaa88';
+        ctx.fillStyle = hexToCSS(c.skin);
         ctx.beginPath();
         ctx.arc(cx, baseY - 143, 15, 0, Math.PI * 2);
         ctx.fill();
@@ -1182,7 +1188,7 @@
         ctx.fill();
 
         // Redraw head on top of hood
-        ctx.fillStyle = '#ddaa88';
+        ctx.fillStyle = hexToCSS(c.skin);
         ctx.beginPath();
         ctx.arc(cx, baseY - 143, 15, 0, Math.PI * 2);
         ctx.fill();
@@ -1218,6 +1224,7 @@
           playerMats.beanie.color.setHex(c.beanie);
           playerMats.scarf.color.setHex(c.scarf);
           playerMats.pack.color.setHex(c.pack);
+          playerMats.skin.color.setHex(c.skin);
         }
       }
 
@@ -2889,6 +2896,7 @@
       playerMats.beanie = beanieMat;
       playerMats.scarf = scarfMat;
       playerMats.pack = packMat;
+      playerMats.skin = skinMat;
 
       // ── Held Torch (visible when equipped) ──────────────
       const torchGroup = new THREE.Group();
