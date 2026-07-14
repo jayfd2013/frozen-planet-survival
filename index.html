@@ -1466,8 +1466,8 @@
 
       const renderer = new THREE.WebGLRenderer({ antialias: true });
       renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
-      renderer.shadowMap.enabled = true;
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1));
+      renderer.shadowMap.enabled = false;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       document.body.appendChild(renderer.domElement);
 
@@ -1483,6 +1483,7 @@
         0.85   // threshold
       );
       composer.addPass(bloomPass);
+      bloomPass.resolution.set(Math.floor(window.innerWidth / 2), Math.floor(window.innerHeight / 2));
       bloomPass.renderToScreen = false;
 
       // Vignette + color grading shader
@@ -4181,12 +4182,12 @@
         for (const wolf of wolves) {
           const dx = wolf.position.x - playerGroup.position.x;
           const dz = wolf.position.z - playerGroup.position.z;
-          const dist = Math.sqrt(dx*dx + dz*dz);
-          if (dist < 20 && (wolf.userData.state === 'chase' || wolf.userData.state === 'attack')) {
+          const dist2 = dx*dx + dz*dz;
+          if (dist2 < 400 && (wolf.userData.state === 'chase' || wolf.userData.state === 'attack')) {
             wolfNear = true;
             break;
           }
-          if (dist < 30 && wolf.userData.state === 'stalk') {
+          if (dist2 < 900 && wolf.userData.state === 'stalk') {
             targetMood = 'tension';
             targetVol = 0.04;
           }
@@ -4274,8 +4275,12 @@
         return mesh;
       }
 
+      let frameCount = 0;
+      let _lastInv = '';
+
       function animate() {
         requestAnimationFrame(animate);
+        frameCount++;
         const rawDt = Math.min(clock.getDelta(), 0.1);
 
         // When paused, still render but don't advance game time
@@ -4336,7 +4341,7 @@
           crystal.rotation.y += dt * 0.3;
         }
 
-        updateFootprints(dt);
+        if (frameCount % 2 === 0) updateFootprints(dt);
 
         // Resource nodes - combined loop (ring pulse + nearest check + respawn)
         let nearestDist = Infinity;
@@ -4374,7 +4379,7 @@
           const obj = placedObjects[i];
           const dx = obj.position.x - playerGroup.position.x;
           const dz = obj.position.z - playerGroup.position.z;
-          const dist = Math.sqrt(dx * dx + dz * dz);
+          const dist2 = dx * dx + dz * dz;
 
           if (obj.userData.type === 'campfire') {
             const data = obj.userData;
@@ -4387,8 +4392,23 @@
               continue;
             }
 
-            // Flicker flames
             const fuelFade = Math.min(1, data.fuel / 20); // dims in last 20s
+            const warmthRange2 = data.warmthRange * data.warmthRange;
+
+            if (dist2 > 400) {
+              // Far campfire (>20 units): only flicker light, skip flame/ember/smoke
+              data.fireLight.intensity = (2.5 + Math.sin(elapsed * 10) * 0.5) * fuelFade;
+              // Warmth check (still needed for distant large fires)
+              if (dist2 < warmthRange2) {
+                state.nearCampfire = true;
+                const dist = Math.sqrt(dist2);
+                state.campfireWarmth = data.warmthPower * (1 - dist / data.warmthRange) * fuelFade;
+              }
+              continue;
+            }
+
+            // Close campfire: full animation
+            // Flicker flames
             for (const flame of data.flames) {
               flame.position.y = flame.userData.baseY + Math.sin(elapsed * 8 + flame.userData.phase) * 0.08;
               flame.scale.y = 0.7 + Math.sin(elapsed * 12 + flame.userData.phase) * 0.3;
@@ -4423,16 +4443,17 @@
             }
 
             // Warmth check
-            if (dist < data.warmthRange) {
+            if (dist2 < warmthRange2) {
               state.nearCampfire = true;
+              const dist = Math.sqrt(dist2);
               state.campfireWarmth = data.warmthPower * (1 - dist / data.warmthRange) * fuelFade;
             }
           } else if (obj.userData.type === 'shelter') {
-            if (dist < obj.userData.shelterRange) {
+            if (dist2 < obj.userData.shelterRange * obj.userData.shelterRange) {
               state.insideShelter = true;
             }
           } else if (obj.userData.type === 'wall' || obj.userData.type === 'door') {
-            if (dist < obj.userData.shelterRange) {
+            if (dist2 < obj.userData.shelterRange * obj.userData.shelterRange) {
               state.insideShelter = true;
             }
           }
@@ -4761,17 +4782,21 @@
             }
           }
 
-          // Update inventory HUD
-          DOM.invWood.textContent = `Wood: ${state.inventory.wood}`;
-          DOM.invStone.textContent = `Stone: ${state.inventory.stone}`;
-          DOM.invMetal.textContent = `Metal: ${state.inventory.metal}`;
-          DOM.invCloth.textContent = `Cloth: ${state.inventory.cloth}`;
-          DOM.invFuel.textContent = `Fuel: ${state.inventory.fuel}`;
-          DOM.invMeat.textContent = `Meat: ${state.meat}`;
-          DOM.invCooked.textContent = `Cooked: ${state.cookedMeat}`;
+          // Update inventory HUD (only when values change)
+          const invStr = `${state.inventory.wood},${state.inventory.stone},${state.inventory.metal},${state.inventory.cloth},${state.inventory.fuel},${state.meat},${state.cookedMeat}`;
+          if (invStr !== _lastInv) {
+            _lastInv = invStr;
+            DOM.invWood.textContent = `Wood: ${state.inventory.wood}`;
+            DOM.invStone.textContent = `Stone: ${state.inventory.stone}`;
+            DOM.invMetal.textContent = `Metal: ${state.inventory.metal}`;
+            DOM.invCloth.textContent = `Cloth: ${state.inventory.cloth}`;
+            DOM.invFuel.textContent = `Fuel: ${state.inventory.fuel}`;
+            DOM.invMeat.textContent = `Meat: ${state.meat}`;
+            DOM.invCooked.textContent = `Cooked: ${state.cookedMeat}`;
+          }
 
           // Update biome display
-          if (!state._biomeFrame || state._biomeFrame++ > 30) {
+          if (!state._biomeFrame || state._biomeFrame++ > 60) {
             state._biomeFrame = 1;
             state._cachedBiome = getBiomeCached(playerGroup.position.x, playerGroup.position.z);
           }
@@ -4931,7 +4956,7 @@
 
           const dx = playerGroup.position.x - wolf.position.x;
           const dz = playerGroup.position.z - wolf.position.z;
-          const distToPlayer = Math.sqrt(dx * dx + dz * dz);
+          const dist2 = dx * dx + dz * dz;
 
           // Check if near fire — wolves flee fire
           let nearFire = false;
@@ -4949,11 +4974,11 @@
 
           if (nearFire) {
             wd.state = 'flee';
-          } else if (distToPlayer < WOLF_ATTACK_RANGE && state.started && !state.dead) {
+          } else if (dist2 < WOLF_ATTACK_RANGE * WOLF_ATTACK_RANGE && state.started && !state.dead) {
             wd.state = 'attack';
-          } else if (distToPlayer < effectiveAggro && state.started && !state.dead && !state.isDay) {
+          } else if (dist2 < effectiveAggro * effectiveAggro && state.started && !state.dead && !state.isDay) {
             wd.state = 'chase';
-          } else if (distToPlayer < effectiveStalk && state.started && !state.dead) {
+          } else if (dist2 < effectiveStalk * effectiveStalk && state.started && !state.dead) {
             wd.state = 'stalk'; // circle the player, keeping distance
           } else {
             wd.state = 'roam';
@@ -4963,12 +4988,13 @@
 
           if (wd.state === 'chase') {
             // Charge at player
-            const len = distToPlayer || 1;
+            const distToPlayer = Math.sqrt(dist2) || 1;
             const chargeSpeed = WOLF_SPEED * 1.4;
-            moveX = (dx / len) * chargeSpeed * dt;
-            moveZ = (dz / len) * chargeSpeed * dt;
+            moveX = (dx / distToPlayer) * chargeSpeed * dt;
+            moveZ = (dz / distToPlayer) * chargeSpeed * dt;
           } else if (wd.state === 'stalk') {
             // Circle the player at a distance, occasionally darting closer
+            const distToPlayer = Math.sqrt(dist2) || 1;
             const angle = Math.atan2(dx, dz);
             const circleAngle = angle + Math.PI / 2 + Math.sin(elapsed * 0.5 + wi) * 0.3;
             const desiredDist = 12 + Math.sin(elapsed * 0.3 + wi * 2) * 4;
@@ -4978,11 +5004,11 @@
             moveZ = Math.cos(circleAngle) * stalkSpeed * dt;
             // Adjust distance — drift toward desired distance
             if (distToPlayer > desiredDist + 2) {
-              moveX += (dx / (distToPlayer || 1)) * stalkSpeed * 0.4 * dt;
-              moveZ += (dz / (distToPlayer || 1)) * stalkSpeed * 0.4 * dt;
+              moveX += (dx / distToPlayer) * stalkSpeed * 0.4 * dt;
+              moveZ += (dz / distToPlayer) * stalkSpeed * 0.4 * dt;
             } else if (distToPlayer < desiredDist - 2) {
-              moveX -= (dx / (distToPlayer || 1)) * stalkSpeed * 0.3 * dt;
-              moveZ -= (dz / (distToPlayer || 1)) * stalkSpeed * 0.3 * dt;
+              moveX -= (dx / distToPlayer) * stalkSpeed * 0.3 * dt;
+              moveZ -= (dz / distToPlayer) * stalkSpeed * 0.3 * dt;
             }
           } else if (wd.state === 'attack') {
             // Lunge and bite, then back off briefly
@@ -4999,7 +5025,7 @@
               playWolfGrowl();
               wd.attackCooldown = 1.5; // pause between bites
               // Small retreat after bite
-              const len = distToPlayer || 1;
+              const len = Math.sqrt(dist2) || 1;
               wolf.position.x -= (dx / len) * 0.8;
               wolf.position.z -= (dz / len) * 0.8;
             }
@@ -5034,7 +5060,7 @@
 
           wolf.position.x += moveX;
           wolf.position.z += moveZ;
-          if (wi % 5 === Math.floor(elapsed) % 5) wolf.position.y = getProceduralHeight(wolf.position.x, wolf.position.z);
+          if (frameCount % 5 === wi % 5) wolf.position.y = getProceduralHeight(wolf.position.x, wolf.position.z);
 
           // Face movement direction
           if (Math.abs(moveX) > 0.001 || Math.abs(moveZ) > 0.001) {
@@ -5073,11 +5099,11 @@
           }
           const rdx = playerGroup.position.x - rabbit.position.x;
           const rdz = playerGroup.position.z - rabbit.position.z;
-          const rDistToPlayer = Math.sqrt(rdx * rdx + rdz * rdz);
+          const rDist2 = rdx * rdx + rdz * rdz;
           let rmoveX = 0, rmoveZ = 0;
-          if (rDistToPlayer < 12 && state.started && !state.dead) {
-            // Flee
-            const rlen = rDistToPlayer || 1;
+          if (rDist2 < 144 && state.started && !state.dead) {
+            // Flee (12^2 = 144)
+            const rlen = Math.sqrt(rDist2) || 1;
             rmoveX = -(rdx / rlen) * 5 * dt;
             rmoveZ = -(rdz / rlen) * 5 * dt;
           } else {
@@ -5099,7 +5125,7 @@
           }
           rabbit.position.x += rmoveX;
           rabbit.position.z += rmoveZ;
-          if (ri % 5 === Math.floor(elapsed) % 5) rabbit.position.y = getProceduralHeight(rabbit.position.x, rabbit.position.z);
+          if (frameCount % 5 === ri % 5) rabbit.position.y = getProceduralHeight(rabbit.position.x, rabbit.position.z);
           if (Math.abs(rmoveX) > 0.001 || Math.abs(rmoveZ) > 0.001) {
             rabbit.rotation.y = Math.atan2(rmoveX, rmoveZ);
           }
@@ -5132,11 +5158,11 @@
           }
           const ddx = playerGroup.position.x - deerAnimal.position.x;
           const ddz = playerGroup.position.z - deerAnimal.position.z;
-          const dDistToPlayer = Math.sqrt(ddx * ddx + ddz * ddz);
+          const dDist2 = ddx * ddx + ddz * ddz;
           let dmoveX = 0, dmoveZ = 0;
-          if (dDistToPlayer < 15 && state.started && !state.dead) {
-            // Flee
-            const dlen = dDistToPlayer || 1;
+          if (dDist2 < 225 && state.started && !state.dead) {
+            // Flee (15^2 = 225)
+            const dlen = Math.sqrt(dDist2) || 1;
             dmoveX = -(ddx / dlen) * 4 * dt;
             dmoveZ = -(ddz / dlen) * 4 * dt;
           } else {
@@ -5158,7 +5184,7 @@
           }
           deerAnimal.position.x += dmoveX;
           deerAnimal.position.z += dmoveZ;
-          if (di % 5 === Math.floor(elapsed) % 5) deerAnimal.position.y = getProceduralHeight(deerAnimal.position.x, deerAnimal.position.z);
+          if (frameCount % 5 === di % 5) deerAnimal.position.y = getProceduralHeight(deerAnimal.position.x, deerAnimal.position.z);
           if (Math.abs(dmoveX) > 0.001 || Math.abs(dmoveZ) > 0.001) {
             deerAnimal.rotation.y = Math.atan2(dmoveX, dmoveZ);
           }
