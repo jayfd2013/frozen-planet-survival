@@ -1371,7 +1371,7 @@
 
       const renderer = new THREE.WebGLRenderer({ antialias: true });
       renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       document.body.appendChild(renderer.domElement);
@@ -1388,6 +1388,7 @@
         0.85   // threshold
       );
       composer.addPass(bloomPass);
+      bloomPass.renderToScreen = false;
 
       // Vignette + color grading shader
       const vignetteShader = {
@@ -4231,6 +4232,9 @@
 
         // Crystal hover animation
         for (const crystal of crystals) {
+          const cdx = crystal.position.x - playerGroup.position.x;
+          const cdz = crystal.position.z - playerGroup.position.z;
+          if (cdx * cdx + cdz * cdz > 1600) continue;
           const d = crystal.userData;
           crystal.position.y =
             d.baseY + Math.sin(elapsed * d.speed + d.phase) * 0.2;
@@ -4239,12 +4243,33 @@
 
         updateFootprints(dt);
 
-        // Resource node ring pulse
-        for (const node of resourceNodes) {
-          if (node.userData.depleted) continue;
-          const ring = node.userData.ring;
-          ring.material.opacity = 0.25 + Math.sin(elapsed * 2) * 0.15;
-          ring.rotation.z = elapsed * 0.5;
+        // Resource nodes - combined loop (ring pulse + nearest check + respawn)
+        let nearestDist = Infinity;
+        state.nearestResource = null;
+        state.nearFishingSpot = null;
+        for (let ni = 0; ni < resourceNodes.length; ni++) {
+          const node = resourceNodes[ni];
+          if (node.userData.depleted) {
+            node.userData.respawnTimer -= dt;
+            if (node.userData.respawnTimer <= 0) {
+              node.userData.depleted = false;
+              node.visible = true;
+            }
+            continue;
+          }
+          const ndx = node.position.x - playerGroup.position.x;
+          const ndz = node.position.z - playerGroup.position.z;
+          const ndist2 = ndx * ndx + ndz * ndz;
+          // Only animate rings for nearby nodes (within 30 units)
+          if (ndist2 < 900) {
+            node.userData.ring.material.opacity = 0.25 + Math.sin(elapsed * 2) * 0.15;
+            node.userData.ring.rotation.z = elapsed * 0.5;
+          }
+          // Nearest check for gathering
+          if (ndist2 < GATHER_RANGE * GATHER_RANGE && ndist2 < nearestDist) {
+            nearestDist = ndist2;
+            state.nearestResource = node;
+          }
         }
 
         // Campfire animation + warmth check
@@ -4428,7 +4453,7 @@
             for (const cave of caveEntrances) {
               const cdx = cave.x - playerGroup.position.x;
               const cdz = cave.z - playerGroup.position.z;
-              if (Math.sqrt(cdx*cdx + cdz*cdz) < 2) {
+              if (cdx*cdx + cdz*cdz < 4) {
                 state.inCave = true;
                 state.caveReturnPos = playerGroup.position.clone();
                 playerGroup.position.set(0, -50, -10);
@@ -4441,7 +4466,7 @@
             // Check exit portal
             const pdx = 0 - playerGroup.position.x;
             const pdz = 15 - playerGroup.position.z;
-            if (Math.sqrt(pdx*pdx + pdz*pdz) < 2 && playerGroup.position.y < -40) {
+            if (pdx*pdx + pdz*pdz < 4 && playerGroup.position.y < -40) {
               state.inCave = false;
               playerGroup.position.copy(state.caveReturnPos);
               playerGroup.position.y += 2;
@@ -4528,21 +4553,6 @@
           DOM.score.textContent = state.score;
 
           // ── Resource Gathering ──
-          // Find nearest resource node
-          let nearestDist = Infinity;
-          state.nearestResource = null;
-          for (const node of resourceNodes) {
-            if (node.userData.depleted) continue;
-            const dx = node.position.x - playerGroup.position.x;
-            const dz = node.position.z - playerGroup.position.z;
-            const dist = Math.sqrt(dx * dx + dz * dz);
-            if (dist < nearestDist) {
-              nearestDist = dist;
-              state.nearestResource = dist <= GATHER_RANGE ? node : null;
-              if (dist <= GATHER_RANGE) nearestDist = dist;
-            }
-          }
-
           const gatherPrompt = DOM.gatherPrompt;
           const gatherLabel = DOM.gatherLabel;
           const gatherBar = DOM.gatherBar;
@@ -4612,8 +4622,8 @@
               for (const spot of fishingSpots) {
                 const fdx = spot.x - playerGroup.position.x;
                 const fdz = spot.z - playerGroup.position.z;
-                const fdist = Math.sqrt(fdx * fdx + fdz * fdz);
-                if (fdist < 2.5) {
+                const fdist2 = fdx * fdx + fdz * fdz;
+                if (fdist2 < 6.25) {
                   state.nearFishingSpot = spot;
                   break;
                 }
@@ -4656,16 +4666,6 @@
             }
           }
 
-          // Resource node respawn
-          for (const node of resourceNodes) {
-            if (!node.userData.depleted) continue;
-            node.userData.respawnTimer -= dt;
-            if (node.userData.respawnTimer <= 0) {
-              node.userData.depleted = false;
-              node.visible = true;
-            }
-          }
-
           // Update inventory HUD
           DOM.invWood.textContent = `Wood: ${state.inventory.wood}`;
           DOM.invStone.textContent = `Stone: ${state.inventory.stone}`;
@@ -4676,7 +4676,11 @@
           DOM.invCooked.textContent = `Cooked: ${state.cookedMeat}`;
 
           // Update biome display
-          const currentBiome = getBiomeAtPlayer();
+          if (!state._biomeFrame || state._biomeFrame++ > 30) {
+            state._biomeFrame = 1;
+            state._cachedBiome = getBiomeCached(playerGroup.position.x, playerGroup.position.z);
+          }
+          const currentBiome = state._cachedBiome || 0;
           DOM.biomeName.textContent = biomeNames[currentBiome];
 
           // Biome affects heat loss
@@ -4808,6 +4812,9 @@
         const runWolfAI = !state.isMultiplayer || state.isHost;
         for (let wi = 0; wi < wolves.length; wi++) {
           const wolf = wolves[wi];
+          const wdx0 = wolf.position.x - playerGroup.position.x;
+          const wdz0 = wolf.position.z - playerGroup.position.z;
+          if (wdx0 * wdx0 + wdz0 * wdz0 > 6400) continue; // skip if > 80 units away
           const wd = wolf.userData;
           // Hit flash timer
           if (wd.hitFlash > 0) {
@@ -4837,7 +4844,7 @@
             if (obj.userData.type !== 'campfire') continue;
             const fdx = obj.position.x - wolf.position.x;
             const fdz = obj.position.z - wolf.position.z;
-            if (Math.sqrt(fdx*fdx+fdz*fdz) < WOLF_FLEE_FIRE_RANGE) { nearFire = true; break; }
+            if (fdx*fdx+fdz*fdz < WOLF_FLEE_FIRE_RANGE * WOLF_FLEE_FIRE_RANGE) { nearFire = true; break; }
           }
 
           // Nighttime wolves are bolder
@@ -4932,7 +4939,7 @@
 
           wolf.position.x += moveX;
           wolf.position.z += moveZ;
-          wolf.position.y = getProceduralHeight(wolf.position.x, wolf.position.z);
+          if (wi % 5 === Math.floor(elapsed) % 5) wolf.position.y = getProceduralHeight(wolf.position.x, wolf.position.z);
 
           // Face movement direction
           if (Math.abs(moveX) > 0.001 || Math.abs(moveZ) > 0.001) {
@@ -4960,6 +4967,9 @@
         // ── Rabbit AI ──────────────────────────────────────
         for (let ri = rabbits.length - 1; ri >= 0; ri--) {
           const rabbit = rabbits[ri];
+          const rdx0 = rabbit.position.x - playerGroup.position.x;
+          const rdz0 = rabbit.position.z - playerGroup.position.z;
+          if (rdx0 * rdx0 + rdz0 * rdz0 > 6400) continue; // skip if > 80 units away
           const rd = rabbit.userData;
           // Hit flash
           if (rd.hitFlash > 0) {
@@ -4994,7 +5004,7 @@
           }
           rabbit.position.x += rmoveX;
           rabbit.position.z += rmoveZ;
-          rabbit.position.y = getProceduralHeight(rabbit.position.x, rabbit.position.z);
+          if (ri % 5 === Math.floor(elapsed) % 5) rabbit.position.y = getProceduralHeight(rabbit.position.x, rabbit.position.z);
           if (Math.abs(rmoveX) > 0.001 || Math.abs(rmoveZ) > 0.001) {
             rabbit.rotation.y = Math.atan2(rmoveX, rmoveZ);
           }
@@ -5016,6 +5026,9 @@
         // ── Deer AI ──────────────────────────────────────
         for (let di = deer.length - 1; di >= 0; di--) {
           const deerAnimal = deer[di];
+          const ddx0 = deerAnimal.position.x - playerGroup.position.x;
+          const ddz0 = deerAnimal.position.z - playerGroup.position.z;
+          if (ddx0 * ddx0 + ddz0 * ddz0 > 6400) continue; // skip if > 80 units away
           const dd = deerAnimal.userData;
           // Hit flash
           if (dd.hitFlash > 0) {
@@ -5050,7 +5063,7 @@
           }
           deerAnimal.position.x += dmoveX;
           deerAnimal.position.z += dmoveZ;
-          deerAnimal.position.y = getProceduralHeight(deerAnimal.position.x, deerAnimal.position.z);
+          if (di % 5 === Math.floor(elapsed) % 5) deerAnimal.position.y = getProceduralHeight(deerAnimal.position.x, deerAnimal.position.z);
           if (Math.abs(dmoveX) > 0.001 || Math.abs(dmoveZ) > 0.001) {
             deerAnimal.rotation.y = Math.atan2(dmoveX, dmoveZ);
           }
@@ -5085,7 +5098,7 @@
           item.mesh.position.y += Math.sin(elapsed * 3 + i) * 0.002;
           const dx = item.mesh.position.x - playerGroup.position.x;
           const dz = item.mesh.position.z - playerGroup.position.z;
-          if (Math.sqrt(dx*dx + dz*dz) < 1.5) {
+          if (dx*dx + dz*dz < 2.25) {
             if (item.type === 'meat') state.meat += item.amount;
             else state.inventory[item.type] = (state.inventory[item.type] || 0) + item.amount;
             showStatus(`Picked up ${item.amount} ${item.type}`, '#44ff88');
@@ -5104,7 +5117,7 @@
           if (page.userData.collected) continue;
           const dx = page.position.x - playerGroup.position.x;
           const dz = page.position.z - playerGroup.position.z;
-          if (Math.sqrt(dx*dx + dz*dz) < 2) {
+          if (dx*dx + dz*dz < 4) {
             page.userData.collected = true;
             page.visible = false;
             collectedPages.push(page.userData.index);
