@@ -871,6 +871,86 @@
         return { grid: l.grid, startDir: l.startDir || 1, requireAllGems: !!l.requireAllGems };
       }
 
+      // Main-thread mirror of the worker — the fallback used when a sandbox
+      // blocks Blob workers (e.g. a strict Content-Security-Policy). The op
+      // counter still guards runaway loops, since every sensor/action ticks it.
+      function simulate(code, level) {
+        const rows = level.grid, H = rows.length, W = rows[0].length;
+        const walls = {}, gems = {};
+        let start = null, goal = null;
+        for (let y = 0; y < H; y++) {
+          for (let x = 0; x < W; x++) {
+            const c = rows[y].charAt(x);
+            if (c === '#') walls[x + ',' + y] = true;
+            else if (c === '*') gems[x + ',' + y] = true;
+            else if (c === 'S') start = { x, y };
+            else if (c === 'G') goal = { x, y };
+          }
+        }
+        const dirs = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+        const st = { x: start.x, y: start.y, dir: level.startDir || 1, collected: {} };
+        const frames = [];
+        function snap(action) {
+          frames.push({ x: st.x, y: st.y, dir: st.dir, action, collected: Object.keys(st.collected) });
+          if (frames.length > 20000) throw new Error('Too many steps — is there an infinite loop?');
+        }
+        snap('start');
+        let ops = 0;
+        function tick() { if (++ops > 200000) throw new Error('Too many operations — possible infinite loop.'); }
+        function front() { const d = dirs[st.dir]; return { x: st.x + d[0], y: st.y + d[1] }; }
+        function blocked(c) { return c.x < 0 || c.y < 0 || c.x >= W || c.y >= H || walls[c.x + ',' + c.y]; }
+        const moveForward = () => { tick(); const c = front(); if (blocked(c)) { snap('bump'); } else { st.x = c.x; st.y = c.y; snap('move'); } };
+        const turnLeft = () => { tick(); st.dir = (st.dir + 3) % 4; snap('turnLeft'); };
+        const turnRight = () => { tick(); st.dir = (st.dir + 1) % 4; snap('turnRight'); };
+        const collect = () => { tick(); const k = st.x + ',' + st.y; if (gems[k] && !st.collected[k]) { st.collected[k] = true; snap('collect'); } else { snap('noop'); } };
+        const canMove = () => { tick(); return !blocked(front()); };
+        const isAtGoal = () => { tick(); return st.x === goal.x && st.y === goal.y; };
+        const isOnGem = () => { tick(); const k = st.x + ',' + st.y; return !!gems[k] && !st.collected[k]; };
+        let error = null;
+        try {
+          const fn = new Function('moveForward', 'turnLeft', 'turnRight', 'collect', 'canMove', 'isAtGoal', 'isOnGem', code);
+          fn(moveForward, turnLeft, turnRight, collect, canMove, isAtGoal, isOnGem);
+        } catch (err) { error = String(err && err.message ? err.message : err); }
+        const total = Object.keys(gems).length;
+        const got = Object.keys(st.collected).length;
+        const reached = st.x === goal.x && st.y === goal.y;
+        const success = reached && (level.requireAllGems ? got === total : true);
+        return { frames, error, success, reached, got, total };
+      }
+
+      // Run user code and deliver a result to cb(result). Prefers an isolated
+      // Web Worker (hard timeout kills true infinite loops); transparently
+      // falls back to the main thread if the worker can't be created or dies.
+      function execute(code, cb) {
+        const level = levelPayload();
+        let settled = false;
+        const finish = (res) => { if (settled) return; settled = true; cb(res); };
+        const fallback = () => { try { finish(simulate(code, level)); } catch (err) { finish({ frames: [], error: String(err && err.message ? err.message : err), success: false, reached: false, got: 0, total: 0 }); } };
+
+        let worker;
+        try {
+          worker = new Worker(workerBlobURL);
+        } catch (e) {
+          fallback();
+          return;
+        }
+        const watchdog = setTimeout(() => {
+          try { worker.terminate(); } catch (e) {}
+          // A timeout here means the worker ran and didn't return — treat as a
+          // genuine infinite loop rather than re-running it on the main thread.
+          finish({ frames: [], error: 'Your program ran too long — check for an infinite loop (a loop with no exit).', success: false, reached: false, got: 0, total: 0 });
+        }, 3500);
+        worker.onmessage = (e) => { clearTimeout(watchdog); try { worker.terminate(); } catch (er) {} finish(e.data); };
+        worker.onerror = () => { clearTimeout(watchdog); try { worker.terminate(); } catch (er) {} fallback(); };
+        try {
+          worker.postMessage({ code, level });
+        } catch (err) {
+          clearTimeout(watchdog);
+          try { worker.terminate(); } catch (er) {}
+          fallback();
+        }
+      }
+
       function run() {
         if (S.running) return;
         S.running = true;
@@ -878,37 +958,14 @@
         clearConsole();
         logSys('Running your program…');
         resetWorld();
-
-        const worker = new Worker(workerBlobURL);
-        const watchdog = setTimeout(() => {
-          worker.terminate();
-          finishError('Your program ran too long — check for an infinite loop (a loop with no exit).');
-        }, 3500);
-
-        worker.onmessage = (e) => {
-          clearTimeout(watchdog);
-          worker.terminate();
-          const res = e.data;
+        execute(codeEl.value, (res) => {
           S.lastFrames = res.frames;
           S.stepIndex = 0;
           S.pendingResult = res;
           if (!res.frames || res.frames.length === 0) { finishError(res.error || 'No actions ran.'); return; }
           switchTab('code');
           playFrames(res.frames, () => finishRun(res));
-        };
-        worker.onerror = (err) => {
-          clearTimeout(watchdog);
-          worker.terminate();
-          finishError(err.message || 'Something went wrong running your code.');
-        };
-
-        try {
-          worker.postMessage({ code: codeEl.value, level: levelPayload() });
-        } catch (err) {
-          clearTimeout(watchdog);
-          worker.terminate();
-          finishError('Could not start: ' + err.message);
-        }
+        });
       }
 
       function finishError(msg) {
@@ -955,19 +1012,16 @@
       function step() {
         if (S.running) return;
         if (!S.lastFrames) {
-          // run in worker but don't animate; just prepare frames
+          // compute frames once, then advance through them one at a time
           logSys('Computing steps…');
-          const worker = new Worker(workerBlobURL);
-          const wd = setTimeout(() => { worker.terminate(); finishError('Program ran too long.'); }, 3500);
-          worker.onmessage = (e) => {
-            clearTimeout(wd); worker.terminate();
-            S.lastFrames = e.data.frames; S.pendingResult = e.data; S.stepIndex = 0;
+          execute(codeEl.value, (res) => {
+            if (!res.frames || res.frames.length === 0) { finishError(res.error || 'No actions ran.'); return; }
+            S.lastFrames = res.frames; S.pendingResult = res; S.stepIndex = 0;
             resetWorld();
             switchTab('code');
             clearConsole(); logSys('Step mode — press Step to advance.');
             doStep();
-          };
-          worker.postMessage({ code: codeEl.value, level: levelPayload() });
+          });
           return;
         }
         doStep();
