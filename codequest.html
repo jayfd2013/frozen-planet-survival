@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CodeQuest — Learn to Code</title>
+    <meta name="description" content="Learn real programming by writing JavaScript to guide a robot through puzzles. Loops, conditionals, functions — the grown-up version of Scratch." />
+    <meta name="theme-color" content="#0b1220" />
+    <style>
+      :root {
+        --bg: #0b1220;
+        --bg2: #0e1729;
+        --panel: rgba(17, 26, 46, 0.72);
+        --panel-solid: #111a2e;
+        --border: rgba(120, 160, 220, 0.14);
+        --text: #e6eefc;
+        --muted: #93a4c4;
+        --accent: #38bdf8;
+        --accent2: #2dd4bf;
+        --gold: #fbbf24;
+        --danger: #fb7185;
+        --ok: #34d399;
+        --floor: #1b2a48;
+        --floor2: #203255;
+        --wall: #0a1120;
+        --mono: 'SFMono-Regular', 'JetBrains Mono', Consolas, 'Liberation Mono', Menlo, monospace;
+      }
+
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+
+      html, body { height: 100%; }
+
+      body {
+        background: radial-gradient(1200px 800px at 15% -10%, #16233f 0%, var(--bg) 55%) fixed;
+        color: var(--text);
+        font-family: 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
+        overflow: hidden;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* ---------- Layout ---------- */
+      #app {
+        display: grid;
+        grid-template-columns: 210px 1fr 460px;
+        grid-template-rows: 100vh;
+        gap: 12px;
+        padding: 12px;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+
+      /* ---------- Level rail ---------- */
+      #rail { padding: 16px 12px; }
+      #rail .brand {
+        display: flex; align-items: center; gap: 9px;
+        font-weight: 800; font-size: 17px; letter-spacing: 0.3px;
+        margin-bottom: 4px;
+      }
+      #rail .brand .logo {
+        width: 26px; height: 26px; border-radius: 7px;
+        background: linear-gradient(140deg, var(--accent), var(--accent2));
+        display: grid; place-items: center; font-size: 15px;
+        box-shadow: 0 0 18px rgba(56, 189, 248, 0.5);
+      }
+      #rail .tag { font-size: 10.5px; color: var(--muted); margin-bottom: 16px; letter-spacing: 0.4px; }
+      .level-list { display: flex; flex-direction: column; gap: 7px; overflow-y: auto; flex: 1; padding-right: 2px; }
+      .level-btn {
+        display: flex; align-items: center; gap: 10px;
+        text-align: left; width: 100%;
+        background: rgba(255,255,255,0.02);
+        border: 1px solid var(--border);
+        color: var(--text);
+        padding: 9px 10px; border-radius: 10px;
+        cursor: pointer; font-size: 12.5px;
+        transition: background 0.15s, border-color 0.15s, transform 0.1s;
+      }
+      .level-btn:hover:not(.locked) { background: rgba(56,189,248,0.10); border-color: rgba(56,189,248,0.4); }
+      .level-btn.active { background: rgba(56,189,248,0.16); border-color: var(--accent); box-shadow: inset 0 0 0 1px rgba(56,189,248,0.3); }
+      .level-btn.locked { opacity: 0.4; cursor: not-allowed; }
+      .level-btn .num {
+        flex: none; width: 24px; height: 24px; border-radius: 7px;
+        background: rgba(255,255,255,0.05); display: grid; place-items: center;
+        font-weight: 700; font-size: 12px; color: var(--muted);
+      }
+      .level-btn.active .num { background: var(--accent); color: #06121f; }
+      .level-btn.done .num { background: var(--ok); color: #05201a; }
+      .level-btn .lb-title { flex: 1; line-height: 1.2; }
+      .level-btn .lb-concept { font-size: 10px; color: var(--muted); }
+      .level-btn .check { color: var(--ok); font-size: 13px; }
+
+      /* ---------- Stage ---------- */
+      #stage { position: relative; }
+      #stageHead {
+        display: flex; align-items: baseline; gap: 12px;
+        padding: 14px 18px 10px; flex: none;
+      }
+      #stageHead h2 { font-size: 16px; font-weight: 700; }
+      #stageHead .concept {
+        font-size: 11px; color: var(--accent2); font-family: var(--mono);
+        background: rgba(45,212,191,0.1); padding: 3px 9px; border-radius: 20px;
+        border: 1px solid rgba(45,212,191,0.25);
+      }
+      #canvasWrap { flex: 1; position: relative; min-height: 0; }
+      canvas#game { display: block; width: 100%; height: 100%; }
+
+      #statusBar {
+        flex: none; display: flex; align-items: center; gap: 16px;
+        padding: 10px 18px; border-top: 1px solid var(--border);
+        font-size: 12.5px; color: var(--muted);
+      }
+      #statusBar .chip { display: flex; align-items: center; gap: 6px; }
+      #statusBar .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+      .speedwrap { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+      .speedwrap input { accent-color: var(--accent); }
+
+      /* ---------- Right / editor ---------- */
+      #side { }
+      .tabs { display: flex; gap: 4px; padding: 10px 12px 0; flex: none; }
+      .tab {
+        background: transparent; border: none; color: var(--muted);
+        padding: 7px 12px; font-size: 12.5px; cursor: pointer; border-radius: 8px 8px 0 0;
+        font-weight: 600;
+      }
+      .tab.active { color: var(--text); background: rgba(255,255,255,0.04); }
+
+      .lesson {
+        padding: 14px 18px; overflow-y: auto; font-size: 13px; line-height: 1.6; color: #cdd8ef;
+        border-bottom: 1px solid var(--border); flex: none; max-height: 34%;
+      }
+      .lesson h3 { font-size: 13px; color: var(--accent); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.6px; }
+      .lesson p { margin-bottom: 9px; }
+      .lesson code {
+        font-family: var(--mono); font-size: 12px; background: rgba(56,189,248,0.12);
+        color: #bfe6ff; padding: 1px 6px; border-radius: 5px;
+      }
+      .lesson .hint {
+        margin-top: 6px; padding: 9px 12px; border-radius: 9px;
+        background: rgba(251,191,36,0.08); border: 1px solid rgba(251,191,36,0.22);
+        font-size: 12px; color: #f3d38a; display: none;
+      }
+      .lesson .hint.show { display: block; }
+      .lesson .hint b { color: var(--gold); }
+
+      /* editor */
+      #editorArea { flex: 1; display: flex; flex-direction: column; min-height: 0; position: relative; }
+      .editorScroll {
+        flex: 1; position: relative; overflow: auto; background: #0a1120;
+      }
+      .editor-pre, #code {
+        margin: 0; border: 0; padding: 14px 16px 14px 52px;
+        font-family: var(--mono); font-size: 13.5px; line-height: 1.55;
+        tab-size: 2; white-space: pre; word-wrap: normal;
+        letter-spacing: 0.2px;
+      }
+      .editor-pre {
+        position: absolute; inset: 0; pointer-events: none; color: var(--text);
+        min-width: 100%;
+      }
+      #code {
+        position: absolute; inset: 0; width: 100%; height: 100%;
+        background: transparent; color: transparent; caret-color: #7fe0ff;
+        resize: none; outline: none; overflow: hidden;
+      }
+      /* line numbers via gutter */
+      .gutter {
+        position: absolute; top: 0; left: 0; width: 40px; padding-top: 14px;
+        font-family: var(--mono); font-size: 13.5px; line-height: 1.55;
+        color: #3f5170; text-align: right; user-select: none; pointer-events: none;
+        white-space: pre;
+      }
+      /* token colors */
+      .tok-com { color: #5a6b8c; font-style: italic; }
+      .tok-str { color: #86efac; }
+      .tok-num { color: #fca5a5; }
+      .tok-kw  { color: #c084fc; font-weight: 600; }
+      .tok-api { color: #38bdf8; font-weight: 600; }
+      .tok-fn  { color: #fde68a; }
+
+      /* controls + console */
+      #controls {
+        flex: none; display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--border);
+        flex-wrap: wrap;
+      }
+      button.btn {
+        border: 1px solid var(--border); background: rgba(255,255,255,0.03);
+        color: var(--text); padding: 8px 14px; border-radius: 9px; cursor: pointer;
+        font-size: 12.5px; font-weight: 600; display: flex; align-items: center; gap: 6px;
+        transition: background 0.15s, transform 0.08s, border-color 0.15s;
+      }
+      button.btn:hover { background: rgba(255,255,255,0.07); }
+      button.btn:active { transform: translateY(1px); }
+      button.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+      button.run { background: linear-gradient(135deg, var(--accent), #0ea5e9); border-color: transparent; color: #04121f; box-shadow: 0 4px 16px rgba(56,189,248,0.35); }
+      button.run:hover { background: linear-gradient(135deg, #7dd3fc, var(--accent)); }
+      button.reset { margin-left: auto; }
+
+      #console {
+        flex: none; height: 118px; overflow-y: auto; padding: 10px 14px;
+        border-top: 1px solid var(--border); background: rgba(4,8,18,0.5);
+        font-family: var(--mono); font-size: 11.5px; line-height: 1.6;
+      }
+      #console .log-line { color: #9fb2d4; }
+      #console .log-line .ic { display: inline-block; width: 16px; }
+      #console .log-move { color: #7fd0ff; }
+      #console .log-turn { color: #c9a7ff; }
+      #console .log-collect { color: var(--gold); }
+      #console .log-bump { color: var(--danger); }
+      #console .log-err { color: var(--danger); }
+      #console .log-ok { color: var(--ok); font-weight: 700; }
+      #console .log-sys { color: #64748b; }
+
+      /* Win modal */
+      #modal {
+        position: fixed; inset: 0; z-index: 100; display: none;
+        place-items: center; background: rgba(4,8,18,0.7); backdrop-filter: blur(4px);
+      }
+      #modal.show { display: grid; }
+      .modal-card {
+        background: linear-gradient(160deg, var(--bg2), #0a1424);
+        border: 1px solid rgba(52,211,153,0.35);
+        border-radius: 20px; padding: 32px 36px; text-align: center;
+        max-width: 380px; box-shadow: 0 30px 80px rgba(0,0,0,0.6), 0 0 60px rgba(52,211,153,0.15);
+        animation: pop 0.35s cubic-bezier(0.2, 1.4, 0.4, 1);
+      }
+      @keyframes pop { from { transform: scale(0.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+      .modal-card .big { font-size: 46px; margin-bottom: 8px; }
+      .modal-card h2 { font-size: 22px; margin-bottom: 8px; }
+      .modal-card p { color: var(--muted); font-size: 13px; margin-bottom: 22px; line-height: 1.5; }
+      .modal-card .row { display: flex; gap: 10px; justify-content: center; }
+
+      /* Scrollbars */
+      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      ::-webkit-scrollbar-thumb { background: rgba(120,160,220,0.25); border-radius: 8px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+
+      @media (max-width: 1100px) {
+        #app { grid-template-columns: 1fr; grid-template-rows: auto; height: auto; overflow: auto; }
+        body { overflow: auto; }
+        #stage { height: 60vh; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <!-- Level rail -->
+      <aside class="panel" id="rail">
+        <div class="brand"><span class="logo">&lt;/&gt;</span> CodeQuest</div>
+        <div class="tag">Learn real code, one puzzle at a time</div>
+        <div class="level-list" id="levelList"></div>
+      </aside>
+
+      <!-- Stage -->
+      <main class="panel" id="stage">
+        <div id="stageHead">
+          <h2 id="levelTitle">Loading…</h2>
+          <span class="concept" id="levelConcept"></span>
+        </div>
+        <div id="canvasWrap"><canvas id="game"></canvas></div>
+        <div id="statusBar">
+          <span class="chip"><span class="dot" id="goalDot"></span> <span id="goalStatus">Not at flag</span></span>
+          <span class="chip" id="gemChip" style="display:none">💎 <span id="gemStatus">0 / 0</span></span>
+          <div class="speedwrap">
+            <span>Speed</span>
+            <input type="range" id="speed" min="0.5" max="4" step="0.5" value="1.5" />
+          </div>
+        </div>
+      </main>
+
+      <!-- Side / editor -->
+      <section class="panel" id="side">
+        <div class="tabs">
+          <button class="tab active" data-tab="lesson">📖 Lesson</button>
+          <button class="tab" data-tab="code">⌨️ Code</button>
+        </div>
+
+        <div class="lesson" id="lessonPane"></div>
+
+        <div id="editorArea">
+          <div class="editorScroll" id="editorScroll">
+            <div class="gutter" id="gutter">1</div>
+            <pre class="editor-pre"><code id="highlight"></code></pre>
+            <textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off"></textarea>
+          </div>
+          <div id="controls">
+            <button class="btn run" id="runBtn">▶ Run</button>
+            <button class="btn" id="stepBtn">⏭ Step</button>
+            <button class="btn" id="solutionBtn">💡 Solution</button>
+            <button class="btn reset" id="resetBtn">↺ Reset code</button>
+          </div>
+          <div id="console"></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Win modal -->
+    <div id="modal">
+      <div class="modal-card">
+        <div class="big" id="modalIcon">🎉</div>
+        <h2 id="modalTitle">Level Complete!</h2>
+        <p id="modalText"></p>
+        <div class="row">
+          <button class="btn" id="replayBtn">↺ Replay</button>
+          <button class="btn run" id="nextBtn">Next Level →</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // ============================================================
+      //  LEVEL DATA
+      //  Grid legend:  S=start  G=goal(flag)  #=wall  *=gem  .=floor
+      //  Directions:   0=North 1=East 2=South 3=West
+      // ============================================================
+      const LEVELS = [
+        {
+          title: 'First Steps',
+          concept: 'sequencing',
+          grid: ['S...G'],
+          startDir: 1,
+          requireAllGems: false,
+          lesson: `
+            <h3>Statements run in order</h3>
+            <p>A program is a list of instructions the computer runs <b>top to bottom</b>. Each line here calls a <em>function</em> — a named action.</p>
+            <p>The robot faces the flag, 4 tiles east. <code>moveForward()</code> moves it one tile. The parentheses <code>()</code> mean "do it now".</p>
+            <p>The starter code moves once. Add more lines until the robot reaches the flag.</p>`,
+          hint: `You need <b>4</b> calls to <code>moveForward()</code>, one per line.`,
+          starter: `// Each line runs in order, top to bottom.\n// The flag is 4 tiles east — add more moves!\nmoveForward();\n`,
+          solution: `moveForward();\nmoveForward();\nmoveForward();\nmoveForward();\n`
+        },
+        {
+          title: 'Turning Corners',
+          concept: 'more functions',
+          grid: ['S...', '....', '...G'],
+          startDir: 1,
+          requireAllGems: false,
+          lesson: `
+            <h3>New commands: turning</h3>
+            <p>The flag is in the far corner, so a straight line won't do. Two new functions:</p>
+            <p><code>turnRight()</code> — rotate 90° clockwise.<br><code>turnLeft()</code> — rotate 90° counter-clockwise.</p>
+            <p>Turning doesn't move you — it just changes which way <code>moveForward()</code> will go. Move east, then turn to face the flag, then move down.</p>`,
+          hint: `Move east <b>3</b> times, then <code>turnRight()</code> to face down, then move <b>2</b> times.`,
+          starter: `// Reach the flag in the far corner.\n// Move east, then turnRight(), then move down.\nmoveForward();\n`,
+          solution: `moveForward();\nmoveForward();\nmoveForward();\nturnRight();\nmoveForward();\nmoveForward();\n`
+        },
+        {
+          title: 'Don\'t Repeat Yourself',
+          concept: 'for loops',
+          grid: ['S........G'],
+          startDir: 1,
+          requireAllGems: false,
+          lesson: `
+            <h3>Loops repeat code</h3>
+            <p>This corridor is 9 tiles long. Writing <code>moveForward()</code> nine times works, but it's tedious — and real programmers avoid repetition.</p>
+            <p>A <b>for loop</b> repeats a block a set number of times:</p>
+            <p><code>for (let i = 0; i &lt; 9; i++) { ... }</code></p>
+            <p>Read it as: "start <code>i</code> at 0, keep going while <code>i</code> is less than 9, add 1 each time." The starter loop only runs 3 times — <b>fix the number</b>.</p>`,
+          hint: `Change the <code>3</code> to <code>9</code> so the loop runs nine times.`,
+          starter: `// This loop only moves 3 tiles — not far enough!\n// Change the number so it reaches the flag.\nfor (let i = 0; i < 3; i++) {\n  moveForward();\n}\n`,
+          solution: `for (let i = 0; i < 9; i++) {\n  moveForward();\n}\n`
+        },
+        {
+          title: 'Gem Collector',
+          concept: 'loops + actions',
+          grid: ['S*.*.*.*G'],
+          startDir: 1,
+          requireAllGems: true,
+          lesson: `
+            <h3>Doing more each loop</h3>
+            <p>A loop's block can contain <b>several</b> statements. Here you must reach the flag <b>and</b> collect every 💎 gem along the way.</p>
+            <p><code>collect()</code> picks up a gem on your current tile (it does nothing if there's no gem — that's safe).</p>
+            <p>The starter loop moves but forgets to collect. Add <code>collect()</code> inside the loop.</p>`,
+          hint: `Put <code>collect()</code> on its own line inside the <code>{ }</code>, after <code>moveForward()</code>.`,
+          starter: `// Collect ALL gems, then reach the flag.\n// Add collect() inside the loop.\nfor (let i = 0; i < 8; i++) {\n  moveForward();\n  // collect() goes here\n}\n`,
+          solution: `for (let i = 0; i < 8; i++) {\n  moveForward();\n  collect();\n}\n`
+        },
+        {
+          title: 'Into the Unknown',
+          concept: 'while loops',
+          grid: ['S......G#'],
+          startDir: 1,
+          requireAllGems: false,
+          lesson: `
+            <h3>Looping until a condition</h3>
+            <p>Sometimes you don't know <em>how many</em> steps you need. A <b>while loop</b> repeats as long as a condition is true:</p>
+            <p><code>while (canMove()) { ... }</code></p>
+            <p><code>canMove()</code> is a <b>sensor</b> — it returns <code>true</code> if the tile ahead is open, <code>false</code> if a wall blocks it. Move forward until you hit the wall, and you'll land on the flag.</p>`,
+          hint: `Replace the whole thing with:<br><code>while (canMove()) { moveForward(); }</code>`,
+          starter: `// You don't know the corridor's length.\n// A fixed count is fragile — use while + canMove().\nwhile (canMove()) {\n  // move forward here\n}\n`,
+          solution: `while (canMove()) {\n  moveForward();\n}\n`
+        },
+        {
+          title: 'The Bend',
+          concept: 'if / else',
+          grid: ['S..', '##.', '##G'],
+          startDir: 1,
+          requireAllGems: false,
+          lesson: `
+            <h3>Making decisions</h3>
+            <p>The path turns a corner. Your robot needs to <b>decide</b>: move if it can, otherwise turn.</p>
+            <p><code>if (condition) { A } else { B }</code> runs <code>A</code> when the condition is true, <code>B</code> when it's false.</p>
+            <p>Loop with <code>while (!isAtGoal())</code> — the <code>!</code> means "not". Inside, if <code>canMove()</code>, go forward; else <code>turnRight()</code>.</p>`,
+          hint: `Inside the loop:<br><code>if (canMove()) { moveForward(); } else { turnRight(); }</code>`,
+          starter: `// This walks straight into the wall at the corner.\n// Use if/else to turn when you can't move.\nwhile (!isAtGoal()) {\n  moveForward();\n}\n`,
+          solution: `while (!isAtGoal()) {\n  if (canMove()) {\n    moveForward();\n  } else {\n    turnRight();\n  }\n}\n`
+        },
+        {
+          title: 'Build a Tool',
+          concept: 'functions',
+          grid: ['S*.*.*.*.*G'],
+          startDir: 1,
+          requireAllGems: true,
+          lesson: `
+            <h3>Writing your own functions</h3>
+            <p>You've been <em>calling</em> functions. Now <b>define</b> one. A function bundles steps under a name you can reuse:</p>
+            <p><code>function advance() {<br>&nbsp;&nbsp;moveForward();<br>&nbsp;&nbsp;collect();<br>}</code></p>
+            <p>Then call <code>advance()</code> in a loop to sweep the whole corridor. The starter shows the repetitive way — refactor it into a function + loop.</p>`,
+          hint: `Define <code>advance()</code> that moves and collects, then call it in a <code>for</code> loop <b>10</b> times.`,
+          starter: `// This is painfully repetitive:\nmoveForward(); collect();\nmoveForward(); collect();\n// ...8 more times. Wrap it in a function\n// called advance(), then loop it 10 times.\n`,
+          solution: `function advance() {\n  moveForward();\n  collect();\n}\n\nfor (let i = 0; i < 10; i++) {\n  advance();\n}\n`
+        },
+        {
+          title: 'The Gauntlet',
+          concept: 'capstone',
+          grid: ['S.*..', 'G###.', '.###*', '*###.', '..*..'],
+          startDir: 1,
+          requireAllGems: true,
+          lesson: `
+            <h3>Put it all together</h3>
+            <p>A ring-shaped maze with 4 gems. The flag sits just below your start — but the only path goes <b>all the way around</b>.</p>
+            <p>Combine everything: a <code>while</code> loop, a decision with <code>if/else</code>, the <code>canMove()</code> sensor, and <code>collect()</code>. Collect each tile as you go, move when you can, turn right when blocked.</p>
+            <p>The starter is a working solution — <b>read it, run it, then experiment.</b> Try breaking it to see what happens!</p>`,
+          hint: `Each loop: <code>collect()</code>, then <code>if (canMove()) moveForward(); else turnRight();</code>`,
+          starter: `// The grand finale — everything you've learned.\n// Read it carefully, run it, then tinker!\nwhile (!isAtGoal()) {\n  collect();\n  if (canMove()) {\n    moveForward();\n  } else {\n    turnRight();\n  }\n}\ncollect();\n`,
+          solution: `while (!isAtGoal()) {\n  collect();\n  if (canMove()) {\n    moveForward();\n  } else {\n    turnRight();\n  }\n}\ncollect();\n`
+        }
+      ];
+
+      // ============================================================
+      //  WEB WORKER SOURCE (sandboxed execution of user code)
+      // ============================================================
+      const WORKER_SRC = [
+        'self.onmessage = function(e){',
+        '  var code = e.data.code, level = e.data.level;',
+        '  var rows = level.grid, H = rows.length, W = rows[0].length;',
+        '  var walls = {}, gems = {}, start = null, goal = null;',
+        '  for (var y = 0; y < H; y++){',
+        '    for (var x = 0; x < W; x++){',
+        '      var c = rows[y].charAt(x);',
+        '      if (c === "#") walls[x+","+y] = true;',
+        '      else if (c === "*") gems[x+","+y] = true;',
+        '      else if (c === "S") start = {x:x,y:y};',
+        '      else if (c === "G") goal = {x:x,y:y};',
+        '    }',
+        '  }',
+        '  var dirs = [[0,-1],[1,0],[0,1],[-1,0]];',
+        '  var st = { x:start.x, y:start.y, dir: (level.startDir||1), collected:{} };',
+        '  var frames = [];',
+        '  function snap(action){',
+        '    frames.push({ x:st.x, y:st.y, dir:st.dir, action:action, collected:Object.keys(st.collected) });',
+        '    if (frames.length > 20000) throw new Error("Too many steps — is there an infinite loop?");',
+        '  }',
+        '  snap("start");',
+        '  var ops = 0;',
+        '  function tick(){ if (++ops > 200000) throw new Error("Too many operations — possible infinite loop."); }',
+        '  function front(){ var d = dirs[st.dir]; return { x: st.x + d[0], y: st.y + d[1] }; }',
+        '  function blocked(c){ return c.x < 0 || c.y < 0 || c.x >= W || c.y >= H || walls[c.x+","+c.y]; }',
+        '  function moveForward(){ tick(); var c = front(); if (blocked(c)) { snap("bump"); } else { st.x = c.x; st.y = c.y; snap("move"); } }',
+        '  function turnLeft(){ tick(); st.dir = (st.dir + 3) % 4; snap("turnLeft"); }',
+        '  function turnRight(){ tick(); st.dir = (st.dir + 1) % 4; snap("turnRight"); }',
+        '  function collect(){ tick(); var k = st.x+","+st.y; if (gems[k] && !st.collected[k]) { st.collected[k] = true; snap("collect"); } else { snap("noop"); } }',
+        '  function canMove(){ tick(); return !blocked(front()); }',
+        '  function isAtGoal(){ tick(); return st.x === goal.x && st.y === goal.y; }',
+        '  function isOnGem(){ tick(); var k = st.x+","+st.y; return !!gems[k] && !st.collected[k]; }',
+        '  var error = null;',
+        '  try {',
+        '    var fn = new Function("moveForward","turnLeft","turnRight","collect","canMove","isAtGoal","isOnGem", code);',
+        '    fn(moveForward, turnLeft, turnRight, collect, canMove, isAtGoal, isOnGem);',
+        '  } catch (err) { error = String(err && err.message ? err.message : err); }',
+        '  var total = Object.keys(gems).length;',
+        '  var got = Object.keys(st.collected).length;',
+        '  var reached = st.x === goal.x && st.y === goal.y;',
+        '  var success = reached && (level.requireAllGems ? got === total : true);',
+        '  self.postMessage({ frames:frames, error:error, success:success, reached:reached, got:got, total:total });',
+        '};'
+      ].join('\n');
+
+      const workerBlobURL = URL.createObjectURL(new Blob([WORKER_SRC], { type: 'application/javascript' }));
+
+      // ============================================================
+      //  STATE
+      // ============================================================
+      const S = {
+        current: 0,
+        parsed: null,       // parsed level for rendering
+        disp: { x: 0, y: 0, angle: 0 },   // continuous robot pose
+        collectedNow: new Set(),
+        anim: null,         // active animation
+        lastFrames: null,   // for stepping
+        stepIndex: 0,
+        pendingResult: null,
+        running: false,
+        speed: 1.5
+      };
+
+      // localStorage helpers
+      const store = {
+        unlocked() { return Math.max(0, parseInt(localStorage.getItem('cq_unlocked') || '0', 10)) || 0; },
+        setUnlocked(n) { localStorage.setItem('cq_unlocked', String(n)); },
+        done() { try { return JSON.parse(localStorage.getItem('cq_done') || '[]'); } catch (e) { return []; } },
+        markDone(i) { const d = store.done(); if (d.indexOf(i) < 0) d.push(i); localStorage.setItem('cq_done', JSON.stringify(d)); },
+        code(i) { return localStorage.getItem('cq_code_' + i); },
+        setCode(i, v) { localStorage.setItem('cq_code_' + i, v); },
+        clearCode(i) { localStorage.removeItem('cq_code_' + i); }
+      };
+
+      // ============================================================
+      //  DOM
+      // ============================================================
+      const $ = (id) => document.getElementById(id);
+      const canvas = $('game'), ctx = canvas.getContext('2d');
+      const codeEl = $('code'), hlEl = $('highlight'), gutterEl = $('gutter');
+      const consoleEl = $('console');
+
+      // ============================================================
+      //  LEVEL PARSING & LOADING
+      // ============================================================
+      function parseLevel(level) {
+        const rows = level.grid, H = rows.length, W = rows[0].length;
+        const walls = new Set(), gems = new Set();
+        let start = null, goal = null;
+        for (let y = 0; y < H; y++) {
+          for (let x = 0; x < W; x++) {
+            const c = rows[y][x];
+            if (c === '#') walls.add(x + ',' + y);
+            else if (c === '*') gems.add(x + ',' + y);
+            else if (c === 'S') start = { x, y };
+            else if (c === 'G') goal = { x, y };
+          }
+        }
+        return { W, H, walls, gems, start, goal, startDir: level.startDir || 1 };
+      }
+
+      function dirToAngle(dir) { return [-Math.PI / 2, 0, Math.PI / 2, Math.PI][dir]; }
+
+      function loadLevel(i) {
+        if (i < 0 || i >= LEVELS.length) return;
+        if (i > store.unlocked()) return; // locked
+        S.current = i;
+        const level = LEVELS[i];
+        S.parsed = parseLevel(level);
+        resetWorld();
+        // lesson pane
+        $('levelTitle').textContent = (i + 1) + '. ' + level.title;
+        $('levelConcept').textContent = level.concept;
+        $('lessonPane').innerHTML = level.lesson +
+          '<div class="hint" id="hintBox"><b>💡 Hint:</b> ' + level.hint + '</div>' +
+          '<p style="margin-top:10px"><a href="#" id="hintToggle" style="color:var(--accent);font-size:12px;text-decoration:none">Show hint ▾</a></p>';
+        const ht = $('hintToggle');
+        if (ht) ht.onclick = (e) => { e.preventDefault(); const h = $('hintBox'); h.classList.toggle('show'); ht.textContent = h.classList.contains('show') ? 'Hide hint ▴' : 'Show hint ▾'; };
+        // code (saved or starter)
+        const saved = store.code(i);
+        setCode(saved != null ? saved : level.starter);
+        clearConsole();
+        logSys('Level ' + (i + 1) + ': ' + level.title);
+        renderLevelList();
+        switchTab('lesson');
+      }
+
+      function resetWorld() {
+        stopAnim();
+        S.collectedNow = new Set();
+        S.lastFrames = null;
+        S.stepIndex = 0;
+        S.disp.x = S.parsed.start.x;
+        S.disp.y = S.parsed.start.y;
+        S.disp.angle = dirToAngle(S.parsed.startDir);
+        updateStatus(false, 0, S.parsed.gems.size);
+      }
+
+      // ============================================================
+      //  CODE EDITOR (textarea + syntax-highlight overlay)
+      // ============================================================
+      const KEYWORDS = /\b(const|let|var|function|return|if|else|for|while|do|break|continue|true|false|null|undefined|new|of|in|typeof)\b/;
+      const APIS = /\b(moveForward|turnLeft|turnRight|collect|canMove|isAtGoal|isOnGem)\b/;
+      const TOKEN = /(\/\/[^\n]*)|(\/\*[\s\S]*?\*\/)|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)|(\b\d+(?:\.\d+)?\b)|([A-Za-z_$][\w$]*)/g;
+
+      function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+      function highlight(code) {
+        let out = '', last = 0, m;
+        TOKEN.lastIndex = 0;
+        while ((m = TOKEN.exec(code)) !== null) {
+          out += esc(code.slice(last, m.index));
+          const t = m[0];
+          if (m[1] || m[2]) out += '<span class="tok-com">' + esc(t) + '</span>';
+          else if (m[3]) out += '<span class="tok-str">' + esc(t) + '</span>';
+          else if (m[4]) out += '<span class="tok-num">' + esc(t) + '</span>';
+          else if (m[5]) {
+            if (KEYWORDS.test(t)) out += '<span class="tok-kw">' + t + '</span>';
+            else if (APIS.test(t)) out += '<span class="tok-api">' + t + '</span>';
+            else {
+              // function definition name or call
+              const after = code.slice(m.index + t.length).match(/^\s*\(/);
+              out += after ? '<span class="tok-fn">' + t + '</span>' : esc(t);
+            }
+          } else out += esc(t);
+          last = m.index + t.length;
+        }
+        out += esc(code.slice(last));
+        return out;
+      }
+
+      function syncEditor() {
+        const code = codeEl.value;
+        hlEl.innerHTML = highlight(code) + '\n';
+        const lines = code.split('\n').length;
+        let g = '';
+        for (let i = 1; i <= lines; i++) g += i + '\n';
+        gutterEl.textContent = g;
+        store.setCode(S.current, code);
+      }
+
+      function setCode(v) {
+        codeEl.value = v;
+        syncEditor();
+        // resize textarea height to content so scrolling matches overlay
+        autoGrow();
+      }
+
+      function autoGrow() {
+        codeEl.style.height = 'auto';
+        const h = Math.max(codeEl.scrollHeight, $('editorScroll').clientHeight);
+        codeEl.style.height = h + 'px';
+        hlEl.parentElement.style.height = h + 'px';
+      }
+
+      codeEl.addEventListener('input', () => { syncEditor(); autoGrow(); });
+      codeEl.addEventListener('scroll', () => { $('editorScroll').scrollTop = codeEl.scrollTop; });
+      codeEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Tab') {
+          e.preventDefault();
+          const s = codeEl.selectionStart, en = codeEl.selectionEnd;
+          codeEl.value = codeEl.value.slice(0, s) + '  ' + codeEl.value.slice(en);
+          codeEl.selectionStart = codeEl.selectionEnd = s + 2;
+          syncEditor();
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); run(); }
+      });
+
+      // ============================================================
+      //  RENDERING
+      // ============================================================
+      function resizeCanvas() {
+        const wrap = $('canvasWrap');
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = wrap.clientWidth * dpr;
+        canvas.height = wrap.clientHeight * dpr;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+      window.addEventListener('resize', () => { resizeCanvas(); });
+
+      function roundRect(c, x, y, w, h, r) {
+        c.beginPath();
+        c.moveTo(x + r, y);
+        c.arcTo(x + w, y, x + w, y + h, r);
+        c.arcTo(x + w, y + h, x, y + h, r);
+        c.arcTo(x, y + h, x, y, r);
+        c.arcTo(x, y, x + w, y, r);
+        c.closePath();
+      }
+
+      function render(ts) {
+        const p = S.parsed;
+        if (!p) return;
+        const cw = $('canvasWrap').clientWidth, ch = $('canvasWrap').clientHeight;
+        ctx.clearRect(0, 0, cw, ch);
+
+        const pad = 24;
+        const cell = Math.min((cw - pad * 2) / p.W, (ch - pad * 2) / p.H);
+        const gw = cell * p.W, gh = cell * p.H;
+        const ox = (cw - gw) / 2, oy = (ch - gh) / 2;
+        const tile = (gx, gy) => ({ x: ox + gx * cell, y: oy + gy * cell });
+
+        // draw cells
+        for (let y = 0; y < p.H; y++) {
+          for (let x = 0; x < p.W; x++) {
+            const t = tile(x, y);
+            const isWall = p.walls.has(x + ',' + y);
+            const inset = 2;
+            if (isWall) {
+              ctx.fillStyle = '#060b16';
+              roundRect(ctx, t.x + inset, t.y + inset, cell - inset * 2, cell - inset * 2, 5);
+              ctx.fill();
+              ctx.strokeStyle = 'rgba(80,110,160,0.10)';
+              ctx.lineWidth = 1;
+              ctx.stroke();
+            } else {
+              const grad = ctx.createLinearGradient(t.x, t.y, t.x, t.y + cell);
+              grad.addColorStop(0, '#213458');
+              grad.addColorStop(1, '#1a2a48');
+              ctx.fillStyle = grad;
+              roundRect(ctx, t.x + inset, t.y + inset, cell - inset * 2, cell - inset * 2, 6);
+              ctx.fill();
+              ctx.strokeStyle = 'rgba(120,160,220,0.08)';
+              ctx.lineWidth = 1;
+              ctx.stroke();
+            }
+          }
+        }
+
+        // goal flag (pulsing)
+        if (p.goal) {
+          const t = tile(p.goal.x, p.goal.y);
+          const cx = t.x + cell / 2, cy = t.y + cell / 2;
+          const pulse = 0.5 + 0.5 * Math.sin(ts / 500);
+          ctx.save();
+          ctx.shadowColor = 'rgba(45,212,191,0.9)';
+          ctx.shadowBlur = 12 + pulse * 12;
+          ctx.strokeStyle = 'rgba(45,212,191,' + (0.5 + pulse * 0.4) + ')';
+          ctx.lineWidth = 2;
+          roundRect(ctx, t.x + 6, t.y + 6, cell - 12, cell - 12, 6);
+          ctx.stroke();
+          ctx.restore();
+          // flag icon
+          const fh = cell * 0.42, pole = cx - cell * 0.13;
+          ctx.strokeStyle = '#7ff0e0'; ctx.lineWidth = Math.max(2, cell * 0.04);
+          ctx.beginPath(); ctx.moveTo(pole, cy - fh / 2); ctx.lineTo(pole, cy + fh / 2); ctx.stroke();
+          ctx.fillStyle = '#2dd4bf';
+          ctx.beginPath();
+          ctx.moveTo(pole, cy - fh / 2);
+          ctx.lineTo(pole + cell * 0.26, cy - fh / 2 + fh * 0.18);
+          ctx.lineTo(pole, cy - fh / 2 + fh * 0.36);
+          ctx.closePath(); ctx.fill();
+        }
+
+        // gems
+        p.gems.forEach((key) => {
+          if (S.collectedNow.has(key)) return;
+          const parts = key.split(','), gx = +parts[0], gy = +parts[1];
+          const t = tile(gx, gy);
+          const cx = t.x + cell / 2, cy = t.y + cell / 2 + Math.sin(ts / 400 + gx + gy) * cell * 0.04;
+          const r = cell * 0.16;
+          ctx.save();
+          ctx.shadowColor = 'rgba(251,191,36,0.8)'; ctx.shadowBlur = 12;
+          ctx.fillStyle = '#fbbf24';
+          ctx.beginPath();
+          ctx.moveTo(cx, cy - r); ctx.lineTo(cx + r * 0.72, cy); ctx.lineTo(cx, cy + r); ctx.lineTo(cx - r * 0.72, cy);
+          ctx.closePath(); ctx.fill();
+          ctx.strokeStyle = 'rgba(255,240,200,0.9)'; ctx.lineWidth = 1;
+          ctx.stroke();
+          ctx.restore();
+        });
+
+        // robot
+        const rt = tile(S.disp.x, S.disp.y);
+        const rcx = rt.x + cell / 2, rcy = rt.y + cell / 2;
+        const rr = cell * 0.30;
+        ctx.save();
+        ctx.translate(rcx, rcy);
+        // shadow
+        ctx.fillStyle = 'rgba(0,0,0,0.28)';
+        ctx.beginPath(); ctx.ellipse(0, rr * 0.9, rr * 0.9, rr * 0.35, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.rotate(S.disp.angle);
+        // direction pointer
+        ctx.fillStyle = '#7dd3fc';
+        ctx.beginPath();
+        ctx.moveTo(rr * 1.15, 0); ctx.lineTo(rr * 0.45, -rr * 0.5); ctx.lineTo(rr * 0.45, rr * 0.5);
+        ctx.closePath(); ctx.fill();
+        // body
+        const bg = ctx.createLinearGradient(0, -rr, 0, rr);
+        bg.addColorStop(0, '#5cc8ff'); bg.addColorStop(1, '#2b8fd6');
+        ctx.fillStyle = bg;
+        ctx.shadowColor = 'rgba(56,189,248,0.55)'; ctx.shadowBlur = 14;
+        roundRect(ctx, -rr, -rr, rr * 2, rr * 2, rr * 0.55);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        // visor
+        ctx.fillStyle = '#08243b';
+        roundRect(ctx, -rr * 0.45, -rr * 0.35, rr * 1.1, rr * 0.7, rr * 0.25);
+        ctx.fill();
+        // eyes
+        ctx.fillStyle = '#8bf3ff';
+        ctx.beginPath(); ctx.arc(rr * 0.08, 0, rr * 0.14, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(rr * 0.42, 0, rr * 0.12, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      }
+
+      // ============================================================
+      //  ANIMATION LOOP
+      // ============================================================
+      const BASE_DUR = 340;
+      function easeInOut(p) { return p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2; }
+      function lerp(a, b, t) { return a + (b - a) * t; }
+
+      function loop(ts) {
+        updateAnim(ts);
+        render(ts);
+        requestAnimationFrame(loop);
+      }
+
+      function updateAnim(ts) {
+        const a = S.anim;
+        if (!a || !a.playing) return;
+        if (a.i >= a.frames.length) {
+          a.playing = false;
+          const cb = a.done; a.done = null;
+          if (cb) cb();
+          return;
+        }
+        if (a.segStart == null) {
+          a.segStart = ts;
+          a.fromX = S.disp.x; a.fromY = S.disp.y; a.fromAngle = S.disp.angle;
+        }
+        const f = a.frames[a.i];
+        const dur = BASE_DUR / S.speed;
+        let p = Math.min(1, (ts - a.segStart) / dur);
+        const e = easeInOut(p);
+
+        if (f.action === 'move') {
+          S.disp.x = lerp(a.fromX, f.x, e);
+          S.disp.y = lerp(a.fromY, f.y, e);
+        } else if (f.action === 'turnRight' || f.action === 'turnLeft') {
+          const sign = f.action === 'turnRight' ? 1 : -1;
+          S.disp.angle = a.fromAngle + sign * (Math.PI / 2) * e;
+        } else if (f.action === 'bump') {
+          const dirs = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+          const d = dirs[f.dir];
+          const amt = Math.sin(p * Math.PI) * 0.22;
+          S.disp.x = a.fromX + d[0] * amt;
+          S.disp.y = a.fromY + d[1] * amt;
+        }
+
+        if (p >= 1) {
+          // finalize segment
+          if (f.action === 'bump') { S.disp.x = a.fromX; S.disp.y = a.fromY; }
+          else { S.disp.x = f.x; S.disp.y = f.y; S.disp.angle = a.fromAngle + (f.action === 'turnRight' ? Math.PI / 2 : f.action === 'turnLeft' ? -Math.PI / 2 : 0); }
+          S.collectedNow = new Set(f.collected);
+          logAction(f);
+          updateStatusFromFrame(f);
+          a.i++;
+          a.segStart = null;
+        }
+      }
+
+      function playFrames(frames, done) {
+        // skip pure 'start'/'noop' at very front handling: keep them but they animate instantly (no movement)
+        S.disp.x = frames[0].x; S.disp.y = frames[0].y;
+        S.disp.angle = dirToAngle(frames[0].dir);
+        S.collectedNow = new Set(frames[0].collected);
+        S.anim = { frames, i: 1, segStart: null, playing: frames.length > 1, done };
+        if (frames.length <= 1) { if (done) done(); }
+      }
+
+      function stopAnim() { if (S.anim) S.anim.playing = false; S.anim = null; }
+
+      // ============================================================
+      //  RUN / STEP
+      // ============================================================
+      function levelPayload() {
+        const l = LEVELS[S.current];
+        return { grid: l.grid, startDir: l.startDir || 1, requireAllGems: !!l.requireAllGems };
+      }
+
+      function run() {
+        if (S.running) return;
+        S.running = true;
+        setButtons(false);
+        clearConsole();
+        logSys('Running your program…');
+        resetWorld();
+
+        const worker = new Worker(workerBlobURL);
+        const watchdog = setTimeout(() => {
+          worker.terminate();
+          finishError('Your program ran too long — check for an infinite loop (a loop with no exit).');
+        }, 3500);
+
+        worker.onmessage = (e) => {
+          clearTimeout(watchdog);
+          worker.terminate();
+          const res = e.data;
+          S.lastFrames = res.frames;
+          S.stepIndex = 0;
+          S.pendingResult = res;
+          if (!res.frames || res.frames.length === 0) { finishError(res.error || 'No actions ran.'); return; }
+          switchTab('code');
+          playFrames(res.frames, () => finishRun(res));
+        };
+        worker.onerror = (err) => {
+          clearTimeout(watchdog);
+          worker.terminate();
+          finishError(err.message || 'Something went wrong running your code.');
+        };
+
+        try {
+          worker.postMessage({ code: codeEl.value, level: levelPayload() });
+        } catch (err) {
+          clearTimeout(watchdog);
+          worker.terminate();
+          finishError('Could not start: ' + err.message);
+        }
+      }
+
+      function finishError(msg) {
+        logErr('✗ ' + msg);
+        S.running = false;
+        setButtons(true);
+      }
+
+      function finishRun(res) {
+        S.running = false;
+        setButtons(true);
+        if (res.error) {
+          logErr('✗ Error: ' + res.error);
+          return;
+        }
+        if (res.success) {
+          logOk('✓ Success! You solved it.');
+          onWin();
+        } else if (!res.reached) {
+          logErr('✗ The robot didn\'t reach the flag. Keep trying!');
+        } else if (LEVELS[S.current].requireAllGems && res.got < res.total) {
+          logErr('✗ Reached the flag, but only collected ' + res.got + ' of ' + res.total + ' gems.');
+        } else {
+          logErr('✗ Not quite — try again.');
+        }
+      }
+
+      function onWin() {
+        const i = S.current;
+        store.markDone(i);
+        if (i + 1 > store.unlocked()) store.setUnlocked(Math.min(LEVELS.length - 1, i + 1));
+        renderLevelList();
+        const hasNext = i + 1 < LEVELS.length;
+        $('modalIcon').textContent = hasNext ? '🎉' : '🏆';
+        $('modalTitle').textContent = hasNext ? 'Level Complete!' : 'You Finished CodeQuest!';
+        $('modalText').textContent = hasNext
+          ? 'Nicely done. Next up: ' + LEVELS[i + 1].title + ' (' + LEVELS[i + 1].concept + ').'
+          : 'You\'ve worked through sequencing, loops, conditionals, and functions — the real foundations of programming. Replay any level to experiment further.';
+        $('nextBtn').style.display = hasNext ? '' : 'none';
+        $('modal').classList.add('show');
+      }
+
+      // Step mode: advance one frame instantly
+      function step() {
+        if (S.running) return;
+        if (!S.lastFrames) {
+          // run in worker but don't animate; just prepare frames
+          logSys('Computing steps…');
+          const worker = new Worker(workerBlobURL);
+          const wd = setTimeout(() => { worker.terminate(); finishError('Program ran too long.'); }, 3500);
+          worker.onmessage = (e) => {
+            clearTimeout(wd); worker.terminate();
+            S.lastFrames = e.data.frames; S.pendingResult = e.data; S.stepIndex = 0;
+            resetWorld();
+            switchTab('code');
+            clearConsole(); logSys('Step mode — press Step to advance.');
+            doStep();
+          };
+          worker.postMessage({ code: codeEl.value, level: levelPayload() });
+          return;
+        }
+        doStep();
+      }
+
+      function doStep() {
+        stopAnim();
+        const frames = S.lastFrames;
+        if (S.stepIndex >= frames.length - 1) {
+          logSys('— end of program —');
+          if (S.pendingResult) finishRun(S.pendingResult);
+          S.lastFrames = null; S.stepIndex = 0;
+          return;
+        }
+        S.stepIndex++;
+        const f = frames[S.stepIndex];
+        S.disp.x = f.x; S.disp.y = f.y; S.disp.angle = dirToAngle(f.dir);
+        S.collectedNow = new Set(f.collected);
+        logAction(f);
+        updateStatusFromFrame(f);
+      }
+
+      // ============================================================
+      //  STATUS + CONSOLE
+      // ============================================================
+      function updateStatus(atGoal, got, total) {
+        $('goalStatus').textContent = atGoal ? 'On the flag!' : 'Not at flag';
+        $('goalDot').style.background = atGoal ? 'var(--ok)' : 'var(--muted)';
+        const req = LEVELS[S.current] && LEVELS[S.current].requireAllGems;
+        $('gemChip').style.display = (total > 0) ? '' : 'none';
+        $('gemStatus').textContent = got + ' / ' + total;
+        $('gemStatus').style.color = (req && got === total && total > 0) ? 'var(--ok)' : '';
+      }
+
+      function updateStatusFromFrame(f) {
+        const p = S.parsed;
+        const atGoal = p.goal && f.x === p.goal.x && f.y === p.goal.y;
+        updateStatus(atGoal, f.collected.length, p.gems.size);
+      }
+
+      function clearConsole() { consoleEl.innerHTML = ''; }
+      function logLine(cls, ic, text) {
+        const d = document.createElement('div');
+        d.className = 'log-line';
+        d.innerHTML = '<span class="ic">' + ic + '</span><span class="' + cls + '">' + esc(text) + '</span>';
+        consoleEl.appendChild(d);
+        consoleEl.scrollTop = consoleEl.scrollHeight;
+      }
+      function logSys(t) { logLine('log-sys', '»', t); }
+      function logErr(t) { logLine('log-err', '', t); }
+      function logOk(t) { logLine('log-ok', '', t); }
+      function logAction(f) {
+        switch (f.action) {
+          case 'move': logLine('log-move', '→', 'moveForward'); break;
+          case 'turnLeft': logLine('log-turn', '↺', 'turnLeft'); break;
+          case 'turnRight': logLine('log-turn', '↻', 'turnRight'); break;
+          case 'collect': logLine('log-collect', '◆', 'collect — got a gem! (' + f.collected.length + ')'); break;
+          case 'bump': logLine('log-bump', '✗', 'moveForward — blocked by a wall'); break;
+          // 'noop' and 'start' are silent to reduce clutter
+        }
+      }
+
+      // ============================================================
+      //  LEVEL LIST UI
+      // ============================================================
+      function renderLevelList() {
+        const list = $('levelList');
+        const unlocked = store.unlocked();
+        const done = store.done();
+        list.innerHTML = '';
+        LEVELS.forEach((l, i) => {
+          const b = document.createElement('button');
+          const locked = i > unlocked;
+          const isDone = done.indexOf(i) >= 0;
+          b.className = 'level-btn' + (i === S.current ? ' active' : '') + (locked ? ' locked' : '') + (isDone ? ' done' : '');
+          b.innerHTML =
+            '<span class="num">' + (locked ? '🔒' : (i + 1)) + '</span>' +
+            '<span class="lb-title">' + esc(l.title) + '<div class="lb-concept">' + esc(l.concept) + '</div></span>' +
+            (isDone ? '<span class="check">✓</span>' : '');
+          if (!locked) b.onclick = () => loadLevel(i);
+          list.appendChild(b);
+        });
+      }
+
+      // ============================================================
+      //  TABS
+      // ============================================================
+      function switchTab(name) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+        $('lessonPane').style.display = name === 'lesson' ? '' : 'none';
+        $('editorArea').style.display = name === 'code' ? 'flex' : 'none';
+        if (name === 'code') autoGrow();
+      }
+      document.querySelectorAll('.tab').forEach(t => t.onclick = () => switchTab(t.dataset.tab));
+
+      // ============================================================
+      //  BUTTONS
+      // ============================================================
+      function setButtons(enabled) {
+        $('runBtn').disabled = !enabled;
+        $('stepBtn').disabled = !enabled;
+        $('runBtn').textContent = enabled ? '▶ Run' : '⏳ Running…';
+      }
+      $('runBtn').onclick = run;
+      $('stepBtn').onclick = step;
+      $('resetBtn').onclick = () => {
+        store.clearCode(S.current);
+        setCode(LEVELS[S.current].starter);
+        resetWorld();
+        clearConsole();
+        logSys('Code reset to starter.');
+      };
+      $('solutionBtn').onclick = () => {
+        setCode(LEVELS[S.current].solution);
+        resetWorld();
+        clearConsole();
+        logSys('Solution loaded — read it, then press Run to watch it work.');
+        switchTab('code');
+      };
+      $('speed').oninput = (e) => { S.speed = parseFloat(e.target.value); };
+      $('replayBtn').onclick = () => { $('modal').classList.remove('show'); run(); };
+      $('nextBtn').onclick = () => { $('modal').classList.remove('show'); loadLevel(S.current + 1); };
+      $('modal').onclick = (e) => { if (e.target === $('modal')) $('modal').classList.remove('show'); };
+
+      // ============================================================
+      //  BOOT
+      // ============================================================
+      function boot() {
+        S.speed = parseFloat($('speed').value);
+        resizeCanvas();
+        renderLevelList();
+        loadLevel(Math.min(store.unlocked(), LEVELS.length - 1));
+        // ensure canvas sizes correctly after layout settles
+        setTimeout(resizeCanvas, 60);
+        requestAnimationFrame(loop);
+      }
+      boot();
+    </script>
+  </body>
+</html>
