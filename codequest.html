@@ -74,6 +74,12 @@
       }
       #rail .tag { font-size: 10.5px; color: var(--muted); margin-bottom: 16px; letter-spacing: 0.4px; }
       .level-list { display: flex; flex-direction: column; gap: 7px; overflow-y: auto; flex: 1; padding-right: 2px; }
+      .chapter-label {
+        font-size: 9.5px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase;
+        color: var(--accent2); margin: 10px 4px 1px; padding-top: 8px;
+        border-top: 1px solid var(--border);
+      }
+      .level-list > .chapter-label:first-child { border-top: none; margin-top: 2px; padding-top: 0; }
       .level-btn {
         display: flex; align-items: center; gap: 10px;
         text-align: left; width: 100%;
@@ -162,6 +168,12 @@
       }
       .lesson .hint.show { display: block; }
       .lesson .hint b { color: var(--gold); }
+      .lesson .why {
+        margin-top: 4px; padding: 8px 12px; border-radius: 9px;
+        background: rgba(45,212,191,0.07); border-left: 2px solid var(--accent2);
+        font-size: 12px; color: #a7e8dd;
+      }
+      .lesson .why b { color: var(--accent2); }
 
       /* editor */
       #editorArea { flex: 1; display: flex; flex-direction: column; min-height: 0; position: relative; }
@@ -227,6 +239,7 @@
       #console .log-turn { color: #c9a7ff; }
       #console .log-collect { color: var(--gold); }
       #console .log-bump { color: var(--danger); }
+      #console .log-say { color: #a7e8dd; }
       #console .log-err { color: var(--danger); }
       #console .log-ok { color: var(--ok); font-weight: 700; }
       #console .log-sys { color: #64748b; }
@@ -250,6 +263,35 @@
       .modal-card p { color: var(--muted); font-size: 13px; margin-bottom: 22px; line-height: 1.5; }
       .modal-card .row { display: flex; gap: 10px; justify-content: center; }
 
+      .ref-btn { margin-top: 10px; flex: none; justify-content: center; width: 100%; }
+
+      /* Reference modal */
+      #refModal {
+        position: fixed; inset: 0; z-index: 100; display: none;
+        place-items: center; background: rgba(4,8,18,0.72); backdrop-filter: blur(5px);
+        padding: 24px;
+      }
+      #refModal.show { display: grid; }
+      .ref-card {
+        background: linear-gradient(165deg, var(--bg2), #0a1424);
+        border: 1px solid var(--border); border-radius: 18px;
+        padding: 22px 24px; width: min(920px, 96vw); max-height: 88vh; overflow-y: auto;
+        box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+      }
+      .ref-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+      .ref-head h2 { font-size: 19px; }
+      .ref-sub { color: var(--muted); font-size: 12.5px; margin: 6px 0 16px; }
+      .ref-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+      .ref-grid section {
+        background: rgba(255,255,255,0.02); border: 1px solid var(--border);
+        border-radius: 12px; padding: 12px 14px;
+      }
+      .ref-grid h4 { font-size: 12.5px; color: var(--accent); margin-bottom: 8px; letter-spacing: 0.3px; }
+      .ref-grid pre {
+        font-family: var(--mono); font-size: 12px; line-height: 1.55; color: var(--text);
+        white-space: pre-wrap; word-break: break-word;
+      }
+
       /* Scrollbars */
       ::-webkit-scrollbar { width: 8px; height: 8px; }
       ::-webkit-scrollbar-thumb { background: rgba(120,160,220,0.25); border-radius: 8px; }
@@ -269,6 +311,7 @@
         <div class="brand"><span class="logo">&lt;/&gt;</span> CodeQuest</div>
         <div class="tag">Learn real code, one puzzle at a time</div>
         <div class="level-list" id="levelList"></div>
+        <button class="btn ref-btn" id="refBtn">📚 Reference</button>
       </aside>
 
       <!-- Stage -->
@@ -330,6 +373,84 @@
       </div>
     </div>
 
+    <!-- Reference / cheat sheet -->
+    <div id="refModal">
+      <div class="ref-card">
+        <div class="ref-head">
+          <h2>📚 JavaScript Reference</h2>
+          <button class="btn" id="refClose">✕ Close</button>
+        </div>
+        <p class="ref-sub">Real JavaScript — the same syntax works in any project, website, or app.</p>
+        <div class="ref-grid">
+          <section>
+            <h4>Variables — store a value</h4>
+            <pre><span class="tok-kw">let</span> score = <span class="tok-num">0</span>;
+<span class="tok-kw">let</span> name = <span class="tok-str">"Kaiya"</span>;
+<span class="tok-kw">const</span> PI = <span class="tok-num">3.14</span>;   <span class="tok-com">// can't change</span>
+score = score + <span class="tok-num">10</span>;   <span class="tok-com">// update it</span>
+score++;              <span class="tok-com">// add 1 (shortcut)</span></pre>
+          </section>
+          <section>
+            <h4>Math &amp; comparisons</h4>
+            <pre>a + b   a - b   a * b   a / b
+a % b   <span class="tok-com">// remainder</span>
+a &gt; b   a &lt; b   a &gt;= b   a &lt;= b
+a === b <span class="tok-com">// equal?</span>   a !== b <span class="tok-com">// not equal?</span>
+a &amp;&amp; b  <span class="tok-com">// and</span>    a || b <span class="tok-com">// or</span>   !a <span class="tok-com">// not</span></pre>
+          </section>
+          <section>
+            <h4>If / else — decisions</h4>
+            <pre><span class="tok-kw">if</span> (score &gt;= <span class="tok-num">10</span>) {
+  <span class="tok-fn">say</span>(<span class="tok-str">"You win!"</span>);
+} <span class="tok-kw">else</span> {
+  <span class="tok-fn">say</span>(<span class="tok-str">"Keep going"</span>);
+}</pre>
+          </section>
+          <section>
+            <h4>Loops — repeat</h4>
+            <pre><span class="tok-kw">for</span> (<span class="tok-kw">let</span> i = <span class="tok-num">0</span>; i &lt; <span class="tok-num">5</span>; i++) {
+  <span class="tok-fn">moveForward</span>();
+}
+<span class="tok-kw">while</span> (<span class="tok-api">canMove</span>()) {
+  <span class="tok-fn">moveForward</span>();
+}</pre>
+          </section>
+          <section>
+            <h4>Arrays — lists of values</h4>
+            <pre><span class="tok-kw">let</span> items = [<span class="tok-num">3</span>, <span class="tok-num">1</span>, <span class="tok-num">4</span>];
+items[<span class="tok-num">0</span>];          <span class="tok-com">// 3 (first)</span>
+items.length;      <span class="tok-com">// 3 (how many)</span>
+<span class="tok-kw">for</span> (<span class="tok-kw">const</span> n <span class="tok-kw">of</span> items) {
+  <span class="tok-fn">say</span>(n);
+}</pre>
+          </section>
+          <section>
+            <h4>Functions — name &amp; reuse</h4>
+            <pre><span class="tok-kw">function</span> <span class="tok-fn">advance</span>() {
+  <span class="tok-fn">moveForward</span>();
+  <span class="tok-fn">collect</span>();
+}
+<span class="tok-fn">advance</span>();   <span class="tok-com">// run it</span></pre>
+          </section>
+          <section>
+            <h4>Robot commands (this game)</h4>
+            <pre><span class="tok-api">moveForward</span>()  <span class="tok-com">// step ahead</span>
+<span class="tok-api">turnLeft</span>()  <span class="tok-api">turnRight</span>()
+<span class="tok-api">collect</span>()      <span class="tok-com">// grab a gem</span>
+<span class="tok-api">read</span>()         <span class="tok-com">// number on signpost</span>
+<span class="tok-api">say</span>(value)     <span class="tok-com">// print to console</span></pre>
+          </section>
+          <section>
+            <h4>Sensors — true / false</h4>
+            <pre><span class="tok-api">canMove</span>()   <span class="tok-com">// path ahead open?</span>
+<span class="tok-api">isAtGoal</span>()  <span class="tok-com">// on the flag?</span>
+<span class="tok-api">isOnGem</span>()   <span class="tok-com">// gem here?</span>
+<span class="tok-com">// use inside if(...) or while(...)</span></pre>
+          </section>
+        </div>
+      </div>
+    </div>
+
     <script>
       // ============================================================
       //  LEVEL DATA
@@ -338,6 +459,7 @@
       // ============================================================
       const LEVELS = [
         {
+          chapter: 'Getting Started',
           title: 'First Steps',
           concept: 'sequencing',
           grid: ['S...G'],
@@ -399,6 +521,7 @@
           solution: `for (let i = 0; i < 8; i++) {\n  moveForward();\n  collect();\n}\n`
         },
         {
+          chapter: 'Logic & Flow',
           title: 'Into the Unknown',
           concept: 'while loops',
           grid: ['S......G#'],
@@ -444,6 +567,92 @@
           solution: `function advance() {\n  moveForward();\n  collect();\n}\n\nfor (let i = 0; i < 10; i++) {\n  advance();\n}\n`
         },
         {
+          chapter: 'Data & Variables',
+          title: 'Remember a Number',
+          concept: 'variables',
+          grid: ['S...', '....', '....', '...G'],
+          signs: { '0,0': 3 },
+          startDir: 1,
+          requireAllGems: false,
+          lesson: `
+            <h3>Variables store values</h3>
+            <p>A <b>variable</b> is a named box that holds a value you can use later. You make one with <code>let</code>:</p>
+            <p><code>let score = 0;</code> &nbsp;<code>let name = "Kaiya";</code></p>
+            <p>The 🪧 signpost on your tile has a number. <code>read()</code> gives it to you — store it: <code>let n = read();</code>. The flag is <code>n</code> east <b>and</b> <code>n</code> south, so keeping <code>n</code> in a variable lets you reuse it twice.</p>
+            <p class="why"><b>In real projects:</b> variables hold everything — a user's name, a score, a total, a setting.</p>`,
+          hint: `After the first loop, add <code>turnRight();</code> then a second <code>for</code> loop that also runs <code>n</code> times.`,
+          starter: `// read() gives you the number on the signpost.\nlet n = read();\n\n// move n tiles east\nfor (let i = 0; i < n; i++) {\n  moveForward();\n}\n\n// now turnRight() and move n tiles south to the flag\n`,
+          solution: `let n = read();\nfor (let i = 0; i < n; i++) {\n  moveForward();\n}\nturnRight();\nfor (let i = 0; i < n; i++) {\n  moveForward();\n}\n`
+        },
+        {
+          title: 'Do the Math',
+          concept: 'operators',
+          grid: ['S.......G'],
+          signs: { '0,0': 4 },
+          startDir: 1,
+          requireAllGems: false,
+          lesson: `
+            <h3>Doing math with values</h3>
+            <p>You can calculate with the usual operators: <code>+</code> <code>-</code> <code>*</code> (times) <code>/</code> (divide).</p>
+            <p><code>let total = price * 2;</code></p>
+            <p>The flag is <b>(sign × 2)</b> tiles away. Read the sign, multiply by 2, and store the result — then loop that many times.</p>
+            <p class="why"><b>In real projects:</b> every price total, timer, or progress bar is just arithmetic on variables.</p>`,
+          hint: `Change <code>read()</code> to <code>read() * 2</code> so <code>dist</code> is big enough.`,
+          starter: `// The flag is (sign x 2) tiles away.\n// Multiply the sign's number by 2.\nlet dist = read();   // <-- not far enough! multiply by 2\n\nfor (let i = 0; i < dist; i++) {\n  moveForward();\n}\n`,
+          solution: `let dist = read() * 2;\nfor (let i = 0; i < dist; i++) {\n  moveForward();\n}\n`
+        },
+        {
+          title: 'Keeping Count',
+          concept: 'counters + output',
+          grid: ['S*.*.*.*G'],
+          startDir: 1,
+          requireAllGems: true,
+          expectSay: [4],
+          lesson: `
+            <h3>Counting with a variable</h3>
+            <p>A variable can <b>change</b> over time. To count, start at 0 and add 1 each time something happens:</p>
+            <p><code>count = count + 1;</code> &nbsp;(or the shortcut <code>count++;</code>)</p>
+            <p>Collect every gem, adding 1 to <code>count</code> for each one. Then <code>say(count)</code> — <code>say()</code> prints a value to the console below, just like <code>console.log</code>. You need to end with the flag <b>and</b> say the right total.</p>
+            <p class="why"><b>In real projects:</b> this is how you tally a score, count items in a cart, or track attempts.</p>`,
+          hint: `Inside the loop: <code>if (isOnGem()) { collect(); count = count + 1; }</code>. After the loop: <code>say(count);</code>`,
+          starter: `// Count the gems, then report the total with say().\nlet count = 0;\n\nfor (let i = 0; i < 8; i++) {\n  moveForward();\n  // if there's a gem here, collect it AND add 1 to count\n}\n\n// say(count);\n`,
+          solution: `let count = 0;\nfor (let i = 0; i < 8; i++) {\n  moveForward();\n  if (isOnGem()) {\n    collect();\n    count = count + 1;\n  }\n}\nsay(count);\n`
+        },
+        {
+          title: 'Which Way?',
+          concept: 'comparisons',
+          grid: ['....S...G'],
+          signs: { '4,0': 7 },
+          startDir: 1,
+          requireAllGems: false,
+          lesson: `
+            <h3>Comparing values</h3>
+            <p>Comparisons ask a true/false question: <code>&gt;</code> greater, <code>&lt;</code> less, <code>&gt;=</code>, <code>&lt;=</code>, <code>===</code> equal, <code>!==</code> not equal.</p>
+            <p><code>if (age &gt;= 18) { ... }</code></p>
+            <p>Read the sign. If its number is <b>greater than 5</b>, the flag is to your right (east). Otherwise it's a dead end to your left. Choose with <code>if / else</code>.</p>
+            <p class="why"><b>In real projects:</b> comparisons drive every decision — is the password long enough? is the cart empty? did the player win?</p>`,
+          hint: `<code>if (read() > 5) { move east } else { turn around }</code>. You start facing east, so the "east" branch is just four moves.`,
+          starter: `// If the sign > 5, the flag is EAST (ahead).\n// Otherwise it's the dead end to your left.\nlet n = read();\n\nif (n > 5) {\n  // move 4 tiles east to the flag\n} else {\n  // wrong way: turn around and move\n  turnLeft();\n  turnLeft();\n}\n`,
+          solution: `let n = read();\nif (n > 5) {\n  for (let i = 0; i < 4; i++) { moveForward(); }\n} else {\n  turnLeft();\n  turnLeft();\n  for (let i = 0; i < 4; i++) { moveForward(); }\n}\n`
+        },
+        {
+          title: 'Follow the List',
+          concept: 'arrays + nested loops',
+          grid: ['S..', '##.', 'G..'],
+          startDir: 1,
+          requireAllGems: false,
+          lesson: `
+            <h3>Arrays: lists of values</h3>
+            <p>An <b>array</b> holds many values in order: <code>let legs = [2, 2, 2];</code>. Read one with <code>legs[0]</code>, or visit them all with a loop:</p>
+            <p><code>for (const s of legs) { ... }</code></p>
+            <p>The path is a U-shape made of three 2-tile legs with a right turn between each. Loop over the array; for each leg, move <code>s</code> tiles (an inner loop!) then <code>turnRight()</code>.</p>
+            <p class="why"><b>In real projects:</b> arrays are everywhere — a list of users, messages, todo items, high scores.</p>`,
+          hint: `<code>for (const s of legs) { for (let i = 0; i &lt; s; i++) { moveForward(); } turnRight(); }</code>`,
+          starter: `// legs is a list. Loop over it with "for..of".\n// For each leg s: move s tiles, then turnRight().\nlet legs = [2, 2, 2];\n\n// add the loops here\n`,
+          solution: `let legs = [2, 2, 2];\nfor (const s of legs) {\n  for (let i = 0; i < s; i++) {\n    moveForward();\n  }\n  turnRight();\n}\n`
+        },
+        {
+          chapter: 'Challenge',
           title: 'The Gauntlet',
           concept: 'capstone',
           grid: ['S.*..', 'G###.', '.###*', '*###.', '..*..'],
@@ -468,6 +677,7 @@
         '  var code = e.data.code, level = e.data.level;',
         '  var rows = level.grid, H = rows.length, W = rows[0].length;',
         '  var walls = {}, gems = {}, start = null, goal = null;',
+        '  var signs = level.signs || {};',
         '  for (var y = 0; y < H; y++){',
         '    for (var x = 0; x < W; x++){',
         '      var c = rows[y].charAt(x);',
@@ -480,6 +690,7 @@
         '  var dirs = [[0,-1],[1,0],[0,1],[-1,0]];',
         '  var st = { x:start.x, y:start.y, dir: (level.startDir||1), collected:{} };',
         '  var frames = [];',
+        '  var output = [];',
         '  function snap(action){',
         '    frames.push({ x:st.x, y:st.y, dir:st.dir, action:action, collected:Object.keys(st.collected) });',
         '    if (frames.length > 20000) throw new Error("Too many steps — is there an infinite loop?");',
@@ -496,16 +707,20 @@
         '  function canMove(){ tick(); return !blocked(front()); }',
         '  function isAtGoal(){ tick(); return st.x === goal.x && st.y === goal.y; }',
         '  function isOnGem(){ tick(); var k = st.x+","+st.y; return !!gems[k] && !st.collected[k]; }',
+        '  function read(){ tick(); var v = signs[st.x+","+st.y]; return (v === undefined ? 0 : v); }',
+        '  function say(v){ tick(); output.push(v); }',
         '  var error = null;',
         '  try {',
-        '    var fn = new Function("moveForward","turnLeft","turnRight","collect","canMove","isAtGoal","isOnGem", code);',
-        '    fn(moveForward, turnLeft, turnRight, collect, canMove, isAtGoal, isOnGem);',
+        '    var fn = new Function("moveForward","turnLeft","turnRight","collect","canMove","isAtGoal","isOnGem","read","say", code);',
+        '    fn(moveForward, turnLeft, turnRight, collect, canMove, isAtGoal, isOnGem, read, say);',
         '  } catch (err) { error = String(err && err.message ? err.message : err); }',
         '  var total = Object.keys(gems).length;',
         '  var got = Object.keys(st.collected).length;',
         '  var reached = st.x === goal.x && st.y === goal.y;',
-        '  var success = reached && (level.requireAllGems ? got === total : true);',
-        '  self.postMessage({ frames:frames, error:error, success:success, reached:reached, got:got, total:total });',
+        '  var sayOk = true;',
+        '  if (level.expectSay) { sayOk = (output.length === level.expectSay.length) && output.every(function(v,i){ return v === level.expectSay[i]; }); }',
+        '  var success = reached && (level.requireAllGems ? got === total : true) && sayOk;',
+        '  self.postMessage({ frames:frames, error:error, success:success, reached:reached, got:got, total:total, output:output, sayOk:sayOk });',
         '};'
       ].join('\n');
 
@@ -562,7 +777,9 @@
             else if (c === 'G') goal = { x, y };
           }
         }
-        return { W, H, walls, gems, start, goal, startDir: level.startDir || 1 };
+        const signs = new Map();
+        if (level.signs) for (const k in level.signs) signs.set(k, level.signs[k]);
+        return { W, H, walls, gems, signs, start, goal, startDir: level.startDir || 1 };
       }
 
       function dirToAngle(dir) { return [-Math.PI / 2, 0, Math.PI / 2, Math.PI][dir]; }
@@ -607,7 +824,7 @@
       //  CODE EDITOR (textarea + syntax-highlight overlay)
       // ============================================================
       const KEYWORDS = /\b(const|let|var|function|return|if|else|for|while|do|break|continue|true|false|null|undefined|new|of|in|typeof)\b/;
-      const APIS = /\b(moveForward|turnLeft|turnRight|collect|canMove|isAtGoal|isOnGem)\b/;
+      const APIS = /\b(moveForward|turnLeft|turnRight|collect|canMove|isAtGoal|isOnGem|read|say)\b/;
       const TOKEN = /(\/\/[^\n]*)|(\/\*[\s\S]*?\*\/)|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)|(\b\d+(?:\.\d+)?\b)|([A-Za-z_$][\w$]*)/g;
 
       function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
@@ -809,6 +1026,30 @@
         ctx.beginPath(); ctx.arc(rr * 0.08, 0, rr * 0.14, 0, Math.PI * 2); ctx.fill();
         ctx.beginPath(); ctx.arc(rr * 0.42, 0, rr * 0.12, 0, Math.PI * 2); ctx.fill();
         ctx.restore();
+
+        // signposts (read() targets) — drawn last so the number is always
+        // legible, as a small tag pinned to the top edge of its tile
+        if (p.signs && p.signs.size) {
+          p.signs.forEach((val, key) => {
+            const parts = key.split(','), sx = +parts[0], sy = +parts[1];
+            const t = tile(sx, sy);
+            const bw = cell * 0.46, bh = cell * 0.3;
+            const bx = t.x + cell / 2 - bw / 2, by = t.y + cell * 0.04;
+            ctx.save();
+            ctx.shadowColor = 'rgba(0,0,0,0.4)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 2;
+            ctx.fillStyle = '#f5c451';
+            roundRect(ctx, bx, by, bw, bh, 5);
+            ctx.fill();
+            ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+            ctx.strokeStyle = 'rgba(255,240,200,0.7)'; ctx.lineWidth = 1;
+            roundRect(ctx, bx, by, bw, bh, 5); ctx.stroke();
+            ctx.fillStyle = '#3a2606';
+            ctx.font = '700 ' + Math.round(cell * 0.22) + 'px -apple-system, system-ui, sans-serif';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(String(val), t.x + cell / 2, by + bh / 2 + 1);
+            ctx.restore();
+          });
+        }
       }
 
       // ============================================================
@@ -884,7 +1125,7 @@
       // ============================================================
       function levelPayload() {
         const l = LEVELS[S.current];
-        return { grid: l.grid, startDir: l.startDir || 1, requireAllGems: !!l.requireAllGems };
+        return { grid: l.grid, startDir: l.startDir || 1, requireAllGems: !!l.requireAllGems, signs: l.signs || null, expectSay: l.expectSay || null };
       }
 
       // Main-thread mirror of the worker — the fallback used when a sandbox
@@ -893,6 +1134,7 @@
       function simulate(code, level) {
         const rows = level.grid, H = rows.length, W = rows[0].length;
         const walls = {}, gems = {};
+        const signs = level.signs || {};
         let start = null, goal = null;
         for (let y = 0; y < H; y++) {
           for (let x = 0; x < W; x++) {
@@ -906,6 +1148,7 @@
         const dirs = [[0, -1], [1, 0], [0, 1], [-1, 0]];
         const st = { x: start.x, y: start.y, dir: level.startDir || 1, collected: {} };
         const frames = [];
+        const output = [];
         function snap(action) {
           frames.push({ x: st.x, y: st.y, dir: st.dir, action, collected: Object.keys(st.collected) });
           if (frames.length > 20000) throw new Error('Too many steps — is there an infinite loop?');
@@ -922,16 +1165,20 @@
         const canMove = () => { tick(); return !blocked(front()); };
         const isAtGoal = () => { tick(); return st.x === goal.x && st.y === goal.y; };
         const isOnGem = () => { tick(); const k = st.x + ',' + st.y; return !!gems[k] && !st.collected[k]; };
+        const read = () => { tick(); const v = signs[st.x + ',' + st.y]; return v === undefined ? 0 : v; };
+        const say = (v) => { tick(); output.push(v); };
         let error = null;
         try {
-          const fn = new Function('moveForward', 'turnLeft', 'turnRight', 'collect', 'canMove', 'isAtGoal', 'isOnGem', code);
-          fn(moveForward, turnLeft, turnRight, collect, canMove, isAtGoal, isOnGem);
+          const fn = new Function('moveForward', 'turnLeft', 'turnRight', 'collect', 'canMove', 'isAtGoal', 'isOnGem', 'read', 'say', code);
+          fn(moveForward, turnLeft, turnRight, collect, canMove, isAtGoal, isOnGem, read, say);
         } catch (err) { error = String(err && err.message ? err.message : err); }
         const total = Object.keys(gems).length;
         const got = Object.keys(st.collected).length;
         const reached = st.x === goal.x && st.y === goal.y;
-        const success = reached && (level.requireAllGems ? got === total : true);
-        return { frames, error, success, reached, got, total };
+        let sayOk = true;
+        if (level.expectSay) { sayOk = output.length === level.expectSay.length && output.every((v, i) => v === level.expectSay[i]); }
+        const success = reached && (level.requireAllGems ? got === total : true) && sayOk;
+        return { frames, error, success, reached, got, total, output, sayOk };
       }
 
       // Run user code and deliver a result to cb(result). Prefers an isolated
@@ -993,17 +1240,24 @@
       function finishRun(res) {
         S.running = false;
         setButtons(true);
+        // echo anything the program printed with say()
+        if (res.output && res.output.length) {
+          res.output.forEach((v) => logLine('log-say', '🖨', 'say → ' + JSON.stringify(v)));
+        }
         if (res.error) {
           logErr('✗ Error: ' + res.error);
           return;
         }
+        const level = LEVELS[S.current];
         if (res.success) {
           logOk('✓ Success! You solved it.');
           onWin();
         } else if (!res.reached) {
           logErr('✗ The robot didn\'t reach the flag. Keep trying!');
-        } else if (LEVELS[S.current].requireAllGems && res.got < res.total) {
+        } else if (level.requireAllGems && res.got < res.total) {
           logErr('✗ Reached the flag, but only collected ' + res.got + ' of ' + res.total + ' gems.');
+        } else if (level.expectSay && !res.sayOk) {
+          logErr('✗ Reached the flag, but say() printed the wrong value. Expected ' + JSON.stringify(level.expectSay.length === 1 ? level.expectSay[0] : level.expectSay) + '.');
         } else {
           logErr('✗ Not quite — try again.');
         }
@@ -1109,6 +1363,12 @@
         const done = store.done();
         list.innerHTML = '';
         LEVELS.forEach((l, i) => {
+          if (l.chapter) {
+            const h = document.createElement('div');
+            h.className = 'chapter-label';
+            h.textContent = l.chapter;
+            list.appendChild(h);
+          }
           const b = document.createElement('button');
           const locked = i > unlocked;
           const isDone = done.indexOf(i) >= 0;
@@ -1169,6 +1429,12 @@
       $('replayBtn').onclick = () => { $('modal').classList.remove('show'); run(); };
       $('nextBtn').onclick = () => { $('modal').classList.remove('show'); loadLevel(S.current + 1); };
       $('modal').onclick = (e) => { if (e.target === $('modal')) $('modal').classList.remove('show'); };
+      $('refBtn').onclick = () => $('refModal').classList.add('show');
+      $('refClose').onclick = () => $('refModal').classList.remove('show');
+      $('refModal').onclick = (e) => { if (e.target === $('refModal')) $('refModal').classList.remove('show'); };
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') { $('modal').classList.remove('show'); $('refModal').classList.remove('show'); }
+      });
 
       // ============================================================
       //  BOOT
