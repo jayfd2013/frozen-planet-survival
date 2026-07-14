@@ -3841,6 +3841,50 @@
       const clock = new THREE.Clock();
       let elapsed = 0;
 
+      // ── Performance: Cache DOM elements ─────────────────
+      const DOM = {
+        statusMsg: document.getElementById('status-msg'),
+        score: document.getElementById('score'),
+        gatherPrompt: document.getElementById('gather-prompt'),
+        gatherLabel: document.getElementById('gather-label'),
+        gatherBar: document.getElementById('gather-bar'),
+        invWood: document.getElementById('inv-wood'),
+        invStone: document.getElementById('inv-stone'),
+        invMetal: document.getElementById('inv-metal'),
+        invCloth: document.getElementById('inv-cloth'),
+        invFuel: document.getElementById('inv-fuel'),
+        invMeat: document.getElementById('inv-meat'),
+        invCooked: document.getElementById('inv-cooked'),
+        biomeName: document.getElementById('biome-name'),
+        deathScore: document.getElementById('death-score'),
+        deathScreen: document.getElementById('death-screen'),
+        winScreen: document.getElementById('win-screen'),
+        winScore: document.getElementById('win-score'),
+        temp: document.getElementById('temp'),
+        health: document.getElementById('health'),
+        healthBar: document.getElementById('health-bar'),
+        energy: document.getElementById('energy'),
+        energyBar: document.getElementById('energy-bar'),
+        tempBarFill: document.getElementById('temp-bar-fill'),
+        dmgFlash: document.getElementById('damage-flash'),
+        journalPopup: document.getElementById('journal-popup'),
+        journalText: document.getElementById('journal-text'),
+        journalCount: document.getElementById('journal-count'),
+        beaconTimerHud: document.getElementById('beacon-timer-hud'),
+        beaconCountdown: document.getElementById('beacon-countdown'),
+        timeDisplay: document.getElementById('time-display'),
+        weatherName: document.getElementById('weather-name'),
+      };
+
+      // ── Performance: Reusable objects ───────────────────
+      const _moveDir = new THREE.Vector3();
+      const _camTarget = new THREE.Vector3();
+      const _hslTemp = {};
+      const biomeNames = ['Frozen Tundra', 'Ice Fields', 'Glacial Mountains', 'Frozen Forest', 'Crystal Caverns'];
+      let minimapFrameSkip = 0;
+      const minimapCanvas = document.getElementById('minimap');
+      const minimapCtx = minimapCanvas.getContext('2d');
+
       // ── Audio System (Web Audio API) ────────────────────
       const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       let audioUnlocked = false;
