@@ -125,18 +125,30 @@
 
       /* ---------- Right / editor ---------- */
       #side { }
-      .tabs { display: flex; gap: 4px; padding: 10px 12px 0; flex: none; }
-      .tab {
-        background: transparent; border: none; color: var(--muted);
-        padding: 7px 12px; font-size: 12.5px; cursor: pointer; border-radius: 8px 8px 0 0;
-        font-weight: 600;
+      .lesson-head {
+        display: flex; align-items: center; gap: 10px; flex: none;
+        padding: 12px 16px; border-bottom: 1px solid var(--border);
       }
-      .tab.active { color: var(--text); background: rgba(255,255,255,0.04); }
+      .lesson-head .lh-label { font-weight: 700; font-size: 13px; }
+      .lesson-head .lh-title { flex: 1; color: var(--accent2); font-size: 12.5px; font-weight: 600; }
+      .lesson-head .lh-toggle {
+        background: rgba(255,255,255,0.04); border: 1px solid var(--border); color: var(--muted);
+        font-size: 11px; padding: 4px 10px; border-radius: 7px; cursor: pointer; font-weight: 600;
+      }
+      .lesson-head .lh-toggle:hover { background: rgba(255,255,255,0.08); color: var(--text); }
+
+      .editor-head {
+        flex: none; padding: 9px 16px; font-size: 12px; color: var(--muted);
+        background: rgba(56,189,248,0.06); border-bottom: 1px solid var(--border);
+        letter-spacing: 0.2px;
+      }
+      .editor-head b { color: var(--accent); }
 
       .lesson {
         padding: 14px 18px; overflow-y: auto; font-size: 13px; line-height: 1.6; color: #cdd8ef;
-        border-bottom: 1px solid var(--border); flex: none; max-height: 34%;
+        border-bottom: 1px solid var(--border); flex: none; max-height: 32%;
       }
+      .lesson.collapsed { display: none; }
       .lesson h3 { font-size: 13px; color: var(--accent); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.6px; }
       .lesson p { margin-bottom: 9px; }
       .lesson code {
@@ -278,12 +290,15 @@
 
       <!-- Side / editor -->
       <section class="panel" id="side">
-        <div class="tabs">
-          <button class="tab active" data-tab="lesson">📖 Lesson</button>
-          <button class="tab" data-tab="code">⌨️ Code</button>
+        <div class="lesson-head" id="lessonHead">
+          <span class="lh-label">📖 Lesson</span>
+          <span class="lh-title" id="lessonHeadTitle"></span>
+          <button class="lh-toggle" id="lessonToggle" aria-expanded="true">Hide ▴</button>
         </div>
 
         <div class="lesson" id="lessonPane"></div>
+
+        <div class="editor-head">⌨️ Your code — type here, then press <b>Run</b></div>
 
         <div id="editorArea">
           <div class="editorScroll" id="editorScroll">
@@ -562,6 +577,7 @@
         // lesson pane
         $('levelTitle').textContent = (i + 1) + '. ' + level.title;
         $('levelConcept').textContent = level.concept;
+        $('lessonHeadTitle').textContent = level.title;
         $('lessonPane').innerHTML = level.lesson +
           '<div class="hint" id="hintBox"><b>💡 Hint:</b> ' + level.hint + '</div>' +
           '<p style="margin-top:10px"><a href="#" id="hintToggle" style="color:var(--accent);font-size:12px;text-decoration:none">Show hint ▾</a></p>';
@@ -1107,15 +1123,23 @@
       }
 
       // ============================================================
-      //  TABS
+      //  LESSON COLLAPSE
+      //  The lesson and editor are always visible together; the lesson can be
+      //  collapsed to give the editor more room. switchTab() is kept as a
+      //  lightweight hook so existing callers behave sensibly.
       // ============================================================
+      function setLessonCollapsed(collapsed) {
+        $('lessonPane').classList.toggle('collapsed', collapsed);
+        const t = $('lessonToggle');
+        t.setAttribute('aria-expanded', String(!collapsed));
+        t.textContent = collapsed ? 'Show ▾' : 'Hide ▴';
+      }
+      $('lessonToggle').onclick = () => setLessonCollapsed(!$('lessonPane').classList.contains('collapsed'));
+
       function switchTab(name) {
-        document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
-        $('lessonPane').style.display = name === 'lesson' ? '' : 'none';
-        $('editorArea').style.display = name === 'code' ? 'flex' : 'none';
+        if (name === 'lesson') setLessonCollapsed(false);
         if (name === 'code') autoGrow();
       }
-      document.querySelectorAll('.tab').forEach(t => t.onclick = () => switchTab(t.dataset.tab));
 
       // ============================================================
       //  BUTTONS
@@ -1154,8 +1178,9 @@
         resizeCanvas();
         renderLevelList();
         loadLevel(Math.min(store.unlocked(), LEVELS.length - 1));
-        // ensure canvas sizes correctly after layout settles
-        setTimeout(resizeCanvas, 60);
+        // ensure canvas sizes correctly after layout settles, and put the
+        // caret in the editor so it's obvious you can start typing
+        setTimeout(() => { resizeCanvas(); autoGrow(); codeEl.focus(); }, 60);
         requestAnimationFrame(loop);
       }
       boot();
