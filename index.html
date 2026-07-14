@@ -3729,7 +3729,7 @@
 
         // Update weather HUD
         const weatherNames = { clear: 'Clear', snowfall: 'Snowfall', blizzard: 'BLIZZARD' };
-        const weatherEl = document.getElementById('weather-name');
+        const weatherEl = DOM.weatherName;
         weatherEl.textContent = weatherNames[state.weather];
         if (state.weather === 'blizzard') {
           weatherEl.style.color = '#ff6666';
@@ -3823,7 +3823,7 @@
         const hours = Math.floor(t * 24);
         const mins = Math.floor((t * 24 - hours) * 60);
         const timeStr = `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
-        const timeEl = document.getElementById('time-display');
+        const timeEl = DOM.timeDisplay;
         if (timeEl) {
           // Track day count (increment when crossing midnight)
           if (t < 0.02 && state._lastTimeOfDay > 0.98) {
@@ -4327,7 +4327,7 @@
           ribbon.mat.opacity = baseOpacity;
           const hueShift = Math.sin(elapsed * 0.2 + ribbon.phase) * 0.1;
           ribbon.mat.color.setHSL(
-            (ribbon.baseColor.getHSL({}).h + hueShift) % 1,
+            (ribbon.baseColor.getHSL(_hslTemp).h + hueShift) % 1,
             0.7,
             0.5
           );
@@ -4350,7 +4350,7 @@
 
         // Player movement
         if (state.started && !state.dead) {
-          const moveDir = new THREE.Vector3();
+          _moveDir.set(0, 0, 0); const moveDir = _moveDir;
 
           // Turn left/right with A/D
           const turnSpeed = 2.5;
@@ -4481,7 +4481,7 @@
           }
 
           // Status message (hypothermia takes priority)
-          const statusEl = document.getElementById('status-msg');
+          const statusEl = DOM.statusMsg;
           if (state.bodyTemp < 26) {
             statusEl.style.display = 'block';
             statusEl.textContent = 'SEVERE HYPOTHERMIA';
@@ -4528,7 +4528,7 @@
 
           // Score ticks up over time
           state.score = Math.floor(elapsed * 10);
-          document.getElementById('score').textContent = state.score;
+          DOM.score.textContent = state.score;
 
           // ── Resource Gathering ──
           // Find nearest resource node
@@ -4546,9 +4546,9 @@
             }
           }
 
-          const gatherPrompt = document.getElementById('gather-prompt');
-          const gatherLabel = document.getElementById('gather-label');
-          const gatherBar = document.getElementById('gather-bar');
+          const gatherPrompt = DOM.gatherPrompt;
+          const gatherLabel = DOM.gatherLabel;
+          const gatherBar = DOM.gatherBar;
 
           if (state.nearestResource) {
             const resType = state.nearestResource.userData.resourceType;
@@ -4595,7 +4595,7 @@
                 state.gatherTarget = null;
 
                 // Flash status
-                const statusEl2 = document.getElementById('status-msg');
+                const statusEl2 = DOM.statusMsg;
                 statusEl2.style.display = 'block';
                 statusEl2.textContent = `+${amt} ${resInfo.name}`;
                 statusEl2.style.color = '#44ff88';
@@ -4670,18 +4670,17 @@
           }
 
           // Update inventory HUD
-          document.getElementById('inv-wood').textContent = `Wood: ${state.inventory.wood}`;
-          document.getElementById('inv-stone').textContent = `Stone: ${state.inventory.stone}`;
-          document.getElementById('inv-metal').textContent = `Metal: ${state.inventory.metal}`;
-          document.getElementById('inv-cloth').textContent = `Cloth: ${state.inventory.cloth}`;
-          document.getElementById('inv-fuel').textContent = `Fuel: ${state.inventory.fuel}`;
-          document.getElementById('inv-meat').textContent = `Meat: ${state.meat}`;
-          document.getElementById('inv-cooked').textContent = `Cooked: ${state.cookedMeat}`;
+          DOM.invWood.textContent = `Wood: ${state.inventory.wood}`;
+          DOM.invStone.textContent = `Stone: ${state.inventory.stone}`;
+          DOM.invMetal.textContent = `Metal: ${state.inventory.metal}`;
+          DOM.invCloth.textContent = `Cloth: ${state.inventory.cloth}`;
+          DOM.invFuel.textContent = `Fuel: ${state.inventory.fuel}`;
+          DOM.invMeat.textContent = `Meat: ${state.meat}`;
+          DOM.invCooked.textContent = `Cooked: ${state.cookedMeat}`;
 
           // Update biome display
-          const biomeNames = ['Frozen Tundra', 'Ice Fields', 'Glacial Mountains', 'Frozen Forest', 'Crystal Caverns'];
           const currentBiome = getBiomeAtPlayer();
-          document.getElementById('biome-name').textContent = biomeNames[currentBiome];
+          DOM.biomeName.textContent = biomeNames[currentBiome];
 
           // Biome affects heat loss
           state.currentBiome = currentBiome;
@@ -4776,26 +4775,26 @@
           // Death check
           if (state.health <= 0 && !state.dead) {
             state.dead = true;
-            document.getElementById('death-score').textContent = state.score;
-            const deathEl = document.getElementById('death-screen');
+            DOM.deathScore.textContent = state.score;
+            const deathEl = DOM.deathScreen;
             deathEl.style.display = 'flex';
             deathEl.style.opacity = '0';
             requestAnimationFrame(() => deathEl.style.opacity = '1');
           }
 
           // Update HUD
-          document.getElementById('temp').textContent = state.bodyTemp.toFixed(1);
-          document.getElementById('health').textContent = Math.floor(state.health);
-          document.getElementById('health-bar').style.width = state.health + '%';
-          document.getElementById('energy').textContent = Math.floor(state.energy);
-          document.getElementById('energy-bar').style.width = state.energy + '%';
+          DOM.temp.textContent = state.bodyTemp.toFixed(1);
+          DOM.health.textContent = Math.floor(state.health);
+          DOM.healthBar.style.width = state.health + '%';
+          DOM.energy.textContent = Math.floor(state.energy);
+          DOM.energyBar.style.width = state.energy + '%';
 
           // ── Frost FX Overlay ──
           updateFrostOverlay(state.bodyTemp);
 
           // ── Body Temp Bar ──
           const tempPercent = Math.max(0, ((state.bodyTemp - 15) / 22) * 100); // 15-37 range
-          const tempFill = document.getElementById('temp-bar-fill');
+          const tempFill = DOM.tempBarFill;
           tempFill.style.height = tempPercent + '%';
           if (state.bodyTemp > 34) {
             tempFill.style.background = 'linear-gradient(to top, #44aaff, #66ccff)';
@@ -4810,7 +4809,8 @@
 
         // ── Wolf AI (host only in multiplayer; clients receive via sync) ──
         const runWolfAI = !state.isMultiplayer || state.isHost;
-        for (const wolf of wolves) {
+        for (let wi = 0; wi < wolves.length; wi++) {
+          const wolf = wolves[wi];
           const wd = wolf.userData;
           // Hit flash timer
           if (wd.hitFlash > 0) {
@@ -4871,8 +4871,8 @@
           } else if (wd.state === 'stalk') {
             // Circle the player at a distance, occasionally darting closer
             const angle = Math.atan2(dx, dz);
-            const circleAngle = angle + Math.PI / 2 + Math.sin(elapsed * 0.5 + wolves.indexOf(wolf)) * 0.3;
-            const desiredDist = 12 + Math.sin(elapsed * 0.3 + wolves.indexOf(wolf) * 2) * 4;
+            const circleAngle = angle + Math.PI / 2 + Math.sin(elapsed * 0.5 + wi) * 0.3;
+            const desiredDist = 12 + Math.sin(elapsed * 0.3 + wi * 2) * 4;
             const stalkSpeed = WOLF_SPEED * 0.7;
             // Circle motion
             moveX = Math.sin(circleAngle) * stalkSpeed * dt;
@@ -4894,7 +4894,7 @@
                 state.health = Math.max(0, state.health);
               }
               // Damage flash
-              const dmgFlash = document.getElementById('damage-flash');
+              const dmgFlash = DOM.dmgFlash;
               if (!state.sandboxMode) dmgFlash.style.opacity = '1';
               setTimeout(() => { dmgFlash.style.opacity = '0'; }, 200);
               playWolfGrowl();
@@ -5111,9 +5111,9 @@
             page.userData.collected = true;
             page.visible = false;
             collectedPages.push(page.userData.index);
-            const popup = document.getElementById('journal-popup');
-            document.getElementById('journal-text').textContent = JOURNAL_ENTRIES[page.userData.index];
-            document.getElementById('journal-count').textContent = `${collectedPages.length}/10`;
+            const popup = DOM.journalPopup;
+            DOM.journalText.textContent = JOURNAL_ENTRIES[page.userData.index];
+            DOM.journalCount.textContent = `${collectedPages.length}/10`;
             popup.style.display = 'block';
             setTimeout(() => popup.style.display = 'none', 6000);
             state.score += 100;
@@ -5123,11 +5123,11 @@
             if (collectedPages.length >= 10) {
               state.rescued = true;
               state.score += 1000;
-              document.getElementById('win-screen').querySelector('h1').textContent = 'MYSTERY SOLVED!';
-              document.getElementById('win-screen').querySelector('h1').style.color = '#eedd44';
-              document.getElementById('win-screen').querySelector('p').textContent = 'You found all the journal pages and uncovered the truth!';
-              document.getElementById('win-score').textContent = state.score;
-              const winEl = document.getElementById('win-screen');
+              DOM.winScreen.querySelector('h1').textContent = 'MYSTERY SOLVED!';
+              DOM.winScreen.querySelector('h1').style.color = '#eedd44';
+              DOM.winScreen.querySelector('p').textContent = 'You found all the journal pages and uncovered the truth!';
+              DOM.winScore.textContent = state.score;
+              const winEl = DOM.winScreen;
               winEl.style.display = 'flex';
               winEl.style.opacity = '0';
               requestAnimationFrame(() => winEl.style.opacity = '1');
@@ -5146,8 +5146,8 @@
           const remaining = Math.max(0, state.beaconRequired - state.beaconTimer);
           const mins = Math.floor(remaining / 60);
           const secs = Math.floor(remaining % 60);
-          document.getElementById('beacon-timer-hud').style.display = 'block';
-          document.getElementById('beacon-countdown').textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+          DOM.beaconTimerHud.style.display = 'block';
+          DOM.beaconCountdown.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
 
           // Animate beacon
           for (const obj of placedObjects) {
@@ -5173,19 +5173,21 @@
             state.rescued = true;
             state.score += 500;
             addChatMessage('System', 'RESCUE SHIP ARRIVED!', '#44ff88');
-            document.getElementById('win-score').textContent = state.score;
-            const winEl = document.getElementById('win-screen');
+            DOM.winScore.textContent = state.score;
+            const winEl = DOM.winScreen;
             winEl.style.display = 'flex';
             winEl.style.opacity = '0';
             requestAnimationFrame(() => winEl.style.opacity = '1');
-            document.getElementById('beacon-timer-hud').style.display = 'none';
+            DOM.beaconTimerHud.style.display = 'none';
           }
         }
 
         // ── Minimap ──────────────────────────────────────
-        if (state.started) {
-          const mc = document.getElementById('minimap');
-          const mctx = mc.getContext('2d');
+        minimapFrameSkip++;
+        if (state.started && minimapFrameSkip >= 3) {
+          minimapFrameSkip = 0;
+          const mc = minimapCanvas;
+          const mctx = minimapCtx;
           const mw = mc.width, mh = mc.height;
           const cx = mw / 2, cy = mh / 2;
           const mapScale = 1.2; // pixels per world unit
@@ -5204,13 +5206,13 @@
           mctx.fillRect(0, 0, mw, mh);
 
           // Draw biome patches (sampled)
-          for (let gx = 0; gx < mw; gx += 6) {
-            for (let gy = 0; gy < mh; gy += 6) {
+          for (let gx = 0; gx < mw; gx += 10) {
+            for (let gy = 0; gy < mh; gy += 10) {
               const worldX = playerGroup.position.x + (gx - cx) / mapScale;
               const worldZ = playerGroup.position.z + (gy - cy) / mapScale;
-              const b = getBiome(worldX, worldZ);
+              const b = getBiomeCached(worldX, worldZ);
               mctx.fillStyle = biomeColors[b];
-              mctx.fillRect(gx, gy, 6, 6);
+              mctx.fillRect(gx, gy, 10, 10);
             }
           }
 
@@ -5351,12 +5353,12 @@
           camBobY = Math.sin(elapsed * bobSpeed) * bobAmount;
           camBobX = Math.cos(elapsed * bobSpeed * 0.5) * bobAmount * 0.5;
         }
-        const cameraTarget = new THREE.Vector3(
+        _camTarget.set(
           playerGroup.position.x + Math.sin(playerGroup.rotation.y + Math.PI) * camDist + camBobX,
           playerGroup.position.y + camHeight + camBobY,
           playerGroup.position.z + Math.cos(playerGroup.rotation.y + Math.PI) * camDist
         );
-        camera.position.lerp(cameraTarget, 3 * dt);
+        camera.position.lerp(_camTarget, 3 * dt);
         camera.lookAt(
           playerGroup.position.x,
           playerGroup.position.y + 1,
