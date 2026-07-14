@@ -2824,7 +2824,7 @@
       }
 
       // ── Snow Particles (scaled for weather system) ─────
-      const snowCount = 5000;
+      const snowCount = 2500;
       const snowGeo = new THREE.BufferGeometry();
       const snowPos = new Float32Array(snowCount * 3);
       const snowVel = new Float32Array(snowCount);
@@ -4203,22 +4203,19 @@
         // Snow animation (driven by weather)
         const snowSpeedMult = weatherCfg.snowSpeed;
         const positions = snow.geometry.attributes.position;
-        for (let i = 0; i < snowCount; i++) {
-          let y = positions.getY(i);
-          y -= snowVel[i] * snowSpeedMult * dt;
-          if (y < 0) {
-            y = 40 + Math.random() * 10;
-            positions.setX(i, playerGroup.position.x + (Math.random() - 0.5) * 120);
-            positions.setZ(i, playerGroup.position.z + (Math.random() - 0.5) * 120);
+        const snowArr = positions.array;
+        const windPushX = windDir.x * windDir.strength * 20 * dt;
+        const windPushZ = windDir.z * windDir.strength * 20 * dt;
+        const px = playerGroup.position.x, pz = playerGroup.position.z;
+        for (let i = 0, i3 = 0; i < snowCount; i++, i3 += 3) {
+          snowArr[i3 + 1] -= snowVel[i] * snowSpeedMult * dt;
+          if (snowArr[i3 + 1] < 0) {
+            snowArr[i3 + 1] = 40 + Math.random() * 10;
+            snowArr[i3] = px + (Math.random() - 0.5) * 120;
+            snowArr[i3 + 2] = pz + (Math.random() - 0.5) * 120;
           }
-          positions.setY(i, y);
-          // Wind-driven horizontal movement
-          let px = positions.getX(i);
-          let pz = positions.getZ(i);
-          px += (windDir.x * windDir.strength * 2 + Math.sin(elapsed + i) * 0.003) * dt * 10;
-          pz += (windDir.z * windDir.strength * 2 + Math.cos(elapsed + i * 0.7) * 0.003) * dt * 10;
-          positions.setX(i, px);
-          positions.setZ(i, pz);
+          snowArr[i3] += windPushX + snowDrift[i] * dt;
+          snowArr[i3 + 2] += windPushZ + snowDrift[i] * dt * 0.7;
         }
         positions.needsUpdate = true;
 
