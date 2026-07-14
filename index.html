@@ -29,28 +29,42 @@
 
       #hud {
         position: absolute;
-        top: 20px;
-        left: 20px;
+        top: 16px;
+        left: 16px;
         z-index: 10;
         pointer-events: none;
+        background: linear-gradient(145deg, rgba(8,12,25,0.65), rgba(10,15,30,0.45));
+        backdrop-filter: blur(8px);
+        border: 1px solid rgba(100,180,255,0.1);
+        border-radius: 12px;
+        padding: 14px 18px;
+        box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+        min-width: 200px;
       }
 
       #hud div {
-        margin-bottom: 8px;
-        font-size: 18px;
-        text-shadow: 0 0 8px rgba(0, 150, 255, 0.6);
+        margin-bottom: 6px;
+        font-size: 13px;
+        color: rgba(200,220,240,0.85);
+        letter-spacing: 0.3px;
       }
 
       #instructions {
         position: absolute;
-        bottom: 30px;
-        width: 100%;
-        text-align: center;
+        bottom: 16px;
+        left: 50%;
+        transform: translateX(-50%);
         z-index: 10;
         pointer-events: none;
-        font-size: 14px;
-        opacity: 0.7;
-        text-shadow: 0 0 6px rgba(0, 150, 255, 0.4);
+        font-size: 11px;
+        opacity: 0.6;
+        background: rgba(8,12,25,0.5);
+        backdrop-filter: blur(6px);
+        border: 1px solid rgba(100,180,255,0.08);
+        border-radius: 20px;
+        padding: 8px 20px;
+        white-space: nowrap;
+        letter-spacing: 0.3px;
       }
 
       #title {
@@ -126,16 +140,18 @@
 
       #temp-bar-container {
         position: absolute;
-        top: 20px;
-        right: 20px;
-        width: 24px;
-        height: 200px;
-        background: rgba(0, 0, 0, 0.4);
-        border: 2px solid rgba(100, 180, 255, 0.4);
-        border-radius: 12px;
+        top: 16px;
+        right: 16px;
+        width: 20px;
+        height: 180px;
+        background: rgba(8,12,25,0.6);
+        border: 1px solid rgba(100, 180, 255, 0.15);
+        border-radius: 10px;
         z-index: 10;
         overflow: hidden;
         display: none;
+        backdrop-filter: blur(6px);
+        box-shadow: 0 4px 16px rgba(0,0,0,0.3);
       }
 
       #temp-bar-fill {
@@ -143,19 +159,20 @@
         bottom: 0;
         width: 100%;
         height: 100%;
-        border-radius: 10px;
+        border-radius: 9px;
         transition: height 0.3s, background 0.3s;
       }
 
       #temp-bar-label {
         position: absolute;
-        top: -24px;
+        top: -22px;
         width: 100%;
         text-align: center;
-        font-size: 11px;
-        text-shadow: 0 0 6px rgba(0, 150, 255, 0.6);
+        font-size: 9px;
+        letter-spacing: 1px;
+        opacity: 0.5;
         white-space: nowrap;
-        left: -10px;
+        left: -8px;
       }
       .lobby-btn {
         background: linear-gradient(135deg, rgba(40, 60, 110, 0.7), rgba(30, 50, 90, 0.5));
@@ -272,107 +289,104 @@
 
       #minimap {
         position: absolute;
-        bottom: 80px;
-        right: 20px;
-        width: 180px;
-        height: 180px;
+        bottom: 70px;
+        right: 16px;
+        width: 160px;
+        height: 160px;
         border-radius: 50%;
-        border: 2px solid rgba(100, 180, 255, 0.4);
-        background: rgba(0, 0, 0, 0.5);
+        border: 1px solid rgba(100, 180, 255, 0.2);
+        background: rgba(8,12,25,0.5);
         z-index: 10;
         pointer-events: none;
         display: none;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.4), inset 0 0 20px rgba(0,0,0,0.3);
       }
 
-      #craft-menu {
-        display: none;
+      .game-panel {
         position: fixed;
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        background: rgba(10, 15, 30, 0.92);
-        border: 2px solid rgba(100, 180, 255, 0.3);
-        border-radius: 12px;
-        padding: 24px 32px;
+        background: linear-gradient(145deg, rgba(8,12,28,0.92), rgba(12,18,35,0.88));
+        border: 1px solid rgba(100,180,255,0.15);
+        border-radius: 16px;
+        padding: 28px 32px;
         z-index: 25;
-        min-width: 360px;
-        backdrop-filter: blur(6px);
+        min-width: 380px;
+        backdrop-filter: blur(12px);
+        box-shadow: 0 16px 48px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04);
       }
 
-      #craft-menu h2 {
+      .game-panel h2 {
         text-align: center;
-        font-size: 22px;
-        margin-bottom: 16px;
-        text-shadow: 0 0 12px rgba(100, 180, 255, 0.6);
+        font-size: 18px;
+        margin-bottom: 18px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        opacity: 0.8;
       }
+
+      #craft-menu { display: none; }
+      #craft-menu h2 { color: #88ccff; text-shadow: 0 0 15px rgba(100,180,255,0.4); }
 
       .craft-item {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 10px 12px;
-        margin-bottom: 8px;
-        background: rgba(40, 60, 90, 0.4);
-        border: 1px solid rgba(100, 180, 255, 0.15);
-        border-radius: 8px;
+        padding: 12px 14px;
+        margin-bottom: 6px;
+        background: rgba(30,50,80,0.3);
+        border: 1px solid rgba(100,180,255,0.08);
+        border-radius: 10px;
         cursor: pointer;
-        transition: background 0.15s, border-color 0.15s;
+        transition: all 0.2s ease;
       }
 
       .craft-item:hover:not(.craft-disabled) {
-        background: rgba(60, 100, 150, 0.5);
-        border-color: rgba(100, 180, 255, 0.4);
+        background: rgba(40,70,120,0.5);
+        border-color: rgba(100,180,255,0.25);
+        transform: translateX(2px);
       }
 
-      .craft-item.craft-disabled {
-        opacity: 0.4;
-        cursor: default;
-      }
+      .craft-item.craft-disabled { opacity: 0.35; cursor: default; }
 
-      .craft-name {
-        font-size: 16px;
-        font-weight: bold;
-      }
-
-      .craft-cost {
-        font-size: 12px;
-        opacity: 0.7;
-        margin-top: 2px;
-      }
-
-      .craft-desc {
-        font-size: 11px;
-        opacity: 0.5;
-        margin-top: 2px;
-      }
+      .craft-name { font-size: 14px; font-weight: 600; letter-spacing: 0.3px; }
+      .craft-cost { font-size: 11px; opacity: 0.5; margin-top: 3px; }
+      .craft-desc { font-size: 10px; opacity: 0.35; margin-top: 2px; }
 
       .craft-btn {
-        padding: 6px 16px;
-        background: rgba(68, 170, 255, 0.3);
-        border: 1px solid rgba(100, 180, 255, 0.4);
-        border-radius: 6px;
+        padding: 7px 18px;
+        background: linear-gradient(135deg, rgba(60,130,220,0.35), rgba(40,100,180,0.25));
+        border: 1px solid rgba(100,180,255,0.25);
+        border-radius: 8px;
         color: white;
-        font-size: 13px;
+        font-size: 12px;
         cursor: pointer;
         white-space: nowrap;
+        transition: all 0.2s;
+        letter-spacing: 0.5px;
       }
 
-      .craft-btn:hover {
-        background: rgba(68, 170, 255, 0.5);
-      }
+      .craft-btn:hover { background: linear-gradient(135deg, rgba(60,130,220,0.55), rgba(40,100,180,0.4)); }
+      .craft-disabled .craft-btn { opacity: 0.2; pointer-events: none; }
 
-      .craft-disabled .craft-btn {
-        opacity: 0.3;
-        pointer-events: none;
+      .skill-item {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 12px 14px; margin-bottom: 6px;
+        background: rgba(50,30,80,0.3); border: 1px solid rgba(180,130,255,0.08);
+        border-radius: 10px; transition: all 0.2s ease;
       }
-      .skill-item { display:flex; justify-content:space-between; align-items:center; padding:10px 12px; margin-bottom:8px; background:rgba(60,40,90,0.4); border:1px solid rgba(180,130,255,0.15); border-radius:8px; }
-      .skill-item:hover { background:rgba(80,50,120,0.5); }
-      .skill-name { font-size:15px; font-weight:bold; color:#ddbbff; }
-      .skill-desc { font-size:11px; opacity:0.5; margin-top:2px; }
-      .skill-level { font-size:13px; color:#bb88ff; }
-      .skill-btn { padding:6px 14px; background:rgba(140,100,220,0.3); border:1px solid rgba(180,130,255,0.4); border-radius:6px; color:white; font-size:13px; cursor:pointer; }
-      .skill-btn:hover { background:rgba(140,100,220,0.5); }
-      .skill-btn:disabled { opacity:0.3; cursor:default; }
+      .skill-item:hover { background: rgba(60,40,100,0.45); transform: translateX(2px); }
+      .skill-name { font-size: 14px; font-weight: 600; color: #ccaaee; }
+      .skill-desc { font-size: 10px; opacity: 0.4; margin-top: 3px; }
+      .skill-level { font-size: 12px; color: #aa88dd; opacity: 0.7; }
+      .skill-btn {
+        padding: 7px 18px; background: linear-gradient(135deg, rgba(120,80,200,0.35), rgba(90,60,160,0.25));
+        border: 1px solid rgba(180,130,255,0.25); border-radius: 8px;
+        color: white; font-size: 12px; cursor: pointer; transition: all 0.2s; letter-spacing: 0.5px;
+      }
+      .skill-btn:hover { background: linear-gradient(135deg, rgba(120,80,200,0.55), rgba(90,60,160,0.4)); }
+      .skill-btn:disabled { opacity: 0.2; cursor: default; }
     </style>
   </head>
   <body>
@@ -455,43 +469,51 @@
     </div>
 
     <div id="hud" style="display: none">
-      <div style="margin-bottom:10px;">
-        <div style="font-size:12px; opacity:0.6; margin-bottom:2px;">HP</div>
-        <div style="width:180px; height:10px; background:rgba(0,0,0,0.5); border-radius:5px; overflow:hidden; border:1px solid rgba(255,100,100,0.3);">
-          <div id="health-bar" style="height:100%; width:100%; background:linear-gradient(to right,#cc4444,#ff6666); border-radius:5px; transition:width 0.3s;"></div>
+      <div style="margin-bottom:8px;">
+        <div style="display:flex; align-items:center; gap:6px; margin-bottom:3px;">
+          <span style="font-size:10px; opacity:0.4; letter-spacing:1px; width:40px;">HP</span>
+          <div style="flex:1; height:6px; background:rgba(0,0,0,0.4); border-radius:3px; overflow:hidden;">
+            <div id="health-bar" style="height:100%; width:100%; background:linear-gradient(to right,#bb3333,#ee5555); border-radius:3px; transition:width 0.3s;"></div>
+          </div>
+          <span id="health" style="font-size:11px; opacity:0.5; width:28px; text-align:right;">100</span>
         </div>
-        <div style="font-size:11px; opacity:0.5; margin-top:1px;"><span id="health">100</span>/100</div>
       </div>
-      <div style="margin-bottom:10px;">
-        <div style="font-size:12px; opacity:0.6; margin-bottom:2px;">Energy</div>
-        <div style="width:180px; height:10px; background:rgba(0,0,0,0.5); border-radius:5px; overflow:hidden; border:1px solid rgba(255,200,50,0.3);">
-          <div id="energy-bar" style="height:100%; width:100%; background:linear-gradient(to right,#cc8800,#ffcc44); border-radius:5px; transition:width 0.3s;"></div>
+      <div style="margin-bottom:8px;">
+        <div style="display:flex; align-items:center; gap:6px; margin-bottom:3px;">
+          <span style="font-size:10px; opacity:0.4; letter-spacing:1px; width:40px;">NRG</span>
+          <div style="flex:1; height:6px; background:rgba(0,0,0,0.4); border-radius:3px; overflow:hidden;">
+            <div id="energy-bar" style="height:100%; width:100%; background:linear-gradient(to right,#bb8800,#eecc33); border-radius:3px; transition:width 0.3s;"></div>
+          </div>
+          <span id="energy" style="font-size:11px; opacity:0.5; width:28px; text-align:right;">100</span>
         </div>
-        <div style="font-size:11px; opacity:0.5; margin-top:1px;"><span id="energy">100</span>/100</div>
       </div>
-      <div style="font-size:14px;">Body Temp: <span id="temp">37.0</span>&deg;C</div>
-      <div>Score: <span id="score">0</span></div>
-      <div>Biome: <span id="biome-name">Tundra</span></div>
-      <div>Weather: <span id="weather-name">Clear</span></div>
-      <div id="time-display" style="color: #ffdd88;">Day 1 06:00</div>
-      <div id="player-name-hud" style="font-size:12px; opacity:0.5;"></div>
-      <div id="sandbox-badge" style="display:none; margin-top:4px; font-size:13px; color:#88dd44; text-shadow:0 0 8px rgba(136,221,68,0.5); letter-spacing:2px;">SANDBOX MODE</div>
-      <div id="status-msg" style="color: #ffaa44; display: none;"></div>
-      <div style="margin-top: 12px; font-size: 14px; opacity: 0.7;">
-        <span id="inv-wood">Wood: 0</span> &nbsp;
-        <span id="inv-stone">Stone: 0</span> &nbsp;
-        <span id="inv-metal">Metal: 0</span> &nbsp;
-        <span id="inv-cloth">Cloth: 0</span> &nbsp;
-        <span id="inv-fuel">Fuel: 0</span> &nbsp;
-        <span id="inv-meat">Meat: 0</span> &nbsp;
+      <div style="height:1px; background:rgba(100,180,255,0.08); margin:10px 0;"></div>
+      <div style="display:grid; grid-template-columns:auto 1fr; gap:2px 10px; font-size:12px;">
+        <span style="opacity:0.35;">Temp</span><span id="temp" style="text-align:right;">37.0</span>
+        <span style="opacity:0.35;">Score</span><span id="score" style="text-align:right;">0</span>
+        <span style="opacity:0.35;">Biome</span><span id="biome-name" style="text-align:right; font-size:11px;">Tundra</span>
+        <span style="opacity:0.35;">Weather</span><span id="weather-name" style="text-align:right;">Clear</span>
+      </div>
+      <div id="time-display" style="color:#e8cc77; font-size:12px; margin-top:8px; text-align:center; opacity:0.7;">Day 1 06:00</div>
+      <div id="player-name-hud" style="font-size:10px; opacity:0.3; text-align:center; margin-top:2px;"></div>
+      <div id="sandbox-badge" style="display:none; margin-top:4px; font-size:10px; color:#88dd44; letter-spacing:2px; text-align:center; text-transform:uppercase;">Sandbox</div>
+      <div id="status-msg" style="color: #ffaa44; display: none; font-size:12px; margin-top:6px; text-align:center;"></div>
+      <div style="height:1px; background:rgba(100,180,255,0.08); margin:10px 0;"></div>
+      <div style="display:flex; flex-wrap:wrap; gap:4px 10px; font-size:11px; opacity:0.55;">
+        <span id="inv-wood">Wood: 0</span>
+        <span id="inv-stone">Stone: 0</span>
+        <span id="inv-metal">Metal: 0</span>
+        <span id="inv-cloth">Cloth: 0</span>
+        <span id="inv-fuel">Fuel: 0</span>
+        <span id="inv-meat">Meat: 0</span>
         <span id="inv-cooked">Cooked: 0</span>
       </div>
     </div>
 
-    <div id="gather-prompt" style="display:none; position:fixed; bottom:120px; left:50%; transform:translateX(-50%); z-index:10; text-align:center; pointer-events:none;">
-      <div id="gather-label" style="font-size:16px; margin-bottom:6px; text-shadow:0 0 8px rgba(0,150,255,0.6);"></div>
-      <div style="width:200px; height:8px; background:rgba(0,0,0,0.5); border-radius:4px; overflow:hidden; border:1px solid rgba(100,180,255,0.3);">
-        <div id="gather-bar" style="height:100%; width:0%; background:linear-gradient(to right,#44aaff,#88ddff); border-radius:4px; transition:width 0.05s;"></div>
+    <div id="gather-prompt" style="display:none; position:fixed; bottom:100px; left:50%; transform:translateX(-50%); z-index:10; text-align:center; pointer-events:none;">
+      <div id="gather-label" style="font-size:13px; margin-bottom:8px; opacity:0.8; letter-spacing:0.5px;"></div>
+      <div style="width:180px; height:4px; background:rgba(0,0,0,0.4); border-radius:2px; overflow:hidden; margin:0 auto;">
+        <div id="gather-bar" style="height:100%; width:0%; background:linear-gradient(to right,#3388cc,#66bbee); border-radius:2px; transition:width 0.05s;"></div>
       </div>
     </div>
 
@@ -499,59 +521,69 @@
       W/S - Move &nbsp;|&nbsp; A/D - Turn &nbsp;|&nbsp; Shift - Sprint &nbsp;|&nbsp; C - Crouch &nbsp;|&nbsp; Space - Jump &nbsp;|&nbsp; E - Gather &nbsp;|&nbsp; Tab - Craft &nbsp;|&nbsp; K - Skills &nbsp;|&nbsp; F - Place &nbsp;|&nbsp; Click - Attack &nbsp;|&nbsp; Q - Cook &nbsp;|&nbsp; R - Eat &nbsp;|&nbsp; G - Drop &nbsp;|&nbsp; T - Chat &nbsp;|&nbsp; Esc - Pause
     </div>
 
-    <div id="craft-menu">
+    <div id="craft-menu" class="game-panel">
       <h2>Crafting</h2>
       <div id="craft-list"></div>
-      <p style="text-align:center; font-size:12px; opacity:0.4; margin-top:12px;">Tab to close</p>
+      <p style="text-align:center; font-size:10px; opacity:0.25; margin-top:14px; letter-spacing:1px;">TAB TO CLOSE</p>
     </div>
 
-    <div id="skill-menu" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:rgba(10,15,30,0.92); border:2px solid rgba(180,130,255,0.3); border-radius:12px; padding:24px 32px; z-index:25; min-width:380px; backdrop-filter:blur(6px);">
-      <h2 style="text-align:center; font-size:22px; margin-bottom:6px; color:#bb88ff; text-shadow:0 0 12px rgba(180,130,255,0.6);">Skills</h2>
-      <div id="skill-points-display" style="text-align:center; font-size:14px; margin-bottom:16px; color:#ddbbff;">Points: 0</div>
+    <div id="skill-menu" class="game-panel" style="display:none;">
+      <h2 style="color:#bb88ff; text-shadow:0 0 15px rgba(180,130,255,0.3);">Skills</h2>
+      <div id="skill-points-display" style="text-align:center; font-size:13px; margin-bottom:16px; color:#ccaaee; opacity:0.7;">Points: 0</div>
       <div id="skill-list"></div>
-      <p style="text-align:center; font-size:12px; opacity:0.4; margin-top:12px;">K to close</p>
+      <p style="text-align:center; font-size:10px; opacity:0.25; margin-top:14px; letter-spacing:1px;">K TO CLOSE</p>
     </div>
 
-    <div id="journal-popup" style="display:none; position:fixed; bottom:200px; left:50%; transform:translateX(-50%); background:rgba(40,35,20,0.92); border:2px solid rgba(238,221,100,0.4); border-radius:10px; padding:20px 28px; z-index:25; max-width:400px; text-align:center; backdrop-filter:blur(4px);">
-      <div style="font-size:12px; color:#eedd66; margin-bottom:8px; letter-spacing:1px;">JOURNAL PAGE FOUND</div>
-      <div id="journal-text" style="font-size:14px; color:#ddc; line-height:1.5; font-style:italic;"></div>
-      <div style="font-size:11px; opacity:0.4; margin-top:10px;" id="journal-count">1/10</div>
+    <div id="journal-popup" style="display:none; position:fixed; bottom:180px; left:50%; transform:translateX(-50%); background:linear-gradient(145deg, rgba(35,30,15,0.92), rgba(25,22,10,0.88)); border:1px solid rgba(200,180,80,0.2); border-radius:14px; padding:22px 30px; z-index:25; max-width:380px; text-align:center; backdrop-filter:blur(10px); box-shadow:0 12px 40px rgba(0,0,0,0.4);">
+      <div style="font-size:10px; color:#ddcc55; letter-spacing:3px; text-transform:uppercase; opacity:0.6; margin-bottom:10px;">Journal Page Found</div>
+      <div style="width:40px; height:1px; background:linear-gradient(to right, transparent, rgba(200,180,80,0.4), transparent); margin:0 auto 12px;"></div>
+      <div id="journal-text" style="font-size:13px; color:rgba(220,210,180,0.85); line-height:1.7; font-style:italic;"></div>
+      <div style="font-size:10px; opacity:0.3; margin-top:12px; letter-spacing:1px;" id="journal-count">1/10</div>
     </div>
 
-    <div id="death-screen" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:30; justify-content:center; align-items:center; flex-direction:column; text-align:center;">
-      <h1 style="font-size:52px; color:#88ccff; text-shadow:0 0 20px rgba(100,180,255,0.8); margin-bottom:16px;">YOU FROZE TO DEATH</h1>
-      <p style="font-size:20px; opacity:0.7; margin-bottom:8px;">Survived for <span id="death-score">0</span> points</p>
-      <p style="font-size:16px; opacity:0.5; margin-top:24px;">Press any key to try again</p>
-      <p style="font-size:11px; opacity:0.2; margin-top:20px;">Made with AI</p>
+    <div id="death-screen" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:linear-gradient(180deg, rgba(10,5,15,0.9), rgba(5,0,10,0.95)); z-index:30; justify-content:center; align-items:center; flex-direction:column; text-align:center; backdrop-filter:blur(6px);">
+      <div style="font-size:11px; letter-spacing:4px; opacity:0.3; text-transform:uppercase; margin-bottom:16px;">Game Over</div>
+      <h1 style="font-size:48px; color:#7ab8e8; text-shadow:0 0 40px rgba(100,170,240,0.6), 0 0 80px rgba(100,170,240,0.2); margin-bottom:20px; letter-spacing:3px; font-weight:300;">YOU FROZE TO DEATH</h1>
+      <div style="width:60px; height:1px; background:linear-gradient(to right, transparent, rgba(100,180,255,0.4), transparent); margin:0 auto 20px;"></div>
+      <p style="font-size:18px; opacity:0.6; margin-bottom:6px;">Survived for <span id="death-score" style="color:#88ccff;">0</span> points</p>
+      <p style="font-size:13px; opacity:0.3; margin-top:30px; letter-spacing:1px;">Press any key to try again</p>
+      <p style="font-size:10px; opacity:0.15; margin-top:24px; letter-spacing:1px;">Made with AI</p>
     </div>
 
-    <div id="win-screen" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,20,0.9); z-index:30; justify-content:center; align-items:center; flex-direction:column; text-align:center;">
-      <h1 style="font-size:52px; color:#44ff88; text-shadow:0 0 30px rgba(68,255,136,0.8); margin-bottom:16px;">RESCUED!</h1>
-      <p style="font-size:22px; opacity:0.8; margin-bottom:8px;">You survived the frozen planet!</p>
-      <p style="font-size:18px; opacity:0.6; margin-bottom:8px;">Final score: <span id="win-score">0</span></p>
-      <p style="font-size:16px; opacity:0.5; margin-top:24px;">Press any key to play again</p>
-      <p style="font-size:11px; opacity:0.2; margin-top:20px;">Made with AI</p>
+    <div id="win-screen" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:linear-gradient(180deg, rgba(5,15,10,0.9), rgba(0,10,5,0.95)); z-index:30; justify-content:center; align-items:center; flex-direction:column; text-align:center; backdrop-filter:blur(6px);">
+      <div style="font-size:11px; letter-spacing:4px; opacity:0.3; text-transform:uppercase; margin-bottom:16px;">Victory</div>
+      <h1 style="font-size:48px; color:#44ee88; text-shadow:0 0 40px rgba(68,238,136,0.6), 0 0 80px rgba(68,238,136,0.2); margin-bottom:20px; letter-spacing:3px; font-weight:300;">RESCUED!</h1>
+      <div style="width:60px; height:1px; background:linear-gradient(to right, transparent, rgba(68,255,136,0.4), transparent); margin:0 auto 20px;"></div>
+      <p style="font-size:18px; opacity:0.7; margin-bottom:6px;">You survived the frozen planet!</p>
+      <p style="font-size:16px; opacity:0.5;">Final score: <span id="win-score" style="color:#44ff88;">0</span></p>
+      <p style="font-size:13px; opacity:0.3; margin-top:30px; letter-spacing:1px;">Press any key to play again</p>
+      <p style="font-size:10px; opacity:0.15; margin-top:24px; letter-spacing:1px;">Made with AI</p>
     </div>
 
-    <div id="beacon-timer-hud" style="display:none; position:fixed; top:50%; right:60px; transform:translateY(-50%); z-index:10; text-align:center; pointer-events:none;">
-      <div style="font-size:14px; color:#ff44ff; text-shadow:0 0 10px rgba(255,68,255,0.6); margin-bottom:8px;">RESCUE ETA</div>
-      <div id="beacon-countdown" style="font-size:36px; color:#ff88cc; text-shadow:0 0 20px rgba(255,68,255,0.6);">2:00</div>
+    <div id="beacon-timer-hud" style="display:none; position:fixed; top:50%; right:50px; transform:translateY(-50%); z-index:10; text-align:center; pointer-events:none; background:rgba(20,10,25,0.5); backdrop-filter:blur(6px); border:1px solid rgba(255,68,255,0.15); border-radius:14px; padding:16px 24px;">
+      <div style="font-size:10px; color:#cc66aa; letter-spacing:3px; text-transform:uppercase; margin-bottom:8px; opacity:0.7;">Rescue ETA</div>
+      <div id="beacon-countdown" style="font-size:32px; color:#ee88cc; text-shadow:0 0 20px rgba(255,68,255,0.4); font-weight:300; letter-spacing:2px;">2:00</div>
     </div>
 
-    <div id="pause-screen" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:28; justify-content:center; align-items:center; flex-direction:column; text-align:center; backdrop-filter:blur(4px);">
-      <h1 style="font-size:42px; color:#88ccff; text-shadow:0 0 20px rgba(100,180,255,0.8); margin-bottom:24px;">PAUSED</h1>
-      <p style="font-size:18px; opacity:0.7; margin-bottom:8px;">Press Escape to resume</p>
-      <div style="margin-top:32px; font-size:14px; opacity:0.5; line-height:2;">
-        <div>W/S - Move Forward/Back</div>
-        <div>A/D - Turn Left/Right</div>
-        <div>Shift - Sprint</div>
-        <div>C - Crouch</div>
-        <div>Space - Jump</div>
-        <div>E - Gather Resources</div>
-        <div>Tab - Crafting Menu</div>
-        <div>F - Place Item</div>
-        <div>Click - Attack Wolves</div>
-        <div>Esc - Pause/Resume</div>
+    <div id="pause-screen" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(5,8,18,0.75); z-index:28; justify-content:center; align-items:center; flex-direction:column; text-align:center; backdrop-filter:blur(8px);">
+      <h1 style="font-size:36px; color:#7ab8e8; text-shadow:0 0 30px rgba(100,180,255,0.4); margin-bottom:12px; letter-spacing:4px; font-weight:300;">PAUSED</h1>
+      <p style="font-size:13px; opacity:0.4; margin-bottom:24px; letter-spacing:1px;">Press Escape to resume</p>
+      <div style="background:rgba(15,25,45,0.5); border:1px solid rgba(100,180,255,0.1); border-radius:12px; padding:20px 30px; font-size:12px; opacity:0.5; line-height:2.2; text-align:left;">
+        <div style="display:grid; grid-template-columns:auto 1fr; gap:4px 16px;">
+          <span style="color:#88ccff; text-align:right;">W/S</span><span>Move</span>
+          <span style="color:#88ccff; text-align:right;">A/D</span><span>Turn</span>
+          <span style="color:#88ccff; text-align:right;">Shift</span><span>Sprint</span>
+          <span style="color:#88ccff; text-align:right;">Space</span><span>Jump</span>
+          <span style="color:#88ccff; text-align:right;">C</span><span>Crouch</span>
+          <span style="color:#88ccff; text-align:right;">E</span><span>Gather</span>
+          <span style="color:#88ccff; text-align:right;">Tab</span><span>Crafting</span>
+          <span style="color:#88ccff; text-align:right;">K</span><span>Skills</span>
+          <span style="color:#88ccff; text-align:right;">F</span><span>Place</span>
+          <span style="color:#88ccff; text-align:right;">Click</span><span>Attack</span>
+          <span style="color:#88ccff; text-align:right;">Q / R</span><span>Cook / Eat</span>
+          <span style="color:#88ccff; text-align:right;">G</span><span>Drop Item</span>
+          <span style="color:#88ccff; text-align:right;">T</span><span>Chat</span>
+        </div>
       </div>
     </div>
 
