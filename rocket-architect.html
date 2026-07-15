@@ -1,0 +1,1533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Orbital Architect — Rocket Builder</title>
+<style>
+  :root{
+    --bg:#05070d; --panel:rgba(16,22,34,0.82); --panel2:rgba(24,32,48,0.9);
+    --line:rgba(120,160,220,0.18); --txt:#dfe8f7; --dim:#8a99b5; --accent:#5ad1ff;
+    --good:#57e08a; --warn:#ffcf5a; --bad:#ff6b6b; --fuel:#ffb347;
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  html,body{height:100%; overflow:hidden; background:var(--bg); color:var(--txt);
+    font-family:'Segoe UI',system-ui,Roboto,sans-serif; -webkit-font-smoothing:antialiased;}
+  #app{position:fixed; inset:0}
+  canvas{display:block}
+  #three{position:absolute; inset:0; z-index:1}
+  .hidden{display:none !important}
+
+  /* ---------- generic panel ---------- */
+  .panel{background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    backdrop-filter:blur(10px); box-shadow:0 8px 30px rgba(0,0,0,0.45);}
+  .title{font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent);
+    font-weight:700;}
+  .dim{color:var(--dim)}
+  .mono{font-variant-numeric:tabular-nums; font-family:'SFMono-Regular',ui-monospace,Menlo,Consolas,monospace}
+
+  /* ---------- BUILD MODE ---------- */
+  #buildUI{position:absolute; inset:0; z-index:5; pointer-events:none}
+  #buildUI .panel{pointer-events:auto}
+
+  #catalog{position:absolute; left:14px; top:14px; bottom:14px; width:250px; padding:12px;
+    display:flex; flex-direction:column; gap:8px; overflow:hidden}
+  #catalog .title{margin-bottom:2px}
+  .cat-tabs{display:flex; flex-wrap:wrap; gap:5px}
+  .cat-tab{font-size:11px; padding:5px 9px; border-radius:20px; cursor:pointer;
+    background:rgba(255,255,255,0.05); border:1px solid transparent; color:var(--dim)}
+  .cat-tab.active{background:rgba(90,209,255,0.16); color:var(--accent); border-color:rgba(90,209,255,0.4)}
+  .part-list{flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:6px; padding-right:4px}
+  .part-list::-webkit-scrollbar{width:6px}
+  .part-list::-webkit-scrollbar-thumb{background:rgba(120,160,220,0.25); border-radius:4px}
+  .part{display:flex; gap:9px; align-items:center; padding:8px; border-radius:9px; cursor:pointer;
+    background:rgba(255,255,255,0.03); border:1px solid transparent; transition:.12s}
+  .part:hover{background:rgba(90,209,255,0.1); border-color:rgba(90,209,255,0.35); transform:translateX(2px)}
+  .part .ic{width:30px; height:30px; border-radius:6px; flex:none; display:grid; place-items:center; font-size:16px}
+  .part .nm{font-size:12.5px; font-weight:600; line-height:1.15}
+  .part .st{font-size:10.5px; color:var(--dim); margin-top:2px}
+
+  #stats{position:absolute; right:14px; top:14px; width:238px; padding:13px; display:flex; flex-direction:column; gap:9px}
+  .statrow{display:flex; justify-content:space-between; align-items:baseline; font-size:12.5px}
+  .statrow .k{color:var(--dim)}
+  .statrow .v{font-weight:700}
+  .bar{height:6px; border-radius:4px; background:rgba(255,255,255,0.08); overflow:hidden; margin-top:3px}
+  .bar > i{display:block; height:100%; border-radius:4px}
+  .twr-note{font-size:11px; margin-top:2px}
+
+  #stagePanel{position:absolute; right:14px; top:290px; width:238px; max-height:40vh; padding:12px; overflow:hidden;
+    display:flex; flex-direction:column; gap:8px}
+  #stageList{display:flex; flex-direction:column-reverse; gap:6px; overflow-y:auto}
+  .stage{display:flex; gap:8px; align-items:center; padding:7px 9px; border-radius:8px; font-size:11.5px;
+    background:rgba(255,255,255,0.04); border:1px solid var(--line)}
+  .stage .num{width:20px; height:20px; border-radius:50%; background:var(--panel2); display:grid; place-items:center;
+    font-size:11px; font-weight:700; flex:none; color:var(--accent)}
+  .stage .desc{flex:1; line-height:1.25}
+
+  #buildBar{position:absolute; left:50%; bottom:16px; transform:translateX(-50%);
+    display:flex; gap:10px; align-items:center; padding:10px 14px}
+  .btn{font-size:13px; font-weight:600; padding:9px 16px; border-radius:9px; cursor:pointer; border:1px solid var(--line);
+    background:rgba(255,255,255,0.05); color:var(--txt); transition:.14s; user-select:none}
+  .btn:hover{background:rgba(255,255,255,0.12)}
+  .btn.primary{background:linear-gradient(135deg,#2fd18a,#1fa768); border:none; color:#04110a; font-weight:800}
+  .btn.primary:hover{filter:brightness(1.1)}
+  .btn.danger{color:var(--bad)}
+  .btn.mini{padding:7px 11px; font-size:12px}
+  .toggle{display:flex; align-items:center; gap:7px; font-size:12px; color:var(--dim)}
+  .sym{display:flex; gap:4px}
+  .sym .s{width:26px; height:26px; border-radius:6px; display:grid; place-items:center; cursor:pointer; font-size:11px;
+    background:rgba(255,255,255,0.05); border:1px solid transparent}
+  .sym .s.on{background:rgba(90,209,255,0.16); color:var(--accent); border-color:rgba(90,209,255,0.4)}
+
+  #hint{position:absolute; left:50%; top:14px; transform:translateX(-50%); font-size:12px; color:var(--dim);
+    background:var(--panel); padding:7px 14px; border-radius:20px; border:1px solid var(--line)}
+
+  /* ---------- FLIGHT HUD ---------- */
+  #flightUI{position:absolute; inset:0; z-index:5; pointer-events:none}
+  #flightUI .panel{pointer-events:auto}
+  #telemetry{position:absolute; left:14px; top:14px; width:210px; padding:12px; display:flex; flex-direction:column; gap:7px}
+  #objectives{position:absolute; left:14px; top:250px; width:210px; padding:11px; display:flex; flex-direction:column; gap:6px}
+  .obj{display:flex; gap:8px; align-items:center; font-size:12px}
+  .obj .box{width:15px; height:15px; border-radius:4px; border:1.5px solid var(--dim); flex:none; display:grid; place-items:center; font-size:11px}
+  .obj.done .box{background:var(--good); border-color:var(--good); color:#04110a}
+  .obj.done{color:var(--good)}
+
+  #throttleWrap{position:absolute; left:14px; bottom:16px; display:flex; gap:10px; align-items:flex-end}
+  #throttleBar{width:20px; height:130px; border-radius:10px; background:rgba(255,255,255,0.08); position:relative; overflow:hidden; border:1px solid var(--line)}
+  #throttleFill{position:absolute; left:0; right:0; bottom:0; background:linear-gradient(0deg,#ff7a45,#ffcf5a)}
+  #stageFlight{width:180px; padding:11px; max-height:40vh; overflow:hidden; display:flex; flex-direction:column; gap:7px}
+  #fuelGauges{display:flex; flex-direction:column; gap:6px}
+
+  #navballWrap{position:absolute; left:50%; bottom:14px; transform:translateX(-50%); text-align:center}
+  #navball{border-radius:50%; box-shadow:0 6px 26px rgba(0,0,0,.5), inset 0 0 0 2px rgba(120,160,220,.25)}
+  #warpIndicator{position:absolute; right:14px; top:14px; width:210px; padding:12px; display:flex; flex-direction:column; gap:8px}
+  .keyhelp{position:absolute; right:14px; bottom:16px; width:230px; padding:11px; font-size:11px; color:var(--dim); line-height:1.7}
+  .keyhelp b{color:var(--txt)}
+  kbd{background:rgba(255,255,255,0.1); border:1px solid var(--line); border-bottom-width:2px; border-radius:4px; padding:1px 5px; font-size:10.5px; color:var(--txt); font-family:inherit}
+
+  #mapView{position:absolute; inset:0; z-index:6; background:rgba(3,6,12,0.72); backdrop-filter:blur(3px); display:grid; place-items:center}
+  #mapCanvas{border-radius:14px; border:1px solid var(--line)}
+  #mapClose{position:absolute; top:18px; right:20px}
+
+  #banner{position:absolute; left:50%; top:22%; transform:translate(-50%,-50%); z-index:8; text-align:center;
+    padding:22px 40px; min-width:340px}
+  #banner h1{font-size:26px; margin-bottom:6px; letter-spacing:.02em}
+  #banner p{color:var(--dim); font-size:14px; line-height:1.5}
+  #banner .btn{margin-top:16px}
+
+  #warnFlash{position:absolute; left:50%; top:46%; transform:translateX(-50%); z-index:7; font-size:18px; font-weight:800;
+    letter-spacing:.06em; color:var(--bad); text-shadow:0 2px 12px rgba(0,0,0,.7); pointer-events:none; opacity:0; transition:opacity .2s}
+
+  #loading{position:absolute; inset:0; z-index:30; display:grid; place-items:center; background:var(--bg)}
+  #loading .spin{width:40px; height:40px; border:3px solid rgba(90,209,255,.2); border-top-color:var(--accent); border-radius:50%; animation:sp 1s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .val-good{color:var(--good)} .val-bad{color:var(--bad)} .val-warn{color:var(--warn)}
+  a.link{color:var(--accent); text-decoration:none; font-size:12px}
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="three"></canvas>
+
+  <!-- ===================== BUILD MODE UI ===================== -->
+  <div id="buildUI">
+    <div id="hint" class="mono">Click parts to stack them &bull; scroll to orbit view &bull; build a rocket that can reach space</div>
+
+    <div id="catalog" class="panel">
+      <div class="title">Vehicle Assembly</div>
+      <div class="cat-tabs" id="catTabs"></div>
+      <div class="part-list" id="partList"></div>
+    </div>
+
+    <div id="stats" class="panel">
+      <div class="title">Vehicle Stats</div>
+      <div class="statrow"><span class="k">Total mass</span><span class="v mono" id="sMass">0.0 t</span></div>
+      <div class="statrow"><span class="k">Parts</span><span class="v mono" id="sParts">0</span></div>
+      <div>
+        <div class="statrow"><span class="k">Thrust/Weight (TWR)</span><span class="v mono" id="sTWR">—</span></div>
+        <div class="bar"><i id="sTWRbar" style="width:0%"></i></div>
+        <div class="twr-note dim" id="sTWRnote">Add an engine &amp; fuel</div>
+      </div>
+      <div class="statrow"><span class="k">Total Δv</span><span class="v mono" id="sDV">0 m/s</span></div>
+      <div class="bar"><i id="sDVbar" style="width:0%; background:var(--accent)"></i></div>
+      <div class="statrow"><span class="k">Stability</span><span class="v mono" id="sStab">—</span></div>
+      <div class="statrow"><span class="k">Crew</span><span class="v mono" id="sCrew">0</span></div>
+    </div>
+
+    <div id="stagePanel" class="panel">
+      <div class="title">Staging Sequence</div>
+      <div id="stageList"></div>
+    </div>
+
+    <div id="buildBar" class="panel">
+      <div class="toggle">Symmetry
+        <div class="sym" id="symSel">
+          <div class="s on" data-s="1">1x</div><div class="s" data-s="2">2x</div>
+          <div class="s" data-s="3">3x</div><div class="s" data-s="4">4x</div>
+        </div>
+      </div>
+      <div class="btn mini danger" id="btnUndo">Remove last</div>
+      <div class="btn mini danger" id="btnClear">Clear</div>
+      <div class="btn primary" id="btnLaunch">🚀 Launch</div>
+    </div>
+  </div>
+
+  <!-- ===================== FLIGHT UI ===================== -->
+  <div id="flightUI" class="hidden">
+    <div id="telemetry" class="panel">
+      <div class="title">Telemetry</div>
+      <div class="statrow"><span class="k">Altitude</span><span class="v mono" id="tAlt">0 m</span></div>
+      <div class="statrow"><span class="k">Speed</span><span class="v mono" id="tSpd">0 m/s</span></div>
+      <div class="statrow"><span class="k">Vertical v</span><span class="v mono" id="tVv">0 m/s</span></div>
+      <div class="statrow"><span class="k">Apoapsis</span><span class="v mono" id="tAp">—</span></div>
+      <div class="statrow"><span class="k">Periapsis</span><span class="v mono" id="tPe">—</span></div>
+      <div class="statrow"><span class="k">Dyn. pressure</span><span class="v mono" id="tQ">0</span></div>
+      <div class="statrow"><span class="k">G-force</span><span class="v mono" id="tG">1.0 g</span></div>
+      <div class="statrow"><span class="k">Skin temp</span><span class="v mono" id="tHeat">—</span></div>
+    </div>
+
+    <div id="objectives" class="panel">
+      <div class="title">Mission</div>
+      <div class="obj" id="obj1"><div class="box"></div><span>Reach space (70 km)</span></div>
+      <div class="obj" id="obj2"><div class="box"></div><span>Achieve stable orbit</span></div>
+      <div class="obj" id="obj3"><div class="box"></div><span>Return crew safely</span></div>
+    </div>
+
+    <div id="throttleWrap">
+      <div>
+        <div style="font-size:10px; color:var(--dim); text-align:center; margin-bottom:4px" class="mono" id="thrLabel">0%</div>
+        <div id="throttleBar"><div id="throttleFill" style="height:0%"></div></div>
+      </div>
+      <div id="stageFlight" class="panel">
+        <div class="title">Stage <span id="stageCur" class="mono" style="color:var(--txt)"></span></div>
+        <div id="stageNext" style="font-size:11.5px; line-height:1.35"></div>
+        <div id="fuelGauges"></div>
+      </div>
+    </div>
+
+    <div id="warpIndicator" class="panel">
+      <div class="title">Flight</div>
+      <div class="statrow"><span class="k">Mission time</span><span class="v mono" id="tMET">T+ 00:00</span></div>
+      <div class="statrow"><span class="k">Time warp</span><span class="v mono" id="tWarp">1×</span></div>
+      <div class="statrow"><span class="k">SAS</span><span class="v mono" id="tSAS">OFF</span></div>
+      <div class="statrow"><span class="k">Crew</span><span class="v mono" id="tCrew">—</span></div>
+      <div class="btn mini" id="btnRevert" style="margin-top:4px; text-align:center">↩ Revert to VAB</div>
+    </div>
+
+    <div id="navballWrap">
+      <canvas id="navball" width="150" height="150"></canvas>
+    </div>
+
+    <div class="keyhelp panel">
+      <b>Controls</b><br/>
+      <kbd>Z</kbd>/<kbd>X</kbd> full / cut throttle &bull; <kbd>Shift</kbd>/<kbd>Ctrl</kbd> throttle<br/>
+      <kbd>A</kbd>/<kbd>D</kbd> pitch W/E &bull; <kbd>T</kbd> SAS &bull; <kbd>F</kbd> hold prograde<br/>
+      <kbd>Space</kbd> next stage &bull; <kbd>M</kbd> map &bull; <kbd>,</kbd>/<kbd>.</kbd> warp
+    </div>
+  </div>
+
+  <!-- map overlay -->
+  <div id="mapView" class="hidden">
+    <canvas id="mapCanvas" width="620" height="620"></canvas>
+    <div class="btn" id="mapClose">Close map (M)</div>
+  </div>
+
+  <div id="banner" class="panel hidden"></div>
+  <div id="warnFlash"></div>
+  <div id="loading"><div class="spin"></div></div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+/* =====================================================================
+   ORBITAL ARCHITECT  —  a Kerbal-style rocket builder & flight sim
+   Build a rocket part-by-part (each adds mass & shifts CoM), stage it,
+   launch it, do a gravity turn to orbit, then reenter with a heat shield
+   and parachute.  Real-ish physics: Tsiolkovsky Δv, vis-viva orbits,
+   exponential atmosphere, aerodynamic drag & stability.
+   ===================================================================== */
+
+/* ---------- constants / planet ---------- */
+const G0 = 9.80665;
+const PLANET = {
+  R: 600000,          // radius (m)  — Kerbin-like
+  GM: 3.5316e12,      // gravitational parameter  (g0 at surface ≈ 9.81)
+  atmoTop: 70000,     // atmosphere top (m)
+  rho0: 1.225,        // sea-level density (kg/m^3)
+  scaleH: 5600,       // density scale height (m)
+  surfV: 174.6,       // eastward surface rotation speed (m/s)
+};
+const DEG = Math.PI / 180;
+const clamp = (x,a,b)=>x<a?a:x>b?b:x;
+const lerp = (a,b,t)=>a+(b-a)*t;
+
+function densityAt(alt){
+  if(alt >= PLANET.atmoTop) return 0;
+  return PLANET.rho0 * Math.exp(-Math.max(0,alt)/PLANET.scaleH);
+}
+
+/* =====================================================================
+   PART CATALOG   (masses in tonnes; converted to kg in sim)
+   dims: r = radius(m), h = height(m)
+   ===================================================================== */
+const PARTS = {
+  // ---- pods ----
+  mk1pod:    {name:'Mk1 Command Pod', cat:'pod', dry:0.84, r:0.625, h:1.1, crew:1, torque:5, col:0xcfd6df, shape:'cone'},
+  probe:     {name:'Probe Core OKTO', cat:'pod', dry:0.10, r:0.55, h:0.3, crew:0, torque:1.5, col:0x9aa4b2, shape:'cyl'},
+  // ---- utility ----
+  chute:     {name:'Mk16 Parachute', cat:'util', dry:0.10, r:0.35, h:0.3, chute:true, col:0xd94f4f, shape:'cyl'},
+  heatshield:{name:'Heat Shield 1.25m', cat:'util', dry:0.30, r:0.70, h:0.22, ablator:0.20, col:0x6b5744, shape:'cyl'},
+  decoupler: {name:'TR-18A Decoupler', cat:'util', dry:0.05, r:0.625, h:0.16, decoupler:true, col:0xf0c04a, shape:'cyl'},
+  fin:       {name:'AV-R8 Winglet', cat:'util', dry:0.02, r:0.55, h:0.5, fin:true, torque:1.2, radial:true, col:0xb0b8c4, shape:'fin'},
+  // ---- fuel tanks (1.25m) ----
+  ftS:       {name:'FL-T100 Tank', cat:'fuel', dry:0.0625, fuel:0.5, r:0.625, h:0.55, col:0xe4e7ec, shape:'cyl'},
+  ftM:       {name:'FL-T200 Tank', cat:'fuel', dry:0.125, fuel:1.0, r:0.625, h:1.1, col:0xe4e7ec, shape:'cyl'},
+  ftL:       {name:'FL-T400 Tank', cat:'fuel', dry:0.25, fuel:2.0, r:0.625, h:1.9, col:0xdfe3ea, shape:'cyl'},
+  // ---- big tank (2.5m) ----
+  ftJumbo:   {name:'Rockomax X32 Tank', cat:'fuel', dry:2.0, fuel:16.0, r:1.25, h:3.75, col:0xd7dbe2, shape:'cyl'},
+  // ---- engines ----
+  terrier:   {name:'LV-909 Terrier', cat:'engine', dry:0.5, r:0.55, h:0.7, thrust:60, ispV:345, ispS:85, torque:0.5, col:0x8a8f98, shape:'nozzle'},
+  reliant:   {name:'LV-T30 Reliant', cat:'engine', dry:1.25, r:0.625, h:1.15, thrust:240, ispV:310, ispS:265, torque:0.5, col:0x777c86, shape:'nozzle'},
+  swivel:    {name:'LV-T45 Swivel', cat:'engine', dry:1.5, r:0.625, h:1.15, thrust:215, ispV:320, ispS:250, torque:1, gimbal:true, col:0x82878f, shape:'nozzle'},
+  mainsail:  {name:'Mainsail 2.5m', cat:'engine', dry:6.0, r:1.25, h:2.1, thrust:1500, ispV:310, ispS:285, torque:1.5, gimbal:true, col:0x6d727b, shape:'nozzle'},
+  // ---- solid booster ----
+  hammer:    {name:'RT-10 Hammer (solid)', cat:'booster', dry:0.75, solid:3.24, r:0.625, h:3.3, thrust:227, ispV:195, ispS:170, col:0xe8e2d2, shape:'cyl'},
+};
+const CATS = [
+  {id:'pod', label:'Pods', icon:'🛰️'},
+  {id:'fuel', label:'Fuel', icon:'🛢️'},
+  {id:'engine', label:'Engines', icon:'🔥'},
+  {id:'booster', label:'Boosters', icon:'🧨'},
+  {id:'util', label:'Utility', icon:'🪂'},
+];
+const CAT_ICON = {pod:'🛰️', fuel:'🛢️', engine:'🔥', booster:'🧨', util:'🪂'};
+
+/* =====================================================================
+   RENDERER / SCENE
+   ===================================================================== */
+const canvas = document.getElementById('three');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x05070d);
+
+const camera = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 0.1, 60000);
+
+// lights
+const sun = new THREE.DirectionalLight(0xfff4e0, 2.4);
+sun.position.set(60, 90, 40);
+scene.add(sun);
+scene.add(new THREE.HemisphereLight(0x7fa8ff, 0x203040, 0.7));
+scene.add(new THREE.AmbientLight(0x445066, 0.35));
+
+// starfield
+const starGeo = new THREE.BufferGeometry();
+{
+  const N = 2500, pos = new Float32Array(N*3);
+  for(let i=0;i<N;i++){
+    const r=8000+Math.random()*20000;
+    const th=Math.random()*Math.PI*2, ph=Math.acos(2*Math.random()-1);
+    pos[i*3]=r*Math.sin(ph)*Math.cos(th); pos[i*3+1]=r*Math.cos(ph); pos[i*3+2]=r*Math.sin(ph)*Math.sin(th);
+  }
+  starGeo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+}
+const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({color:0xffffff, size:22, sizeAttenuation:true, transparent:true, opacity:0.9}));
+scene.add(stars);
+
+/* -------- build-mode ground pad -------- */
+const buildGroup = new THREE.Group();
+scene.add(buildGroup);
+{
+  const pad = new THREE.Mesh(new THREE.CylinderGeometry(6,6,0.5,48),
+    new THREE.MeshStandardMaterial({color:0x2a3140, metalness:0.2, roughness:0.9}));
+  pad.position.y = -0.25; buildGroup.add(pad);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(4.2,0.12,8,48),
+    new THREE.MeshStandardMaterial({color:0x3a4557, emissive:0x1b2536, emissiveIntensity:0.5}));
+  ring.rotation.x = Math.PI/2; ring.position.y = 0.02; buildGroup.add(ring);
+  const grid = new THREE.GridHelper(40, 40, 0x33507a, 0x1c2740);
+  grid.position.y = 0; buildGroup.add(grid);
+}
+// rocket container (used in both modes)
+const rocketGroup = new THREE.Group();
+scene.add(rocketGroup);
+// CoM marker
+const comMarker = new THREE.Mesh(new THREE.SphereGeometry(0.16,16,16),
+  new THREE.MeshBasicMaterial({color:0xffd24a}));
+buildGroup.add(comMarker);
+
+/* -------- flight-mode planet (cosmetic, floating-origin) -------- */
+const flightGroup = new THREE.Group();
+flightGroup.visible = false;
+scene.add(flightGroup);
+const PR = 3400;                       // rendered planet radius (units)
+const planetMesh = new THREE.Mesh(
+  new THREE.SphereGeometry(PR, 64, 48),
+  new THREE.MeshStandardMaterial({color:0x2f6d3f, roughness:1, metalness:0, flatShading:false})
+);
+// simple continents via vertex color noise
+{
+  const g = planetMesh.geometry; const pos = g.attributes.position;
+  const colors = new Float32Array(pos.count*3);
+  const cOcean = new THREE.Color(0x1c4f8a), cLand=new THREE.Color(0x3f7d43), cSnow=new THREE.Color(0xcfe0e8);
+  for(let i=0;i<pos.count;i++){
+    const x=pos.getX(i)/PR,y=pos.getY(i)/PR,z=pos.getZ(i)/PR;
+    const n = Math.sin(x*7)*Math.cos(z*6)+Math.sin(y*5+z*3)*0.7+Math.sin(x*13+y*4)*0.4;
+    let c = n>0.25? cLand : cOcean;
+    if(Math.abs(y)>0.8) c = cSnow;
+    colors[i*3]=c.r; colors[i*3+1]=c.g; colors[i*3+2]=c.b;
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(colors,3));
+  planetMesh.material.vertexColors = true;
+}
+flightGroup.add(planetMesh);
+// atmosphere shell
+const atmoMesh = new THREE.Mesh(new THREE.SphereGeometry(PR*1.06,48,32),
+  new THREE.MeshBasicMaterial({color:0x5aa9ff, transparent:true, opacity:0.14, side:THREE.BackSide}));
+flightGroup.add(atmoMesh);
+
+// exhaust particle system
+const EXH_N = 260;
+const exhGeo = new THREE.BufferGeometry();
+const exhPos = new Float32Array(EXH_N*3);
+const exhVel = new Float32Array(EXH_N*3);
+const exhLife = new Float32Array(EXH_N);
+exhGeo.setAttribute('position', new THREE.BufferAttribute(exhPos,3));
+const exhaust = new THREE.Points(exhGeo, new THREE.PointsMaterial({
+  color:0xffb057, size:0.5, transparent:true, opacity:0.9, blending:THREE.AdditiveBlending, depthWrite:false}));
+rocketGroup.add(exhaust);
+let exhEnabled = false;
+
+/* =====================================================================
+   PART MESH FACTORY
+   ===================================================================== */
+function makeMat(col, opts={}){
+  return new THREE.MeshStandardMaterial({color:col, metalness:opts.metal??0.55, roughness:opts.rough??0.5,
+    emissive:opts.emis??0x000000, emissiveIntensity:opts.emisI??0});
+}
+function buildPartMesh(def){
+  const g = new THREE.Group();
+  const mat = makeMat(def.col);
+  if(def.shape==='cone'){
+    const m=new THREE.Mesh(new THREE.CylinderGeometry(def.r*0.45, def.r, def.h, 24), mat);
+    g.add(m);
+    const win=new THREE.Mesh(new THREE.SphereGeometry(def.r*0.22,12,12), makeMat(0x1b2838,{metal:0.1,rough:0.1,emis:0x0a1420,emisI:0.4}));
+    win.position.set(0, def.h*0.05, def.r*0.55); win.scale.z=0.4; g.add(win);
+  } else if(def.shape==='nozzle'){
+    const body=new THREE.Mesh(new THREE.CylinderGeometry(def.r*0.85, def.r*0.7, def.h*0.55, 20), mat);
+    body.position.y=def.h*0.22; g.add(body);
+    const bell=new THREE.Mesh(new THREE.CylinderGeometry(def.r*0.35, def.r*0.9, def.h*0.5, 20, 1, true),
+      makeMat(0x3a3d44,{metal:0.9,rough:0.35}));
+    bell.position.y=-def.h*0.22; bell.material.side=THREE.DoubleSide; g.add(bell);
+  } else if(def.shape==='fin'){
+    const shape=new THREE.Shape();
+    shape.moveTo(0,0); shape.lineTo(def.r,-def.h*0.4); shape.lineTo(def.r,-def.h); shape.lineTo(0,-def.h*0.7); shape.lineTo(0,0);
+    const geo=new THREE.ExtrudeGeometry(shape,{depth:0.04, bevelEnabled:false});
+    const m=new THREE.Mesh(geo, mat); m.position.z=-0.02; g.add(m);
+  } else {
+    // cyl
+    const seg = def.cat==='fuel'? 24:20;
+    const m=new THREE.Mesh(new THREE.CylinderGeometry(def.r, def.r, def.h, seg), mat);
+    g.add(m);
+    if(def.cat==='fuel'){
+      const band=new THREE.Mesh(new THREE.CylinderGeometry(def.r*1.02, def.r*1.02, def.h*0.08, seg),
+        makeMat(0x333842,{metal:0.7,rough:0.4}));
+      band.position.y=def.h*0.32; g.add(band);
+      const band2=band.clone(); band2.position.y=-def.h*0.32; g.add(band2);
+    }
+    if(def.chute){
+      m.material = makeMat(0x9aa4b2,{metal:0.4});
+      const cap=new THREE.Mesh(new THREE.SphereGeometry(def.r,16,10,0,Math.PI*2,0,Math.PI/2), makeMat(def.col));
+      cap.position.y=def.h*0.5; g.add(cap);
+    }
+  }
+  return g;
+}
+
+/* =====================================================================
+   BUILD STATE
+   stack: array of {id, def, mesh}  ordered TOP -> BOTTOM (index0 = top)
+   radials: array of {id, def, count, meshes}  attached radially near bottom
+   ===================================================================== */
+const build = {
+  stack: [],            // vertical stack, top first
+  radials: [],          // radial groups (boosters/fins)
+  symmetry: 1,
+  activeCat: 'pod',
+};
+
+function partStats(){
+  // compute mass, CoM, dv, twr, stability
+  // Lay out stack along +Y from bottom.  Bottom of stack at y=0 going up.
+  let totalH = build.stack.reduce((s,p)=>s+p.def.h, 0);
+  let y = totalH;                      // top
+  let mass = 0, moment = 0;            // tonnes
+  let crew = 0;
+  const positions = [];
+  for(const p of build.stack){
+    const cy = y - p.def.h/2;          // center height of this part
+    const m = p.def.dry + (p.def.fuel||0) + (p.def.solid||0);
+    mass += m; moment += m*cy; crew += p.def.crew||0;
+    positions.push({p, cy});
+    y -= p.def.h;
+  }
+  // radials attach near bottom third
+  let radialArea = 0, radialCoP = 0, finArea=0, finCoP=0;
+  for(const r of build.radials){
+    const attachY = totalH*0.28;
+    const m = (r.def.dry + (r.def.solid||0)) * r.count;
+    mass += m; moment += m*attachY;
+    if(r.def.fin){ finArea += r.def.r*r.def.h*r.count; finCoP += attachY*r.def.r*r.def.h*r.count; }
+  }
+  const com = mass>0 ? moment/mass : 0;
+
+  // center of pressure (drag centroid) — body ~ geometric mid, fins pull down
+  let bodyArea = 0, bodyCoP = 0;
+  for(const {p,cy} of positions){ const a=p.def.r*p.def.h; bodyArea+=a; bodyCoP+=cy*a; }
+  const cop = (bodyArea+finArea)>0 ? (bodyCoP+finCoP)/(bodyArea+finArea) : com;
+  // stability margin: positive when CoP is BELOW CoM (stable weathervane)
+  const stab = com - cop;               // >0 stable
+
+  // Δv & TWR from staging
+  const stages = computeStages();
+  let dv = 0, launchTWR = 0;
+  let m0 = mass;                        // running mass from top? we compute per stage bottom-up
+  // Δv: sum over stages using rocket eqn.  Process stages in FIRE ORDER.
+  // Build mass-at-ignition for each stage.
+  const dvInfo = stageDeltaV(stages, mass);
+  dv = dvInfo.totalDV;
+  launchTWR = dvInfo.launchTWR;
+
+  return {mass, com, cop, stab, crew, dv, launchTWR, totalH, stages, dvInfo};
+}
+
+/* ---------- STAGING ----------
+   Determine fire order.  Model:
+   - radial boosters (if any) fire FIRST (stage 0), then decouple.
+   - stack sections separated by decouplers; bottom-most powered section fires next.
+   - after each section burns out -> decouple below it, ignite next engine up.
+   - parachute deploys LAST.
+   Returns array of stage objects (fire order index 0 first):
+     {kind:'boosters'|'burn'|'chute', engines:[], fuelKg, thrust, ispV, ispS, jettison:[]}
+   ------------------------------------------------------------------- */
+function computeStages(){
+  const stages = [];
+  // --- boosters ---
+  const boosterGroup = build.radials.filter(r=>r.def.solid);
+  if(boosterGroup.length){
+    let fuel=0, thrust=0, ispV=0, ispS=0, tw=0;
+    for(const r of boosterGroup){
+      const n=r.count; fuel+=(r.def.solid)*n; thrust+=r.def.thrust*n;
+      ispV=r.def.ispV; ispS=r.def.ispS;
+    }
+    stages.push({kind:'boosters', label:`Ignite ${boosterGroup.reduce((s,r)=>s+r.count,0)}× solid booster`,
+      fuelKg:fuel*1000, thrust:thrust, ispV, ispS, source:boosterGroup});
+    stages.push({kind:'decouple', label:'Jettison spent boosters', target:'boosters'});
+  }
+  // --- stack sections (bottom -> up) ---
+  // walk from bottom, group tanks feeding the lowest engine until a decoupler.
+  const s = build.stack;               // top..bottom
+  // find engine indices from bottom
+  let i = s.length-1;
+  const consumed = new Array(s.length).fill(false);
+  while(i>=0){
+    // skip already handled non-engine bottom parts until engine or top
+    if(!s[i] || s[i].def.cat!=='engine'){
+      // could be a decoupler or tank at very bottom w/o engine; just move up
+      // but if it's a decoupler at bottom, it's a section boundary
+      i--; continue;
+    }
+    // engine at i: gather engines at this level (adjacent engines) + fuel above until decoupler
+    const engines=[s[i]];
+    // fuel: scan upward from i-1 collecting tanks until decoupler/engine/top
+    let fuelKg=0; let j=i-1; let jettisonTopIdx=i;
+    while(j>=0){
+      const d=s[j].def;
+      if(d.decoupler){ break; }
+      if(d.cat==='engine'){ break; }
+      if(d.fuel){ fuelKg += d.fuel*1000; }
+      j--;
+    }
+    let thrust=0,ispV=0,ispS=0;
+    for(const e of engines){ thrust+=e.def.thrust; ispV=e.def.ispV; ispS=e.def.ispS; }
+    const tankIdxs=[]; for(let k=j+1;k<i;k++){ if(s[k].def.fuel) tankIdxs.push(k); }
+    stages.push({kind:'burn', label:`Ignite ${engines[0].def.name}`, engines,
+      fuelKg, thrust, ispV, ispS, sectionTop:j+1, sectionBottom:i, tankIdxs});
+    // decoupler below section? if there is a decoupler above this section, next stage decouples it
+    if(j>=0 && s[j].def.decoupler){
+      stages.push({kind:'decouple', label:'Decouple spent stage', decouplerIdx:j, dropFrom:j});
+      i=j-1;
+    } else {
+      i=j;  // continue upward (no decoupler -> next engine feeds from same? treat as separate)
+    }
+  }
+  // --- parachute ---
+  const chute = s.find(p=>p.def.chute);
+  if(chute) stages.push({kind:'chute', label:'Deploy parachute', target:'chute'});
+  return stages;
+}
+
+// Δv via Tsiolkovsky, simulating the fire order with an explicit active-part model
+// so that jettisoned dry mass is correctly removed between stages.
+function stageDeltaV(stages, totalMassT){
+  const s = build.stack;
+  // live fuel per stack index (kg), and active flags
+  const fuel = s.map(p=>(p.def.fuel||0)*1000 + (p.def.solid||0)*1000);
+  const active = s.map(()=>true);
+  const radialActive = build.radials.map(()=>true);
+  const massOf = ()=>{
+    let m=0;
+    for(let k=0;k<s.length;k++){ if(active[k]) m += s[k].def.dry*1000 + fuel[k]; }
+    for(let k=0;k<build.radials.length;k++){ if(radialActive[k]){ const r=build.radials[k];
+      m += r.def.dry*1000*r.count + (r.def.solid||0)*1000*r.count; } }
+    return m;
+  };
+  let totalDV=0, launchTWR=0; const perStage=[]; let firstBurn=true;
+  let radialSolidLeft = build.radials.map(r=>(r.def.solid||0)*1000*r.count);
+
+  for(const st of stages){
+    if(st.kind==='burn'){
+      const m0 = massOf();
+      const m1 = m0 - st.fuelKg;
+      if(st.fuelKg>0 && m1>0){
+        totalDV += st.ispV*G0*Math.log(m0/m1);
+        perStage.push({label:st.label, dv:st.ispV*G0*Math.log(m0/m1), twr:(st.thrust*1000)/(m0*G0)});
+      }
+      // empty this stage's tanks
+      for(const ti of (st.tankIdxs||[])) fuel[ti]=0;
+      if(firstBurn){ launchTWR=(st.thrust*(st.ispS/st.ispV)*1000)/(m0*G0); firstBurn=false; }
+    } else if(st.kind==='boosters'){
+      const m0=massOf();
+      const m1=m0-st.fuelKg;
+      if(st.fuelKg>0 && m1>0){ totalDV += st.ispV*G0*Math.log(m0/m1);
+        perStage.push({label:st.label, dv:st.ispV*G0*Math.log(m0/m1), twr:(st.thrust*1000)/(m0*G0)}); }
+      for(let k=0;k<build.radials.length;k++){ if(build.radials[k].def.solid){ /* emptied */ } }
+      if(firstBurn){ launchTWR=(st.thrust*(st.ispS/st.ispV)*1000)/(m0*G0); firstBurn=false; }
+    } else if(st.kind==='decouple'){
+      if(st.target==='boosters'){ for(let k=0;k<build.radials.length;k++){ if(build.radials[k].def.solid) radialActive[k]=false; } }
+      else if(st.decouplerIdx!=null){
+        for(let k=st.decouplerIdx;k<s.length;k++){ if(s[k].def.cat!=='pod') active[k]=false; }
+      }
+    }
+  }
+  return {totalDV, launchTWR, perStage};
+}
+
+/* ---------- rebuild 3D stack + stats UI ---------- */
+function rebuildRocketMesh(){
+  // clear
+  while(rocketGroup.children.length){
+    const c=rocketGroup.children.pop();
+    if(c===exhaust){ /* keep */ }
+    else { if(c.geometry) c.geometry.dispose?.(); rocketGroup.remove(c); }
+  }
+  rocketGroup.add(exhaust);
+  const totalH = build.stack.reduce((s,p)=>s+p.def.h,0);
+  let y = totalH;                       // top
+  for(const p of build.stack){
+    const mesh = buildPartMesh(p.def);
+    mesh.position.y = y - p.def.h/2;
+    p.mesh = mesh; rocketGroup.add(mesh);
+    y -= p.def.h;
+  }
+  // radials
+  for(const r of build.radials){
+    r.meshes=[];
+    const attachY = totalH*0.28;
+    const bodyR = 0.7;                  // approx main radius
+    for(let k=0;k<r.count;k++){
+      const ang = (k/r.count)*Math.PI*2;
+      const mesh = buildPartMesh(r.def);
+      const rr = bodyR + r.def.r*0.6;
+      mesh.position.set(Math.cos(ang)*rr, r.def.fin? attachY: attachY, Math.sin(ang)*rr);
+      if(r.def.fin){ mesh.rotation.y = -ang + Math.PI/2; mesh.position.y = totalH*0.06; }
+      mesh.rotation.z = 0;
+      r.meshes.push(mesh); rocketGroup.add(mesh);
+    }
+  }
+  // center rocket so CoM area near pad; keep bottom at y=0 in build
+  rocketGroup.position.set(0,0,0);
+}
+
+function refreshStatsUI(){
+  const st = partStats();
+  document.getElementById('sMass').textContent = st.mass.toFixed(2)+' t';
+  document.getElementById('sParts').textContent = build.stack.length + build.radials.reduce((s,r)=>s+r.count,0);
+  document.getElementById('sCrew').textContent = st.crew;
+  // TWR
+  const twrEl=document.getElementById('sTWR'), bar=document.getElementById('sTWRbar'), note=document.getElementById('sTWRnote');
+  if(st.launchTWR>0){
+    twrEl.textContent = st.launchTWR.toFixed(2);
+    bar.style.width = clamp(st.launchTWR/2.5*100,0,100)+'%';
+    if(st.launchTWR<1){ twrEl.className='v mono val-bad'; bar.style.background='var(--bad)'; note.textContent='Too heavy — won\'t lift off!'; note.className='twr-note val-bad'; }
+    else if(st.launchTWR<1.3){ twrEl.className='v mono val-warn'; bar.style.background='var(--warn)'; note.textContent='Sluggish liftoff — aim for 1.4–1.8'; note.className='twr-note val-warn'; }
+    else if(st.launchTWR>2.2){ twrEl.className='v mono val-warn'; bar.style.background='var(--warn)'; note.textContent='Very high — you\'ll fight drag. ~1.5 ideal'; note.className='twr-note val-warn'; }
+    else { twrEl.className='v mono val-good'; bar.style.background='var(--good)'; note.textContent='Good liftoff thrust ✓'; note.className='twr-note val-good'; }
+  } else { twrEl.textContent='—'; twrEl.className='v mono'; bar.style.width='0%'; note.textContent='Add an engine & fuel'; note.className='twr-note dim'; }
+  // Δv
+  document.getElementById('sDV').textContent = Math.round(st.dv)+' m/s';
+  const dvEl=document.getElementById('sDVbar'); dvEl.style.width=clamp(st.dv/3400*100,0,100)+'%';
+  dvEl.style.background = st.dv>=3400? 'var(--good)': st.dv>=2000? 'var(--warn)':'var(--accent)';
+  // stability
+  const stabEl=document.getElementById('sStab');
+  if(build.stack.length<2){ stabEl.textContent='—'; stabEl.className='v mono'; }
+  else if(st.stab>0.15){ stabEl.textContent='Stable ✓'; stabEl.className='v mono val-good'; }
+  else if(st.stab>-0.2){ stabEl.textContent='Marginal'; stabEl.className='v mono val-warn'; }
+  else { stabEl.textContent='Unstable — add fins!'; stabEl.className='v mono val-bad'; }
+  // CoM marker position (in build coords: bottom at y=0)
+  comMarker.position.set(0, st.com, 0);
+  comMarker.visible = build.stack.length>0;
+  // staging list
+  renderStageList(st.stages);
+}
+
+function renderStageList(stages){
+  const el=document.getElementById('stageList'); el.innerHTML='';
+  stages.forEach((s,idx)=>{
+    const d=document.createElement('div'); d.className='stage';
+    let icon = s.kind==='chute'?'🪂': s.kind==='decouple'?'✂️': s.kind==='boosters'?'🧨':'🔥';
+    d.innerHTML=`<div class="num">${idx}</div><div class="desc">${icon} ${s.label}</div>`;
+    el.appendChild(d);
+  });
+  if(!stages.length){ el.innerHTML='<div class="dim" style="font-size:11px">No stages yet — add engines, decouplers & a parachute.</div>'; }
+}
+
+/* ---------- catalog UI ---------- */
+function renderCatalog(){
+  const tabs=document.getElementById('catTabs'); tabs.innerHTML='';
+  CATS.forEach(c=>{
+    const t=document.createElement('div'); t.className='cat-tab'+(c.id===build.activeCat?' active':'');
+    t.textContent=c.label; t.onclick=()=>{ build.activeCat=c.id; renderCatalog(); };
+    tabs.appendChild(t);
+  });
+  const list=document.getElementById('partList'); list.innerHTML='';
+  Object.entries(PARTS).filter(([id,d])=>d.cat===build.activeCat).forEach(([id,d])=>{
+    const el=document.createElement('div'); el.className='part';
+    let stat='';
+    if(d.cat==='engine') stat=`${d.thrust} kN · Isp ${d.ispS}/${d.ispV}s`;
+    else if(d.cat==='fuel') stat=`${d.fuel} t fuel · ${d.dry} t dry`;
+    else if(d.cat==='booster') stat=`${d.thrust} kN · ${d.solid} t solid`;
+    else if(d.cat==='pod') stat=`${d.dry} t · ${d.crew} crew`;
+    else stat=`${d.dry} t${d.chute?' · parachute':d.fin?' · aero fin':d.ablator?' · ablator':d.decoupler?' · separator':''}`;
+    const color='#'+d.col.toString(16).padStart(6,'0');
+    el.innerHTML=`<div class="ic" style="background:${color}22;border:1px solid ${color}55">${CAT_ICON[d.cat]}</div>
+      <div><div class="nm">${d.name}</div><div class="st">${stat}</div></div>`;
+    el.onclick=()=>addPart(id);
+    list.appendChild(el);
+  });
+}
+
+function addPart(id){
+  const def=PARTS[id];
+  if(def.radial || def.cat==='booster' && build.symmetry>1 || (def.cat==='booster')){
+    // radial candidates: fins always radial; boosters radial if symmetry>1, else stack
+    if(def.fin || (def.cat==='booster')){
+      // boosters can be stacked (sym 1) or radial (sym>1). Fins always radial.
+      if(def.fin || build.symmetry>1){
+        build.radials.push({id, def, count:def.fin?Math.max(2,build.symmetry):build.symmetry});
+        commitBuild(); return;
+      }
+    }
+  }
+  // otherwise stack at bottom (append)
+  build.stack.push({id, def});
+  commitBuild();
+}
+function commitBuild(){ rebuildRocketMesh(); refreshStatsUI(); frameBuildCamera(); }
+
+document.getElementById('btnUndo').onclick=()=>{
+  if(build.radials.length && build.stack.length===0){ build.radials.pop(); }
+  else if(build.stack.length){ build.stack.pop(); }
+  else if(build.radials.length){ build.radials.pop(); }
+  commitBuild();
+};
+document.getElementById('btnClear').onclick=()=>{ build.stack=[]; build.radials=[]; commitBuild(); };
+document.querySelectorAll('#symSel .s').forEach(s=>{
+  s.onclick=()=>{ document.querySelectorAll('#symSel .s').forEach(x=>x.classList.remove('on')); s.classList.add('on'); build.symmetry=+s.dataset.s; };
+});
+
+/* ---------- build camera framing ---------- */
+let buildCamTarget = new THREE.Vector3(0,3,0);
+function frameBuildCamera(){
+  const h = Math.max(4, build.stack.reduce((s,p)=>s+p.def.h,0));
+  buildCamTarget.set(0, h*0.5, 0);
+}
+let buildCamAngle = 0.5, buildCamDist = 14, buildCamHeight=0;
+function updateBuildCamera(dt){
+  buildCamAngle += dt*0.12;
+  const h = Math.max(5, build.stack.reduce((s,p)=>s+p.def.h,0));
+  const dist = clamp(h*1.4+6, 10, 40);
+  camera.position.set(Math.sin(buildCamAngle)*dist, buildCamTarget.y+h*0.15, Math.cos(buildCamAngle)*dist);
+  camera.lookAt(buildCamTarget);
+}
+
+/* =====================================================================
+   FLIGHT SIMULATION
+   2D physics in the launch plane (planet-centered). Rendered cosmetically.
+   pos, vel are Vector2 (x=east tangential ref, y up) in planet frame.
+   We use polar-ish: pos vector from planet center.
+   ===================================================================== */
+const flight = {
+  active:false,
+  pos:new THREE.Vector2(),      // m, from planet center
+  vel:new THREE.Vector2(),      // m/s
+  angle:0,                      // ship nose direction (rad), 0 = local up
+  omega:0,                      // angular velocity rad/s
+  throttle:0,
+  met:0,
+  warp:1,
+  sas:false, sasHold:'off',     // 'off'|'stab'|'prograde'
+  parts:[],                     // runtime part instances
+  radials:[],
+  stages:[], stageIdx:-1,
+  activeEngines:[],
+  crewAlive:true,
+  dead:false, landed:false,
+  maxAlt:0,
+  ablator:0, ablatorMax:0,
+  skinTemp:290, // K
+  heatShield:null,
+  chute:null, chuteState:'stowed', // stowed|armed|deployed|ripped
+  gforce:1,
+  objSpace:false, objOrbit:false, objReturn:false,
+  airborne:false, flameoutWarned:false, curStageFuelMax:0,
+};
+
+function totalStackHeightM(){ return build.stack.reduce((s,p)=>s+p.def.h,0); }
+
+function startFlight(){
+  const st = partStats();
+  if(build.stack.length===0){ flash('Build a rocket first!'); return; }
+  const hasEngine = build.stack.some(p=>p.def.cat==='engine') || build.radials.some(r=>r.def.solid);
+  if(!hasEngine){ flash('No engines — add propulsion!'); return; }
+  // set up runtime
+  flight.active=true; flight.dead=false; flight.landed=false;
+  flight.met=0; flight.warp=1; flight.throttle=0; flight.omega=0; flight.angle=0;
+  flight.sas=false; flight.sasHold='off'; flight.crewAlive=true; flight.maxAlt=0;
+  flight.skinTemp=290; flight.gforce=1;
+  flight.objSpace=flight.objOrbit=flight.objReturn=false;
+  flight.airborne=false; flight.flameoutWarned=false; flight.curStageFuelMax=0;
+  // start on surface: r = R, at "equator", moving east at surface speed
+  flight.pos.set(0, PLANET.R+ (totalStackHeightM()/2));
+  flight.vel.set(PLANET.surfV, 0);      // eastward tangential
+  // runtime parts (deep-ish copy tracking fuel & jettison)
+  flight.parts = build.stack.map((p,i)=>({idx:i, def:p.def, mesh:p.mesh, fuel:(p.def.fuel||0)*1000, solid:(p.def.solid||0)*1000, jettisoned:false, ignited:false}));
+  flight.radials = build.radials.map(r=>({def:r.def, count:r.count, meshes:r.meshes, solid:(r.def.solid||0)*1000*r.count, jettisoned:false, ignited:false}));
+  flight.stages = computeStages();
+  flight.stageIdx = -1;
+  flight.activeEngines=[];
+  // heat shield / chute refs
+  const hs = flight.parts.find(p=>p.def.ablator);
+  flight.heatShield = hs || null; flight.ablatorMax = hs? hs.def.ablator*1000:0; flight.ablator=flight.ablatorMax;
+  const ch = flight.parts.find(p=>p.def.chute);
+  flight.chute = ch||null; flight.chuteState = ch? 'stowed':'none';
+  flight.stab0 = st.stab;
+
+  // switch UI + scene
+  document.getElementById('buildUI').classList.add('hidden');
+  document.getElementById('flightUI').classList.remove('hidden');
+  buildGroup.visible=false; flightGroup.visible=true; comMarker.visible=false;
+  hideBanner();
+  // orient rocket upright, place at render origin
+  rocketGroup.rotation.set(0,0,0);
+  rebuildRocketMesh();
+  refreshFlightStageUI();
+  flash('Liftoff clear — press Z for full throttle, then Space to stage', 2600);
+}
+
+function revertToBuild(){
+  flight.active=false;
+  document.getElementById('flightUI').classList.add('hidden');
+  document.getElementById('buildUI').classList.remove('hidden');
+  document.getElementById('mapView').classList.add('hidden');
+  buildGroup.visible=true; flightGroup.visible=false;
+  exhEnabled=false;
+  // restore all part meshes visible
+  rebuildRocketMesh(); refreshStatsUI();
+  hideBanner();
+}
+document.getElementById('btnRevert').onclick=revertToBuild;
+
+/* ---------- current mass / active thrust ---------- */
+function currentMassKg(){
+  let m=0;
+  for(const p of flight.parts){ if(p.jettisoned) continue; m += p.def.dry*1000 + p.fuel + p.solid; }
+  for(const r of flight.radials){ if(r.jettisoned) continue; m += r.def.dry*1000*r.count + r.solid; }
+  // ablator loss reduces heat shield mass a touch
+  if(flight.heatShield && !flight.heatShield.jettisoned) m -= (flight.ablatorMax - flight.ablator);
+  return Math.max(1, m);
+}
+function currentCoMoffset(){
+  // offset of CoM from geometric attach reference — used for control arm; approx via mass distribution
+  return 0;
+}
+
+/* ---------- advance one physics substep ---------- */
+function physStep(dt){
+  const f = flight;
+  const r = f.pos.length();
+  const alt = r - PLANET.R;
+  f.maxAlt = Math.max(f.maxAlt, alt);
+  const mass = currentMassKg();
+  const speed = f.vel.length();
+
+  // gravity (toward center)
+  const gMag = PLANET.GM / (r*r);
+  const grav = f.pos.clone().multiplyScalar(-gMag/r);   // vector
+
+  // local up unit
+  const up = f.pos.clone().normalize();
+  // ship nose direction: rotate 'up' by angle around plane (angle from local vertical, +east tilt)
+  const east = new THREE.Vector2(up.y, -up.x);           // 90° clockwise -> east tangent
+  const nose = up.clone().multiplyScalar(Math.cos(f.angle)).add(east.clone().multiplyScalar(Math.sin(f.angle)));
+
+  // air-relative velocity: the atmosphere co-rotates with the planet, so on the pad
+  // airspeed ≈ 0 even though inertial speed = surface rotation (~175 m/s east).
+  // ALL aerodynamics (drag, dynamic pressure, weathervaning, heating, landing) use this.
+  const Omega = PLANET.surfV / PLANET.R;                  // planet angular rate
+  const airVel = east.clone().multiplyScalar(Omega * r); // local air velocity (eastward)
+  const vAirVec = f.vel.clone().sub(airVel);
+  const airspeed = vAirVec.length();
+
+  // ---- thrust ----
+  const rho = densityAt(alt);
+  let thrustN = 0, ispEff = 300;
+  let burning = false;
+  if(f.throttle>0){
+    let totThrust=0, wsum=0, mdotDen=0;
+    for(const e of f.activeEngines){
+      // has fuel?
+      let hasFuel=false, ispV=e.def.ispV, ispS=e.def.ispS, thr=e.def.thrust*1000;
+      if(e.kind==='booster'){ if(e.ref.solid>0) hasFuel=true; }
+      else { if(e.fuelSource && e.fuelSource.some(t=>t.fuel>0)) hasFuel=true; }
+      if(!hasFuel) continue;
+      const ispE = ispV + (ispS-ispV)*clamp(rho/PLANET.rho0,0,1);
+      const thrE = thr * (ispE/ispV);
+      totThrust += thrE; wsum += thrE; mdotDen += thrE/(ispE*G0);
+    }
+    if(totThrust>0){
+      burning=true;
+      thrustN = totThrust * f.throttle;
+      const mdot = mdotDen * f.throttle;           // kg/s
+      // consume fuel
+      consumeFuel(mdot*dt);
+    }
+  }
+  exhEnabled = burning;
+  // flameout: engines lit & throttle up but no fuel -> prompt to stage
+  if(f.throttle>0 && f.activeEngines.length>0 && !burning){
+    if(!f.flameoutWarned && f.stageIdx+1<f.stages.length){
+      flash('⛽ Flameout — press <kbd>Space</kbd> to stage', 2600); f.flameoutWarned=true;
+    }
+  } else if(burning){ f.flameoutWarned=false; }
+
+  // ---- drag (air-relative) ----
+  let dragAccel = new THREE.Vector2();
+  const Q = 0.5*rho*airspeed*airspeed;             // dynamic pressure (Pa)
+  if(rho>0 && airspeed>1){
+    // frontal area from max radius; chute adds huge area when deployed
+    let maxR=0; for(const p of flight.parts){ if(!p.jettisoned) maxR=Math.max(maxR,p.def.r); }
+    for(const r2 of flight.radials){ if(!r2.jettisoned) maxR=Math.max(maxR, 0.9); }
+    let area = Math.PI*maxR*maxR;
+    let Cd = 0.22;
+    // angle of attack increases effective drag
+    const vDir = vAirVec.clone().normalize();
+    const aoaDrag = Math.acos(clamp(nose.dot(vDir),-1,1));
+    Cd += Math.sin(aoaDrag)*Math.sin(aoaDrag)*1.1;   // side-on = more drag
+    if(f.chuteState==='deployed'){ area += 40; Cd += 1.0; }
+    const dragMag = Q*Cd*area / mass;
+    dragAccel = vDir.multiplyScalar(-dragMag);
+  }
+
+  // ---- integrate translation (semi-implicit Euler) ----
+  const thrustAccel = nose.clone().multiplyScalar(thrustN/mass);
+  const acc = grav.add(thrustAccel).add(dragAccel);
+  f.vel.add(acc.clone().multiplyScalar(dt));
+  f.pos.add(f.vel.clone().multiplyScalar(dt));
+
+  // g-force (felt accel = thrust+drag, excludes gravity)
+  const felt = thrustAccel.clone().add(dragAccel).length();
+  f.gforce = felt/G0;
+
+  // ---- rotational dynamics (weathervane about AIR-relative velocity) ----
+  // below ~1 m/s airspeed there's no aero direction; hold current attitude.
+  const vDir = airspeed>1 ? vAirVec.clone().normalize() : nose.clone();
+  const vAngle = Math.atan2(vDir.dot(east), vDir.dot(up));   // airflow angle in up/east frame
+  let aoa = f.angle - vAngle;
+  while(aoa>Math.PI) aoa-=2*Math.PI; while(aoa<-Math.PI) aoa+=2*Math.PI;
+  const I = mass * Math.pow(Math.max(2,totalStackHeightM())*0.5,2) * 0.35;  // moment of inertia approx
+  let torque = 0;
+  // aero torque: margin>0 restoring toward velocity, <0 destabilizing
+  const stab = f.stab0;
+  torque += -stab * Q * Math.sin(aoa) * 12.0;      // Nm-ish (scaled)
+  // player / SAS control
+  let ctrlAuth = 0;
+  for(const p of flight.parts){ if(!p.jettisoned) ctrlAuth += (p.def.torque||0); }
+  for(const rr of flight.radials){ if(!rr.jettisoned) ctrlAuth += (rr.def.torque||0)*rr.count; }
+  ctrlAuth *= 1000; // scale
+  // gimbal adds control when thrusting
+  if(burning) ctrlAuth *= 1.6;
+  let ctrlInput = input.pitch;  // -1..1
+  if(f.sas){
+    if(f.sasHold==='prograde'){
+      // steer toward prograde
+      let err = -aoa; ctrlInput = clamp(err*3 - f.omega*2, -1,1);
+    } else {
+      // stability assist: kill rotation
+      ctrlInput = clamp(input.pitch - f.omega*3, -1,1);
+    }
+  }
+  torque += ctrlInput * ctrlAuth;
+  // damping
+  torque += -f.omega * I * 0.6;
+  f.omega += torque/I * dt;
+  f.omega = clamp(f.omega, -2, 2);
+  f.angle += f.omega*dt;
+
+  // ---- heating ----
+  const heatFlux = rho * Math.pow(speed,3) * 1.7e-6;  // scaled
+  // heat shield protects if oriented retrograde (nose away from velocity -> shield at bottom faces flow)
+  const retro = Math.cos(aoa) < -0.3;                 // moving mostly backward-ish
+  if(heatFlux>0.5){
+    if(flight.heatShield && !flight.heatShield.jettisoned && flight.ablator>0 && retro){
+      flight.ablator -= heatFlux*dt*0.9;              // ablate
+      flight.skinTemp += (heatFlux*0.02 - (flight.skinTemp-290)*0.02)*dt;
+    } else {
+      flight.skinTemp += (heatFlux*0.08 - (flight.skinTemp-290)*0.02)*dt;
+    }
+  } else {
+    flight.skinTemp += -(flight.skinTemp-290)*0.05*dt;
+  }
+  if(flight.skinTemp>1400 && !flight.dead){
+    explode('BURNED UP ON REENTRY');
+  }
+
+  // ---- structural / aero failure (flip apart) ----
+  if(Q>25000 && Math.abs(aoa)>60*DEG && speed>200 && !flight.dead){
+    // ripping apart from shear when going sideways at high Q
+    explode('AERODYNAMIC FAILURE — ripped apart');
+  }
+
+  // ---- chute rip check ----
+  if(flight.chuteState==='deployed' && Q>18000){
+    flight.chuteState='ripped'; flash('Parachute ripped off — too fast!',2200);
+  }
+  // auto-full-deploy chute low & slow
+  if(flight.chuteState==='armed' && alt<3000 && Q<8000){ flight.chuteState='deployed'; flash('Parachute deployed!'); }
+
+  if(alt>100) flight.airborne=true;
+
+  // ---- ground contact (only once we've actually left the pad) ----
+  if(alt <= 0.5 && !flight.dead){
+    if(flight.airborne){           // came back down
+      const vLand = Math.abs(speed);
+      if(vLand < 8) landSuccess();
+      else explode('CRASHED — impact too hard ('+vLand.toFixed(0)+' m/s)');
+    }
+    // clamp to surface (resting on pad, or after landing)
+    f.pos.setLength(PLANET.R+0.5);
+    if(f.vel.dot(up)<0) f.vel.addScaledVector(up, -f.vel.dot(up));
+  }
+
+  // objectives
+  if(alt>PLANET.atmoTop && !flight.objSpace){ flight.objSpace=true; setObj('obj1',true); flash('🌌 You reached space!',2000); }
+  const orb = orbitElements();
+  if(orb.pe>PLANET.atmoTop && !flight.objOrbit){ flight.objOrbit=true; setObj('obj2',true); flash('🛰️ Stable orbit achieved!',2400); }
+  f.met += dt;
+}
+
+function consumeFuel(kg){
+  // drain from active engines' fuel sources (stack tanks), and boosters
+  let need=kg;
+  for(const e of flight.activeEngines){
+    if(need<=0) break;
+    if(e.kind==='booster'){
+      const take=Math.min(e.ref.solid, need); e.ref.solid-=take; need-=take;
+    } else if(e.fuelSource){
+      for(const t of e.fuelSource){
+        if(need<=0) break;
+        const take=Math.min(t.fuel, need); t.fuel-=take; need-=take;
+      }
+    }
+  }
+}
+
+/* ---------- staging (fire next) ---------- */
+function fireNextStage(){
+  const f=flight;
+  if(f.stageIdx+1 >= f.stages.length){ flash('No more stages'); return; }
+  f.stageIdx++;
+  const st = f.stages[f.stageIdx];
+  if(st.kind==='boosters'){
+    let solidMax=0;
+    for(const r of f.radials){ if(r.def.solid){ r.ignited=true; solidMax+=(r.def.solid||0)*1000*r.count;
+      f.activeEngines.push({kind:'booster', ref:r, def:r.def});
+    }}
+    f.curStageFuelMax=solidMax; f.flameoutWarned=false;
+    if(f.throttle===0) f.throttle=1;
+    flash('🧨 Boosters ignited!');
+  } else if(st.kind==='burn'){
+    // ignite engines in this stage, set fuel sources = tanks in section
+    const tanks=[];
+    for(let i=st.sectionTop; i<st.sectionBottom; i++){
+      const p=f.parts[i]; if(p && p.def.fuel) tanks.push(p);
+    }
+    for(const e of st.engines){
+      // find runtime part matching this engine def
+      const runtime = f.parts.find(p=>p.def===e.def && !p.jettisoned && !p.ignited);
+      if(runtime){ runtime.ignited=true; f.activeEngines.push({kind:'engine', def:e.def, fuelSource:tanks, ref:runtime}); }
+    }
+    f.curStageFuelMax = tanks.reduce((s,t)=>s+(t.def.fuel||0)*1000, 0);
+    f.flameoutWarned=false;
+    if(f.throttle===0) f.throttle=1;
+    flash('🔥 '+st.label);
+  } else if(st.kind==='decouple'){
+    // jettison spent stuff below
+    if(st.target==='boosters'){
+      for(const r of f.radials){ if(r.def.solid && !r.jettisoned){ r.jettisoned=true; r.meshes.forEach(m=>m.visible=false); } }
+      f.activeEngines=f.activeEngines.filter(e=>e.kind!=='booster');
+      flash('✂️ Boosters jettisoned');
+    } else if(st.decouplerIdx!=null){
+      // jettison everything from decouplerIdx downward that's spent
+      for(let i=st.decouplerIdx; i<f.parts.length; i++){
+        const p=f.parts[i]; if(p && !p.jettisoned && p.def.cat!=='pod'){ p.jettisoned=true; if(p.mesh)p.mesh.visible=false; }
+      }
+      f.activeEngines=f.activeEngines.filter(e=>!(e.ref&&e.ref.jettisoned));
+      flash('✂️ Stage decoupled');
+    }
+  } else if(st.kind==='chute'){
+    if(flight.chuteState==='stowed'||flight.chuteState==='none'){
+      flight.chuteState='armed';
+      const alt=flight.pos.length()-PLANET.R;
+      const Q=0.5*densityAt(alt)*flight.vel.lengthSq();
+      if(Q>18000){ flight.chuteState='ripped'; flash('🪂 Parachute ripped — deployed too fast!',2400); }
+      else flash('🪂 Parachute armed — will open when slow & low');
+    }
+  }
+  refreshFlightStageUI();
+}
+
+function refreshFlightStageUI(){
+  const f=flight;
+  document.getElementById('stageCur').textContent = (f.stageIdx+1)+'/'+f.stages.length;
+  const next = f.stages[f.stageIdx+1];
+  document.getElementById('stageNext').innerHTML = next
+    ? `<span class="dim">Next (Space):</span><br/>${stageIcon(next)} ${next.label}`
+    : `<span class="dim">All stages fired</span>`;
+  const fg=document.getElementById('fuelGauges'); fg.innerHTML='';
+  // CURRENT stage fuel (from active engines' sources) — tells you when to stage
+  let curNow=0, isSolid=false;
+  for(const e of f.activeEngines){
+    if(e.kind==='booster'){ curNow+=e.ref.solid; isSolid=true; }
+    else if(e.fuelSource){ for(const t of e.fuelSource) curNow+=t.fuel; }
+  }
+  if(f.curStageFuelMax>0 && f.activeEngines.length){
+    fg.appendChild(gauge(isSolid?'Stage solid fuel':'Stage fuel', curNow, f.curStageFuelMax, isSolid?'#e88b3a':'#ffb347'));
+  }
+  // total remaining across whole vehicle
+  let totNow=0, totMax=0;
+  for(const p of f.parts){ if(p.jettisoned) continue; totNow+=p.fuel; totMax+=(p.def.fuel||0)*1000; }
+  for(const r of f.radials){ if(r.jettisoned) continue; totNow+=r.solid; totMax+=(r.def.solid||0)*1000*r.count; }
+  if(totMax>0) fg.appendChild(gauge('Total remaining', totNow, totMax, '#5ad1ff'));
+}
+function stageIcon(s){ return s.kind==='chute'?'🪂': s.kind==='decouple'?'✂️': s.kind==='boosters'?'🧨':'🔥'; }
+function gauge(label,now,max,col){
+  const d=document.createElement('div');
+  const pct=clamp(now/max*100,0,100);
+  d.innerHTML=`<div style="display:flex;justify-content:space-between;font-size:10.5px" class="dim"><span>${label}</span><span>${Math.round(pct)}%</span></div>
+    <div class="bar"><i style="width:${pct}%;background:${col}"></i></div>`;
+  return d;
+}
+
+/* ---------- orbital elements (vis-viva) ---------- */
+function orbitElements(){
+  const f=flight, GM=PLANET.GM;
+  const r=f.pos.length(), v=f.vel.length();
+  const energy = v*v/2 - GM/r;
+  const a = -GM/(2*energy);                 // semi-major axis
+  // specific angular momentum (2D): h = x*vy - y*vx
+  const h = f.pos.x*f.vel.y - f.pos.y*f.vel.x;
+  const e = Math.sqrt(Math.max(0, 1 + (2*energy*h*h)/(GM*GM)));
+  let ap, pe;
+  if(energy<0){ ap=a*(1+e)-PLANET.R; pe=a*(1-e)-PLANET.R; }
+  else { ap=Infinity; pe=a*(1-e)-PLANET.R; }
+  return {a,e,ap,pe,energy,h,r,v};
+}
+
+/* ---------- death / success ---------- */
+function explode(reason){
+  if(flight.dead) return;
+  flight.dead=true; flight.crewAlive=false; exhEnabled=false;
+  // hide rocket, spawn debris burst via exhaust reuse
+  spawnExplosion();
+  showBanner('💥 Mission Failed', reason+'<br/><span class="dim">Max altitude: '+fmtAlt(flight.maxAlt)+'</span>',
+    [{label:'Return to VAB', cb:revertToBuild, primary:true}]);
+}
+function landSuccess(){
+  if(flight.dead||flight.landed) return;
+  flight.landed=true; flight.throttle=0; exhEnabled=false;
+  const wasOrbit=flight.objOrbit;
+  if(wasOrbit || flight.objSpace){ flight.objReturn=true; setObj('obj3',true); }
+  let msg = flight.objOrbit? 'Orbit → reentry → touchdown. A complete mission! 🏆'
+    : flight.objSpace? 'You reached space and landed safely.'
+    : 'Safe landing (didn\'t reach space this time).';
+  showBanner('🪂 Safe Landing!', msg+'<br/><span class="dim">Max altitude: '+fmtAlt(flight.maxAlt)+'</span>',
+    [{label:'Fly again', cb:revertToBuild, primary:true}]);
+}
+
+/* ---------- explosion particles ---------- */
+let exploding=false, exhMode='thrust';
+function spawnExplosion(){
+  exploding=true; exhMode='boom';
+  exhaust.material.color.set(0xff5522); exhaust.material.size=1.4;
+  for(let i=0;i<EXH_N;i++){
+    exhPos[i*3]=0; exhPos[i*3+1]=0; exhPos[i*3+2]=0;
+    const dir=new THREE.Vector3(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5).normalize().multiplyScalar(6+Math.random()*10);
+    exhVel[i*3]=dir.x; exhVel[i*3+1]=dir.y; exhVel[i*3+2]=dir.z; exhLife[i]=1;
+  }
+  rocketGroup.children.forEach(c=>{ if(c!==exhaust) c.visible=false; });
+}
+
+/* ---------- exhaust update ---------- */
+function updateExhaust(dt){
+  if(exhMode==='boom'){
+    for(let i=0;i<EXH_N;i++){
+      exhLife[i]-=dt*0.6;
+      exhPos[i*3]+=exhVel[i*3]*dt; exhPos[i*3+1]+=exhVel[i*3+1]*dt; exhPos[i*3+2]+=exhVel[i*3+2]*dt;
+      exhVel[i*3+1]-=dt*3;
+    }
+    exhaust.material.opacity=0.85;
+    exhGeo.attributes.position.needsUpdate=true;
+    return;
+  }
+  // thrust plume from bottom of rocket
+  const bottomY = 0; // rocket bottom
+  for(let i=0;i<EXH_N;i++){
+    if(exhEnabled && exhLife[i]<=0){
+      exhPos[i*3]=(Math.random()-0.5)*0.5; exhPos[i*3+1]=bottomY-0.2; exhPos[i*3+2]=(Math.random()-0.5)*0.5;
+      exhVel[i*3]=(Math.random()-0.5)*1.2; exhVel[i*3+1]=-6-Math.random()*6; exhVel[i*3+2]=(Math.random()-0.5)*1.2;
+      exhLife[i]=0.4+Math.random()*0.4;
+    }
+    if(exhLife[i]>0){
+      exhLife[i]-=dt;
+      exhPos[i*3]+=exhVel[i*3]*dt; exhPos[i*3+1]+=exhVel[i*3+1]*dt; exhPos[i*3+2]+=exhVel[i*3+2]*dt;
+    } else { exhPos[i*3+1]=9999; }
+  }
+  exhaust.material.color.set(0xffb057); exhaust.material.size=0.5; exhaust.material.opacity=0.9;
+  exhGeo.attributes.position.needsUpdate=true;
+}
+
+/* =====================================================================
+   FLIGHT RENDERING (cosmetic 3D, floating origin at rocket)
+   ===================================================================== */
+function updateFlightRender(){
+  const f=flight;
+  const r=f.pos.length(); const alt=r-PLANET.R;
+  // planet: put its surface directly "below" rocket along local up.
+  // In render space rocket is at origin; local up is +Y. Planet center at -PR*... below.
+  // We tilt the whole planet so the point under the ship is at bottom.
+  const altR = mapAltRender(alt);
+  planetMesh.position.set(0, -(PR+altR), 0);
+  atmoMesh.position.copy(planetMesh.position);
+  // rotate planet slowly for life + so continents move under us based on horizontal travel
+  const along = Math.atan2(f.pos.x, f.pos.y); // angle around planet
+  planetMesh.rotation.z = -along;
+  planetMesh.rotation.y = f.met*0.002;
+
+  // rocket orientation: tilt by current angle (nose from local up toward east)
+  rocketGroup.rotation.set(0,0,-f.angle);
+  rocketGroup.position.set(0,0,0);
+
+  // sky / background color by altitude
+  const t = clamp(alt/PLANET.atmoTop,0,1);
+  const skyLow=new THREE.Color(0x6fa8e6), skyHigh=new THREE.Color(0x05070d);
+  scene.background.copy(skyLow).lerp(skyHigh, Math.pow(t,0.6));
+  atmoMesh.material.opacity = 0.14*(1-t);
+  stars.material.opacity = clamp(t*1.3,0,0.9);
+
+  // camera: chase from side, slightly above, framing the rocket
+  const camDist = 12 + totalStackHeightM()*0.4;
+  camera.position.set(camDist*0.85, camDist*0.35, camDist*0.75);
+  camera.lookAt(0, totalStackHeightM()*0.2, 0);
+  // sun follows to keep lit
+  sun.position.set(camera.position.x+40, 80, camera.position.z+40);
+}
+function mapAltRender(alt){
+  // compress altitude so we always see ground curvature nicely
+  if(alt<2000) return 60 + alt*0.02;
+  return 100 + Math.log10(1+alt/1000)*260;
+}
+
+/* =====================================================================
+   NAVBALL / attitude indicator
+   ===================================================================== */
+const nb = document.getElementById('navball'), nbx = nb.getContext('2d');
+function drawNavball(){
+  const w=nb.width, h=nb.height, cx=w/2, cy=h/2, R=w/2-4;
+  nbx.clearRect(0,0,w,h);
+  const f=flight;
+  const r=f.pos.length(); const up=f.pos.clone().normalize();
+  const east=new THREE.Vector2(up.y,-up.x);
+  // horizon rotates with ship pitch (angle from vertical)
+  nbx.save(); nbx.translate(cx,cy);
+  // sky/ground disc
+  nbx.beginPath(); nbx.arc(0,0,R,0,Math.PI*2); nbx.clip();
+  // pitch = angle of nose above local horizon = 90° - angleFromUp? our angle is from up.
+  // Represent: rotate so "up" is top. Ship nose points at f.angle from up (east positive).
+  nbx.rotate(f.angle);
+  // draw sky (up half) and ground
+  nbx.fillStyle='#3a7bd5'; nbx.fillRect(-R,-R,2*R,R);
+  nbx.fillStyle='#6b4a2a'; nbx.fillRect(-R,0,2*R,R);
+  nbx.strokeStyle='rgba(255,255,255,0.6)'; nbx.lineWidth=2; nbx.beginPath(); nbx.moveTo(-R,0); nbx.lineTo(R,0); nbx.stroke();
+  // pitch ticks
+  nbx.fillStyle='rgba(255,255,255,0.55)'; nbx.font='9px monospace'; nbx.textAlign='center';
+  for(let p=-60;p<=60;p+=30){ if(p===0)continue; const yy=-p/90*R; nbx.fillRect(-14,yy-0.5,28,1); }
+  nbx.restore();
+  // fixed frame markers
+  nbx.save(); nbx.translate(cx,cy);
+  nbx.beginPath(); nbx.arc(0,0,R,0,Math.PI*2); nbx.strokeStyle='rgba(120,160,220,0.5)'; nbx.lineWidth=2; nbx.stroke();
+  // ship reference (fixed, pointing up = nose)
+  nbx.strokeStyle='#ffd24a'; nbx.lineWidth=3;
+  nbx.beginPath(); nbx.moveTo(-16,0); nbx.lineTo(-6,0); nbx.moveTo(6,0); nbx.lineTo(16,0); nbx.moveTo(0,-16); nbx.lineTo(0,-6); nbx.stroke();
+  // prograde marker (velocity direction relative to nose)
+  if(f.vel.length()>3){
+    const vDir=f.vel.clone().normalize();
+    const vAngle=Math.atan2(vDir.dot(east), vDir.dot(up)); // 0 = up
+    const rel = vAngle - f.angle;
+    const px=Math.sin(rel)*R*0.7, py=-Math.cos(rel)*R*0.7;
+    nbx.strokeStyle='#57e08a'; nbx.lineWidth=2;
+    nbx.beginPath(); nbx.arc(px,py,6,0,Math.PI*2);
+    nbx.moveTo(px-10,py); nbx.lineTo(px-6,py); nbx.moveTo(px+6,py); nbx.lineTo(px+10,py); nbx.moveTo(px,py-10);nbx.lineTo(px,py-6); nbx.stroke();
+  }
+  nbx.restore();
+}
+
+/* =====================================================================
+   MAP VIEW (2D orbit)
+   ===================================================================== */
+const mapC=document.getElementById('mapCanvas'), mx=mapC.getContext('2d');
+let mapOpen=false;
+function drawMap(){
+  const w=mapC.width,h=mapC.height,cx=w/2,cy=h/2;
+  mx.fillStyle='#070b14'; mx.fillRect(0,0,w,h);
+  const f=flight; const orb=orbitElements();
+  // scale: fit apoapsis (or current r) in view
+  const rNow=f.pos.length();
+  const rMax = Math.max(rNow, isFinite(orb.ap)? orb.ap+PLANET.R : rNow*1.5, PLANET.R*1.3);
+  const scale = (Math.min(w,h)/2-40)/rMax;
+  // planet
+  mx.fillStyle='#2f6d3f'; mx.beginPath(); mx.arc(cx,cy,PLANET.R*scale,0,Math.PI*2); mx.fill();
+  mx.strokeStyle='rgba(90,169,255,0.35)'; mx.lineWidth=1.5;
+  mx.beginPath(); mx.arc(cx,cy,(PLANET.R+PLANET.atmoTop)*scale,0,Math.PI*2); mx.stroke();
+  // orbit ellipse (sampled)
+  if(orb.e<1 && orb.energy<0){
+    const a=orb.a, e=orb.e;
+    // orientation: argument from eccentricity vector; approximate using current pos & vel
+    // compute periapsis direction
+    const GM=PLANET.GM;
+    // eccentricity vector e_vec = ((v^2 - GM/r)*rvec - (r·v)vvec)/GM
+    const rv = f.pos.x*f.vel.x + f.pos.y*f.vel.y;
+    const v2=f.vel.lengthSq();
+    const ex=((v2-GM/rNow)*f.pos.x - rv*f.vel.x)/GM;
+    const ey=((v2-GM/rNow)*f.pos.y - rv*f.vel.y)/GM;
+    const argp=Math.atan2(ey,ex);
+    mx.strokeStyle='rgba(90,209,255,0.9)'; mx.lineWidth=2; mx.beginPath();
+    for(let th=0;th<=Math.PI*2+0.02;th+=0.03){
+      const rr=a*(1-e*e)/(1+e*Math.cos(th));
+      const ang=argp+th;
+      const X=cx + Math.cos(ang)*rr*scale;
+      const Y=cy - Math.sin(ang)*rr*scale;   // flip y for screen; note map frame vs sim frame
+      if(th===0)mx.moveTo(X,Y); else mx.lineTo(X,Y);
+    }
+    mx.stroke();
+    // Ap / Pe markers
+    const drawNode=(rr,ang,col,txt)=>{
+      const X=cx+Math.cos(ang)*rr*scale, Y=cy-Math.sin(ang)*rr*scale;
+      mx.fillStyle=col; mx.beginPath(); mx.arc(X,Y,5,0,Math.PI*2); mx.fill();
+      mx.fillStyle='#dfe8f7'; mx.font='11px monospace'; mx.fillText(txt, X+8, Y+3);
+    };
+    if(isFinite(orb.ap)) drawNode(a*(1+e), argp+Math.PI, '#57e08a', 'Ap '+fmtAlt(orb.ap));
+    drawNode(a*(1-e), argp, '#ffcf5a', 'Pe '+fmtAlt(orb.pe));
+  } else {
+    // escape / suborbital: just draw velocity vector
+  }
+  // ship position (map uses sim coords: x right, y up)
+  const sx=cx + f.pos.x*scale, sy=cy - f.pos.y*scale;
+  mx.fillStyle='#ffffff'; mx.beginPath(); mx.arc(sx,sy,4,0,Math.PI*2); mx.fill();
+  // velocity arrow
+  const vs=0.5; mx.strokeStyle='#57e08a'; mx.lineWidth=1.5;
+  mx.beginPath(); mx.moveTo(sx,sy); mx.lineTo(sx+f.vel.x*scale*30, sy-f.vel.y*scale*30); mx.stroke();
+  // labels
+  mx.fillStyle='#8a99b5'; mx.font='12px monospace';
+  mx.fillText('Ap: '+(isFinite(orb.ap)?fmtAlt(orb.ap):'escape'), 16, 24);
+  mx.fillText('Pe: '+fmtAlt(orb.pe), 16, 42);
+  mx.fillText('Alt: '+fmtAlt(rNow-PLANET.R), 16, 60);
+  mx.fillText('Spd: '+Math.round(orb.v)+' m/s', 16, 78);
+}
+
+/* =====================================================================
+   HUD UPDATE
+   ===================================================================== */
+function fmtAlt(m){
+  if(!isFinite(m)) return '∞';
+  if(Math.abs(m)>=1000) return (m/1000).toFixed(m>=100000?0:1)+' km';
+  return Math.round(m)+' m';
+}
+function updateHUD(){
+  const f=flight; const r=f.pos.length(); const alt=r-PLANET.R;
+  const up=f.pos.clone().normalize();
+  const vv=f.vel.dot(up);
+  const orb=orbitElements();
+  const Q=0.5*densityAt(alt)*f.vel.lengthSq();
+  document.getElementById('tAlt').textContent=fmtAlt(alt);
+  document.getElementById('tSpd').textContent=Math.round(f.vel.length())+' m/s';
+  document.getElementById('tVv').textContent=(vv>=0?'+':'')+Math.round(vv)+' m/s';
+  document.getElementById('tAp').textContent = isFinite(orb.ap)&&orb.ap>0? fmtAlt(orb.ap):'—';
+  document.getElementById('tPe').textContent = orb.pe>-PLANET.R? fmtAlt(orb.pe):'—';
+  document.getElementById('tQ').textContent = Math.round(Q)+' Pa';
+  const qEl=document.getElementById('tQ'); qEl.className='v mono'+(Q>20000?' val-bad':Q>12000?' val-warn':'');
+  document.getElementById('tG').textContent=f.gforce.toFixed(1)+' g';
+  const heatEl=document.getElementById('tHeat');
+  if(f.skinTemp>320){ heatEl.textContent=Math.round(f.skinTemp)+' K'; heatEl.className='v mono'+(f.skinTemp>1000?' val-bad':f.skinTemp>600?' val-warn':''); }
+  else { heatEl.textContent='nominal'; heatEl.className='v mono'; }
+  // throttle
+  document.getElementById('throttleFill').style.height=(f.throttle*100)+'%';
+  document.getElementById('thrLabel').textContent=Math.round(f.throttle*100)+'%';
+  // met
+  const tt=Math.max(0,f.met); const mm=String(Math.floor(tt/60)).padStart(2,'0'), ss=String(Math.floor(tt%60)).padStart(2,'0');
+  document.getElementById('tMET').textContent='T+ '+mm+':'+ss;
+  document.getElementById('tWarp').textContent=f.warp+'×';
+  document.getElementById('tSAS').textContent = f.sas? (f.sasHold==='prograde'?'PROGRADE':'ON'):'OFF';
+  document.getElementById('tSAS').className='v mono'+(f.sas?' val-good':'');
+  document.getElementById('tCrew').textContent = flight.crewAlive? (build.stack.reduce((s,p)=>s+(p.def.crew||0),0)+' alive'):'LOST';
+  document.getElementById('tCrew').className='v mono'+(flight.crewAlive?'':' val-bad');
+}
+function setObj(id,done){ document.getElementById(id).classList.toggle('done',done);
+  document.querySelector('#'+id+' .box').textContent = done?'✓':''; }
+
+/* =====================================================================
+   BANNERS / FLASH
+   ===================================================================== */
+const bannerEl=document.getElementById('banner');
+function showBanner(title, html, btns){
+  bannerEl.innerHTML=`<h1>${title}</h1><p>${html}</p>`;
+  (btns||[]).forEach(b=>{
+    const el=document.createElement('div'); el.className='btn'+(b.primary?' primary':''); el.textContent=b.label;
+    el.style.margin='16px 6px 0'; el.onclick=b.cb; bannerEl.appendChild(el);
+  });
+  bannerEl.classList.remove('hidden');
+}
+function hideBanner(){ bannerEl.classList.add('hidden'); }
+let flashTimer=null;
+function flash(msg, ms=1600){
+  const el=document.getElementById('warnFlash'); el.innerHTML=msg; el.style.opacity=1;
+  clearTimeout(flashTimer); flashTimer=setTimeout(()=>el.style.opacity=0, ms);
+}
+
+/* =====================================================================
+   INPUT
+   ===================================================================== */
+const input={pitch:0, keys:{}};
+addEventListener('keydown', e=>{
+  if(!flight.active) return;
+  const k=e.key.toLowerCase();
+  input.keys[k]=true;
+  if(k===' '){ e.preventDefault(); if(!flight.dead&&!flight.landed) fireNextStage(); }
+  if(k==='z'){ flight.throttle=1; }
+  if(k==='x'){ flight.throttle=0; }
+  if(k==='t'){ flight.sas=!flight.sas; if(flight.sas&&flight.sasHold==='prograde')flight.sasHold='stab'; }
+  if(k==='f'){ flight.sas=true; flight.sasHold = flight.sasHold==='prograde'?'stab':'prograde'; }
+  if(k==='m'){ toggleMap(); }
+  if(k==='.'){ flight.warp=Math.min(50, flight.warp*2 || 1); if(flight.warp<1)flight.warp=1; }
+  if(k===','){ flight.warp=Math.max(1, Math.floor(flight.warp/2)); }
+});
+addEventListener('keyup', e=>{ input.keys[e.key.toLowerCase()]=false; });
+function pollInput(){
+  input.pitch=0;
+  if(input.keys['a']||input.keys['arrowleft']) input.pitch=-1;
+  if(input.keys['d']||input.keys['arrowright']) input.pitch=1;
+  if(input.keys['shift']) flight.throttle=clamp(flight.throttle+0.02,0,1);
+  if(input.keys['control']) flight.throttle=clamp(flight.throttle-0.02,0,1);
+}
+function toggleMap(){ mapOpen=!mapOpen; document.getElementById('mapView').classList.toggle('hidden',!mapOpen); }
+document.getElementById('mapClose').onclick=toggleMap;
+
+/* =====================================================================
+   MAIN LOOP
+   ===================================================================== */
+document.getElementById('btnLaunch').onclick=startFlight;
+let last=performance.now();
+function loop(now){
+  const dt=Math.min(0.05,(now-last)/1000); last=now;
+  if(!flight.active){
+    updateBuildCamera(dt);
+    // idle exhaust off
+    exhEnabled=false; exhMode='thrust'; updateExhaust(dt);
+  } else {
+    pollInput();
+    if(!flight.dead && !flight.landed){
+      // physics substeps with warp
+      const powered = flight.activeEngines.length>0 && flight.throttle>0;
+      const subDt = powered? 0.02 : 0.05;
+      const target = dt * flight.warp;
+      let steps=Math.ceil(target/subDt); steps=clamp(steps,1,60);
+      const sdt=target/steps;
+      for(let i=0;i<steps && !flight.dead && !flight.landed;i++) physStep(sdt);
+      // auto burnout detection: if active engine ran dry, notify once
+    }
+    updateExhaust(dt);
+    updateFlightRender();
+    updateHUD();
+    refreshFlightStageUI();
+    drawNavball();
+    if(mapOpen) drawMap();
+  }
+  stars.rotation.y += dt*0.005;
+  renderer.render(scene,camera);
+  requestAnimationFrame(loop);
+}
+
+/* =====================================================================
+   INIT
+   ===================================================================== */
+function init(){
+  renderCatalog();
+  // A ready-made two-stage orbital rocket so the player can launch immediately.
+  build.stack=[
+    {id:'chute',def:PARTS.chute},
+    {id:'mk1pod',def:PARTS.mk1pod},
+    {id:'heatshield',def:PARTS.heatshield},
+    {id:'decoupler',def:PARTS.decoupler},
+    {id:'ftL',def:PARTS.ftL},         // upper stage tank
+    {id:'terrier',def:PARTS.terrier}, // efficient vacuum engine
+    {id:'decoupler',def:PARTS.decoupler},
+    {id:'ftL',def:PARTS.ftL},         // lower stage tanks
+    {id:'ftL',def:PARTS.ftL},
+    {id:'reliant',def:PARTS.reliant}, // punchy sea-level engine
+  ];
+  build.radials=[{id:'fin',def:PARTS.fin,count:4}];
+  commitBuild();
+  document.getElementById('loading').classList.add('hidden');
+  requestAnimationFrame(loop);
+}
+addEventListener('resize', ()=>{
+  camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
+init();
+</script>
+</body>
+</html>
