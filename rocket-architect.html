@@ -1569,8 +1569,9 @@ function showBanner(title, html, btns){
 }
 function hideBanner(){ bannerEl.classList.add('hidden'); }
 let flashTimer=null;
-function flash(msg, ms=1600){
-  const el=document.getElementById('warnFlash'); el.innerHTML=msg; el.style.opacity=1;
+function flash(msg, ms=1600, color){
+  const el=document.getElementById('warnFlash'); el.innerHTML=msg;
+  el.style.color = color || 'var(--bad)'; el.style.opacity=1;
   clearTimeout(flashTimer); flashTimer=setTimeout(()=>el.style.opacity=0, ms);
 }
 
@@ -1586,10 +1587,12 @@ function moveSelected(dir){                 // dir -1 = toward top, +1 = toward 
     return false;
   }
   const i = build.attach.index, j = i + dir;
-  if(j < 0 || j >= build.stack.length){ flash('Already at the '+(dir<0?'top':'bottom'), 1200); return false; }
+  const name = build.stack[i].def.name;
+  if(j < 0 || j >= build.stack.length){ flash(`"${name}" is already at the ${dir<0?'top':'bottom'}`, 1400, 'var(--warn)'); return false; }
   const t = build.stack[i]; build.stack[i] = build.stack[j]; build.stack[j] = t;
   build.attach.index = j;
   commitBuild(); updateAttachMarker();
+  flash(`${dir<0?'▲ Moved up':'▼ Moved down'}: ${name}`, 1100, 'var(--good)');
   return true;
 }
 document.getElementById('btnMoveUp').onclick = ()=>moveSelected(-1);
