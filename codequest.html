@@ -7,23 +7,31 @@
     <meta name="description" content="Learn real programming by writing JavaScript to guide a robot through puzzles. Loops, conditionals, functions — the grown-up version of Scratch." />
     <meta name="theme-color" content="#0b1220" />
     <style>
+      /* ============================================================
+         "Graph-paper robotics workshop" — a light, flat engineering-pad
+         identity. Persimmon is the interactive/brand colour (also the
+         robot); green means finish/done; gold is gems; slate is structure.
+         Deliberately NOT a dark, glassy, neon-teal coding app.
+         ============================================================ */
       :root {
-        --bg: #0b1220;
-        --bg2: #0e1729;
-        --panel: rgba(17, 26, 46, 0.72);
-        --panel-solid: #111a2e;
-        --border: rgba(120, 160, 220, 0.14);
-        --text: #e6eefc;
-        --muted: #93a4c4;
-        --accent: #38bdf8;
-        --accent2: #2dd4bf;
-        --gold: #fbbf24;
-        --danger: #fb7185;
-        --ok: #34d399;
-        --floor: #1b2a48;
-        --floor2: #203255;
-        --wall: #0a1120;
-        --mono: 'SFMono-Regular', 'JetBrains Mono', Consolas, 'Liberation Mono', Menlo, monospace;
+        --paper: #e7eaf0;
+        --card: #ffffff;
+        --card2: #f6f7fa;
+        --line: #d7dce6;
+        --line2: #c4cbd8;
+        --ink: #1b2431;
+        --muted: #69748a;
+        --accent: #ef5a3c;        /* persimmon — robot + interactive */
+        --accent-ink: #c23c22;    /* readable persimmon text on light */
+        --accent-soft: #fde8e2;
+        --go: #1f9d55;            /* goal / success */
+        --go-ink: #157043;
+        --go-soft: #e4f4ea;
+        --gold: #c98a08;         /* gems / hints */
+        --gold-soft: #fbf1d6;
+        --danger: #d64545;
+        --ok: #1f9d55;
+        --mono: 'SFMono-Regular', 'JetBrains Mono', ui-monospace, Consolas, 'Liberation Mono', Menlo, monospace;
       }
 
       * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -31,8 +39,12 @@
       html, body { height: 100%; }
 
       body {
-        background: radial-gradient(1200px 800px at 15% -10%, #16233f 0%, var(--bg) 55%) fixed;
-        color: var(--text);
+        background-color: var(--paper);
+        background-image:
+          linear-gradient(rgba(70,90,120,0.05) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(70,90,120,0.05) 1px, transparent 1px);
+        background-size: 22px 22px;
+        color: var(--ink);
         font-family: 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
         overflow: hidden;
         -webkit-font-smoothing: antialiased;
@@ -48,11 +60,10 @@
       }
 
       .panel {
-        background: var(--panel);
-        border: 1px solid var(--border);
-        border-radius: 16px;
-        backdrop-filter: blur(10px);
-        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        box-shadow: 0 1px 2px rgba(20,30,50,0.04), 0 8px 24px rgba(20,30,50,0.06);
         overflow: hidden;
         display: flex;
         flex-direction: column;
@@ -63,46 +74,47 @@
       #rail { padding: 16px 12px; }
       #rail .brand {
         display: flex; align-items: center; gap: 9px;
-        font-weight: 800; font-size: 17px; letter-spacing: 0.3px;
-        margin-bottom: 4px;
+        font-family: var(--mono); font-weight: 700; font-size: 16px; letter-spacing: 0.2px;
+        margin-bottom: 4px; color: var(--ink);
       }
       #rail .brand .logo {
         width: 26px; height: 26px; border-radius: 7px;
-        background: linear-gradient(140deg, var(--accent), var(--accent2));
-        display: grid; place-items: center; font-size: 15px;
-        box-shadow: 0 0 18px rgba(56, 189, 248, 0.5);
+        background: linear-gradient(140deg, #ff7a5e, var(--accent));
+        display: grid; place-items: center; font-size: 13px; color: #fff; font-weight: 700;
+        box-shadow: 0 2px 6px rgba(239,90,60,0.4);
       }
-      #rail .tag { font-size: 10.5px; color: var(--muted); margin-bottom: 16px; letter-spacing: 0.4px; }
+      #rail .tag { font-size: 10.5px; color: var(--muted); margin-bottom: 16px; letter-spacing: 0.3px; }
       .level-list { display: flex; flex-direction: column; gap: 7px; overflow-y: auto; flex: 1; padding-right: 2px; }
       .chapter-label {
-        font-size: 9.5px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase;
-        color: var(--accent2); margin: 10px 4px 1px; padding-top: 8px;
-        border-top: 1px solid var(--border);
+        font-family: var(--mono);
+        font-size: 9.5px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase;
+        color: #8e98a9; margin: 10px 4px 1px; padding-top: 8px;
+        border-top: 1px solid var(--line);
       }
       .level-list > .chapter-label:first-child { border-top: none; margin-top: 2px; padding-top: 0; }
       .level-btn {
         display: flex; align-items: center; gap: 10px;
         text-align: left; width: 100%;
-        background: rgba(255,255,255,0.02);
-        border: 1px solid var(--border);
-        color: var(--text);
+        background: var(--card2);
+        border: 1px solid var(--line);
+        color: var(--ink);
         padding: 9px 10px; border-radius: 10px;
         cursor: pointer; font-size: 12.5px;
         transition: background 0.15s, border-color 0.15s, transform 0.1s;
       }
-      .level-btn:hover:not(.locked) { background: rgba(56,189,248,0.10); border-color: rgba(56,189,248,0.4); }
-      .level-btn.active { background: rgba(56,189,248,0.16); border-color: var(--accent); box-shadow: inset 0 0 0 1px rgba(56,189,248,0.3); }
-      .level-btn.locked { opacity: 0.4; cursor: not-allowed; }
+      .level-btn:hover:not(.locked) { background: var(--accent-soft); border-color: #f2b3a5; }
+      .level-btn.active { background: var(--accent-soft); border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+      .level-btn.locked { opacity: 0.45; cursor: not-allowed; }
       .level-btn .num {
         flex: none; width: 24px; height: 24px; border-radius: 7px;
-        background: rgba(255,255,255,0.05); display: grid; place-items: center;
-        font-weight: 700; font-size: 12px; color: var(--muted);
+        background: #e7ebf1; display: grid; place-items: center;
+        font-family: var(--mono); font-weight: 700; font-size: 12px; color: var(--muted);
       }
-      .level-btn.active .num { background: var(--accent); color: #06121f; }
-      .level-btn.done .num { background: var(--ok); color: #05201a; }
-      .level-btn .lb-title { flex: 1; line-height: 1.2; }
-      .level-btn .lb-concept { font-size: 10px; color: var(--muted); }
-      .level-btn .check { color: var(--ok); font-size: 13px; }
+      .level-btn.active .num { background: var(--accent); color: #fff; }
+      .level-btn.done .num { background: var(--go); color: #fff; }
+      .level-btn .lb-title { flex: 1; line-height: 1.2; font-weight: 600; }
+      .level-btn .lb-concept { font-size: 10px; color: var(--muted); font-weight: 400; }
+      .level-btn .check { color: var(--go); font-size: 13px; }
 
       /* ---------- Stage ---------- */
       #stage { position: relative; }
@@ -110,22 +122,22 @@
         display: flex; align-items: baseline; gap: 12px;
         padding: 14px 18px 10px; flex: none;
       }
-      #stageHead h2 { font-size: 16px; font-weight: 700; }
+      #stageHead h2 { font-size: 16px; font-weight: 700; color: var(--ink); }
       #stageHead .concept {
-        font-size: 11px; color: var(--accent2); font-family: var(--mono);
-        background: rgba(45,212,191,0.1); padding: 3px 9px; border-radius: 20px;
-        border: 1px solid rgba(45,212,191,0.25);
+        font-size: 11px; color: #55617a; font-family: var(--mono);
+        background: #eef1f6; padding: 3px 9px; border-radius: 6px;
+        border: 1px solid var(--line);
       }
       #canvasWrap { flex: 1; position: relative; min-height: 0; }
       canvas#game { display: block; width: 100%; height: 100%; }
 
       #statusBar {
         flex: none; display: flex; align-items: center; gap: 16px;
-        padding: 10px 18px; border-top: 1px solid var(--border);
+        padding: 10px 18px; border-top: 1px solid var(--line);
         font-size: 12.5px; color: var(--muted);
       }
       #statusBar .chip { display: flex; align-items: center; gap: 6px; }
-      #statusBar .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+      #statusBar .dot { width: 8px; height: 8px; border-radius: 50%; background: #b7c0cf; }
       .speedwrap { margin-left: auto; display: flex; align-items: center; gap: 8px; }
       .speedwrap input { accent-color: var(--accent); }
 
@@ -133,52 +145,52 @@
       #side { }
       .lesson-head {
         display: flex; align-items: center; gap: 10px; flex: none;
-        padding: 12px 16px; border-bottom: 1px solid var(--border);
+        padding: 12px 16px; border-bottom: 1px solid var(--line);
       }
       .lesson-head .lh-label { font-weight: 700; font-size: 13px; }
-      .lesson-head .lh-title { flex: 1; color: var(--accent2); font-size: 12.5px; font-weight: 600; }
+      .lesson-head .lh-title { flex: 1; color: var(--accent-ink); font-size: 12.5px; font-weight: 700; }
       .lesson-head .lh-toggle {
-        background: rgba(255,255,255,0.04); border: 1px solid var(--border); color: var(--muted);
+        background: var(--card2); border: 1px solid var(--line); color: var(--muted);
         font-size: 11px; padding: 4px 10px; border-radius: 7px; cursor: pointer; font-weight: 600;
       }
-      .lesson-head .lh-toggle:hover { background: rgba(255,255,255,0.08); color: var(--text); }
+      .lesson-head .lh-toggle:hover { background: #eef1f6; color: var(--ink); }
 
       .editor-head {
         flex: none; padding: 9px 16px; font-size: 12px; color: var(--muted);
-        background: rgba(56,189,248,0.06); border-bottom: 1px solid var(--border);
-        letter-spacing: 0.2px;
+        background: var(--accent-soft); border-bottom: 1px solid var(--line);
+        letter-spacing: 0.2px; font-family: var(--mono);
       }
-      .editor-head b { color: var(--accent); }
+      .editor-head b { color: var(--accent-ink); }
 
       .lesson {
-        padding: 14px 18px; overflow-y: auto; font-size: 13px; line-height: 1.6; color: #cdd8ef;
-        border-bottom: 1px solid var(--border); flex: none; max-height: 32%;
+        padding: 14px 18px; overflow-y: auto; font-size: 13px; line-height: 1.6; color: #3a4557;
+        border-bottom: 1px solid var(--line); flex: none; max-height: 32%;
       }
       .lesson.collapsed { display: none; }
-      .lesson h3 { font-size: 13px; color: var(--accent); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.6px; }
+      .lesson h3 { font-size: 13px; color: var(--accent-ink); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.6px; }
       .lesson p { margin-bottom: 9px; }
       .lesson code {
-        font-family: var(--mono); font-size: 12px; background: rgba(56,189,248,0.12);
-        color: #bfe6ff; padding: 1px 6px; border-radius: 5px;
+        font-family: var(--mono); font-size: 12px; background: #eef1f6;
+        color: #334155; padding: 1px 6px; border-radius: 5px;
       }
       .lesson .hint {
         margin-top: 6px; padding: 9px 12px; border-radius: 9px;
-        background: rgba(251,191,36,0.08); border: 1px solid rgba(251,191,36,0.22);
-        font-size: 12px; color: #f3d38a; display: none;
+        background: var(--gold-soft); border: 1px solid #ecd9a0;
+        font-size: 12px; color: #7a5a08; display: none;
       }
       .lesson .hint.show { display: block; }
-      .lesson .hint b { color: var(--gold); }
+      .lesson .hint b { color: #a9760a; }
       .lesson .why {
         margin-top: 4px; padding: 8px 12px; border-radius: 9px;
-        background: rgba(45,212,191,0.07); border-left: 2px solid var(--accent2);
-        font-size: 12px; color: #a7e8dd;
+        background: var(--go-soft); border-left: 3px solid var(--go);
+        font-size: 12px; color: #1c6b3f;
       }
-      .lesson .why b { color: var(--accent2); }
+      .lesson .why b { color: var(--go-ink); }
 
       /* editor */
       #editorArea { flex: 1; display: flex; flex-direction: column; min-height: 0; position: relative; }
       .editorScroll {
-        flex: 1; position: relative; overflow: auto; background: #0a1120;
+        flex: 1; position: relative; overflow: auto; background: var(--card2);
       }
       .editor-pre, #code {
         margin: 0; border: 0; padding: 14px 16px 14px 52px;
@@ -187,114 +199,117 @@
         letter-spacing: 0.2px;
       }
       .editor-pre {
-        position: absolute; inset: 0; pointer-events: none; color: var(--text);
+        position: absolute; inset: 0; pointer-events: none; color: #334155;
         min-width: 100%;
       }
       #code {
         position: absolute; inset: 0; width: 100%; height: 100%;
-        background: transparent; color: transparent; caret-color: #7fe0ff;
+        background: transparent; color: transparent; caret-color: var(--accent);
         resize: none; outline: none; overflow: hidden;
       }
       /* line numbers via gutter */
       .gutter {
         position: absolute; top: 0; left: 0; width: 40px; padding-top: 14px;
         font-family: var(--mono); font-size: 13.5px; line-height: 1.55;
-        color: #3f5170; text-align: right; user-select: none; pointer-events: none;
+        color: #b0bac9; text-align: right; user-select: none; pointer-events: none;
         white-space: pre;
       }
-      /* token colors */
-      .tok-com { color: #5a6b8c; font-style: italic; }
-      .tok-str { color: #86efac; }
-      .tok-num { color: #fca5a5; }
-      .tok-kw  { color: #c084fc; font-weight: 600; }
-      .tok-api { color: #38bdf8; font-weight: 600; }
-      .tok-fn  { color: #fde68a; }
+      /* token colours — tuned for a light code surface */
+      .tok-com { color: #97a2b2; font-style: italic; }
+      .tok-str { color: #16794a; }
+      .tok-num { color: #b4530a; }
+      .tok-kw  { color: #7c3aed; font-weight: 600; }
+      .tok-api { color: #c2410c; font-weight: 700; }
+      .tok-fn  { color: #1d4ed8; }
 
       /* controls + console */
       #controls {
-        flex: none; display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--border);
+        flex: none; display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line);
         flex-wrap: wrap;
       }
       button.btn {
-        border: 1px solid var(--border); background: rgba(255,255,255,0.03);
-        color: var(--text); padding: 8px 14px; border-radius: 9px; cursor: pointer;
+        border: 1px solid var(--line2); background: #fff;
+        color: var(--ink); padding: 8px 14px; border-radius: 9px; cursor: pointer;
         font-size: 12.5px; font-weight: 600; display: flex; align-items: center; gap: 6px;
         transition: background 0.15s, transform 0.08s, border-color 0.15s;
       }
-      button.btn:hover { background: rgba(255,255,255,0.07); }
+      button.btn:hover { background: #eef1f6; border-color: var(--line2); }
       button.btn:active { transform: translateY(1px); }
-      button.btn:disabled { opacity: 0.45; cursor: not-allowed; }
-      button.run { background: linear-gradient(135deg, var(--accent), #0ea5e9); border-color: transparent; color: #04121f; box-shadow: 0 4px 16px rgba(56,189,248,0.35); }
-      button.run:hover { background: linear-gradient(135deg, #7dd3fc, var(--accent)); }
+      button.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+      button.run { background: var(--accent); border-color: transparent; color: #fff; box-shadow: 0 2px 8px rgba(239,90,60,0.35); }
+      button.run:hover { background: #e34e30; }
       button.reset { margin-left: auto; }
+      button.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
       #console {
         flex: none; height: 118px; overflow-y: auto; padding: 10px 14px;
-        border-top: 1px solid var(--border); background: rgba(4,8,18,0.5);
+        border-top: 1px solid var(--line); background: #f2f4f8;
         font-family: var(--mono); font-size: 11.5px; line-height: 1.6;
       }
-      #console .log-line { color: #9fb2d4; }
+      #console .log-line { color: #5b6678; }
       #console .log-line .ic { display: inline-block; width: 16px; }
-      #console .log-move { color: #7fd0ff; }
-      #console .log-turn { color: #c9a7ff; }
-      #console .log-collect { color: var(--gold); }
+      #console .log-move { color: #1d68b3; }
+      #console .log-turn { color: #7c3aed; }
+      #console .log-collect { color: #a9760a; }
       #console .log-bump { color: var(--danger); }
-      #console .log-say { color: #a7e8dd; }
+      #console .log-say { color: var(--go-ink); }
       #console .log-err { color: var(--danger); }
-      #console .log-ok { color: var(--ok); font-weight: 700; }
-      #console .log-sys { color: #64748b; }
+      #console .log-ok { color: var(--go-ink); font-weight: 700; }
+      #console .log-sys { color: #97a2b2; }
 
       /* Win modal */
       #modal {
         position: fixed; inset: 0; z-index: 100; display: none;
-        place-items: center; background: rgba(4,8,18,0.7); backdrop-filter: blur(4px);
+        place-items: center; background: rgba(27,36,49,0.4); backdrop-filter: blur(2px);
       }
       #modal.show { display: grid; }
       .modal-card {
-        background: linear-gradient(160deg, var(--bg2), #0a1424);
-        border: 1px solid rgba(52,211,153,0.35);
-        border-radius: 20px; padding: 32px 36px; text-align: center;
-        max-width: 380px; box-shadow: 0 30px 80px rgba(0,0,0,0.6), 0 0 60px rgba(52,211,153,0.15);
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-top: 4px solid var(--go);
+        border-radius: 16px; padding: 32px 36px; text-align: center;
+        max-width: 380px; box-shadow: 0 30px 70px rgba(20,30,50,0.28);
         animation: pop 0.35s cubic-bezier(0.2, 1.4, 0.4, 1);
       }
       @keyframes pop { from { transform: scale(0.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
       .modal-card .big { font-size: 46px; margin-bottom: 8px; }
-      .modal-card h2 { font-size: 22px; margin-bottom: 8px; }
+      .modal-card h2 { font-size: 22px; margin-bottom: 8px; color: var(--ink); }
       .modal-card p { color: var(--muted); font-size: 13px; margin-bottom: 22px; line-height: 1.5; }
       .modal-card .row { display: flex; gap: 10px; justify-content: center; }
 
-      .ref-btn { margin-top: 10px; flex: none; justify-content: center; width: 100%; }
+      .ref-btn { margin-top: 8px; flex: none; justify-content: center; width: 100%; }
+      .ref-btn.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); }
 
       /* Reference modal */
       #refModal {
         position: fixed; inset: 0; z-index: 100; display: none;
-        place-items: center; background: rgba(4,8,18,0.72); backdrop-filter: blur(5px);
+        place-items: center; background: rgba(27,36,49,0.42); backdrop-filter: blur(2px);
         padding: 24px;
       }
       #refModal.show { display: grid; }
       .ref-card {
-        background: linear-gradient(165deg, var(--bg2), #0a1424);
-        border: 1px solid var(--border); border-radius: 18px;
+        background: var(--card);
+        border: 1px solid var(--line); border-top: 4px solid var(--accent); border-radius: 14px;
         padding: 22px 24px; width: min(920px, 96vw); max-height: 88vh; overflow-y: auto;
-        box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+        box-shadow: 0 30px 70px rgba(20,30,50,0.28);
       }
       .ref-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-      .ref-head h2 { font-size: 19px; }
+      .ref-head h2 { font-size: 19px; color: var(--ink); }
       .ref-sub { color: var(--muted); font-size: 12.5px; margin: 6px 0 16px; }
       .ref-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
       .ref-grid section {
-        background: rgba(255,255,255,0.02); border: 1px solid var(--border);
+        background: var(--card2); border: 1px solid var(--line);
         border-radius: 12px; padding: 12px 14px;
       }
-      .ref-grid h4 { font-size: 12.5px; color: var(--accent); margin-bottom: 8px; letter-spacing: 0.3px; }
+      .ref-grid h4 { font-size: 12.5px; color: var(--accent-ink); margin-bottom: 8px; letter-spacing: 0.3px; }
       .ref-grid pre {
-        font-family: var(--mono); font-size: 12px; line-height: 1.55; color: var(--text);
+        font-family: var(--mono); font-size: 12px; line-height: 1.55; color: #334155;
         white-space: pre-wrap; word-break: break-word;
       }
 
       /* Scrollbars */
       ::-webkit-scrollbar { width: 8px; height: 8px; }
-      ::-webkit-scrollbar-thumb { background: rgba(120,160,220,0.25); border-radius: 8px; }
+      ::-webkit-scrollbar-thumb { background: rgba(30,50,80,0.18); border-radius: 8px; }
       ::-webkit-scrollbar-track { background: transparent; }
 
       @media (max-width: 1100px) {
@@ -311,6 +326,7 @@
         <div class="brand"><span class="logo">&lt;/&gt;</span> CodeQuest</div>
         <div class="tag">Learn real code, one puzzle at a time</div>
         <div class="level-list" id="levelList"></div>
+        <button class="btn ref-btn" id="sandboxBtn">🧪 Sandbox</button>
         <button class="btn ref-btn" id="refBtn">📚 Reference</button>
       </aside>
 
@@ -669,6 +685,23 @@ items.length;      <span class="tok-com">// 3 (how many)</span>
         }
       ];
 
+      // Free-play playground — an open board with no win condition. Reached
+      // through the Sandbox button, not part of the level progression.
+      const SANDBOX = {
+        title: 'Sandbox',
+        concept: 'free play',
+        grid: ['S.......', '...*....', '........', '....*...', '........', '.....*.G'],
+        startDir: 1,
+        requireAllGems: false,
+        lesson: `
+          <h3>Your playground</h3>
+          <p>No goal, no rules — just experiment. Every command and concept works here: loops, variables, <code>if</code>, functions, arrays, <code>say()</code>, and all the robot commands.</p>
+          <p>The board is wide open with a few 💎 gems and a 🚩 flag to play with. Nothing is graded — press <b>Run</b> and see what happens. Open <b>📚 Reference</b> anytime for syntax.</p>`,
+        hint: `Try changing numbers, adding a <code>for</code> loop, or printing values with <code>say()</code>.`,
+        starter: `// Free play — no goal, no rules. Experiment!\n// Loops, variables, functions, say(), robot commands.\n\nsay("Let's explore!");\n\nlet steps = 3;\nfor (let i = 0; i < steps; i++) {\n  moveForward();\n}\n\nturnRight();\nmoveForward();\ncollect();\n\nsay("2 + 2 = " + (2 + 2));\nsay("double steps: " + steps * 2);\n`,
+        solution: null
+      };
+
       // ============================================================
       //  WEB WORKER SOURCE (sandboxed execution of user code)
       // ============================================================
@@ -739,8 +772,14 @@ items.length;      <span class="tok-com">// 3 (how many)</span>
         stepIndex: 0,
         pendingResult: null,
         running: false,
+        sandbox: false,     // free-play mode (no win condition)
         speed: 1.5
       };
+
+      // the level currently on the stage (a real level, or the sandbox)
+      function curLevel() { return S.sandbox ? SANDBOX : LEVELS[S.current]; }
+      // localStorage key for the editor contents of whatever is loaded
+      function codeKey() { return S.sandbox ? 'sandbox' : S.current; }
 
       // localStorage helpers
       const store = {
@@ -784,29 +823,54 @@ items.length;      <span class="tok-com">// 3 (how many)</span>
 
       function dirToAngle(dir) { return [-Math.PI / 2, 0, Math.PI / 2, Math.PI][dir]; }
 
+      function renderLesson(level) {
+        $('lessonHeadTitle').textContent = level.title;
+        $('lessonPane').innerHTML = level.lesson +
+          '<div class="hint" id="hintBox"><b>💡 Hint:</b> ' + level.hint + '</div>' +
+          '<p style="margin-top:10px"><a href="#" id="hintToggle" style="color:var(--accent-ink);font-size:12px;text-decoration:none">Show hint ▾</a></p>';
+        const ht = $('hintToggle');
+        if (ht) ht.onclick = (e) => { e.preventDefault(); const h = $('hintBox'); h.classList.toggle('show'); ht.textContent = h.classList.contains('show') ? 'Hide hint ▴' : 'Show hint ▾'; };
+      }
+
       function loadLevel(i) {
         if (i < 0 || i >= LEVELS.length) return;
         if (i > store.unlocked()) return; // locked
+        S.sandbox = false;
         S.current = i;
         const level = LEVELS[i];
         S.parsed = parseLevel(level);
         resetWorld();
-        // lesson pane
         $('levelTitle').textContent = (i + 1) + '. ' + level.title;
         $('levelConcept').textContent = level.concept;
-        $('lessonHeadTitle').textContent = level.title;
-        $('lessonPane').innerHTML = level.lesson +
-          '<div class="hint" id="hintBox"><b>💡 Hint:</b> ' + level.hint + '</div>' +
-          '<p style="margin-top:10px"><a href="#" id="hintToggle" style="color:var(--accent);font-size:12px;text-decoration:none">Show hint ▾</a></p>';
-        const ht = $('hintToggle');
-        if (ht) ht.onclick = (e) => { e.preventDefault(); const h = $('hintBox'); h.classList.toggle('show'); ht.textContent = h.classList.contains('show') ? 'Hide hint ▴' : 'Show hint ▾'; };
-        // code (saved or starter)
+        renderLesson(level);
         const saved = store.code(i);
         setCode(saved != null ? saved : level.starter);
         clearConsole();
         logSys('Level ' + (i + 1) + ': ' + level.title);
         renderLevelList();
+        refreshNav();
         switchTab('lesson');
+      }
+
+      function enterSandbox() {
+        S.sandbox = true;
+        S.parsed = parseLevel(SANDBOX);
+        resetWorld();
+        $('levelTitle').textContent = SANDBOX.title;
+        $('levelConcept').textContent = SANDBOX.concept;
+        renderLesson(SANDBOX);
+        const saved = store.code('sandbox');
+        setCode(saved != null ? saved : SANDBOX.starter);
+        clearConsole();
+        logSys('Sandbox — free play. Press Run anytime.');
+        renderLevelList();
+        refreshNav();
+        switchTab('lesson');
+      }
+
+      // reflect active nav state (which level / sandbox is loaded)
+      function refreshNav() {
+        $('sandboxBtn').classList.toggle('active', S.sandbox);
       }
 
       function resetWorld() {
@@ -860,7 +924,7 @@ items.length;      <span class="tok-com">// 3 (how many)</span>
         let g = '';
         for (let i = 1; i <= lines; i++) g += i + '\n';
         gutterEl.textContent = g;
-        store.setCode(S.current, code);
+        store.setCode(codeKey(), code);
       }
 
       function setCode(v) {
@@ -931,20 +995,20 @@ items.length;      <span class="tok-com">// 3 (how many)</span>
             const isWall = p.walls.has(x + ',' + y);
             const inset = 2;
             if (isWall) {
-              ctx.fillStyle = '#060b16';
+              ctx.fillStyle = '#334255';
               roundRect(ctx, t.x + inset, t.y + inset, cell - inset * 2, cell - inset * 2, 5);
               ctx.fill();
-              ctx.strokeStyle = 'rgba(80,110,160,0.10)';
+              ctx.strokeStyle = 'rgba(20,30,50,0.18)';
               ctx.lineWidth = 1;
               ctx.stroke();
             } else {
               const grad = ctx.createLinearGradient(t.x, t.y, t.x, t.y + cell);
-              grad.addColorStop(0, '#213458');
-              grad.addColorStop(1, '#1a2a48');
+              grad.addColorStop(0, '#ffffff');
+              grad.addColorStop(1, '#f4f7fb');
               ctx.fillStyle = grad;
               roundRect(ctx, t.x + inset, t.y + inset, cell - inset * 2, cell - inset * 2, 6);
               ctx.fill();
-              ctx.strokeStyle = 'rgba(120,160,220,0.08)';
+              ctx.strokeStyle = 'rgba(90,110,140,0.16)';
               ctx.lineWidth = 1;
               ctx.stroke();
             }
@@ -957,18 +1021,18 @@ items.length;      <span class="tok-com">// 3 (how many)</span>
           const cx = t.x + cell / 2, cy = t.y + cell / 2;
           const pulse = 0.5 + 0.5 * Math.sin(ts / 500);
           ctx.save();
-          ctx.shadowColor = 'rgba(45,212,191,0.9)';
-          ctx.shadowBlur = 12 + pulse * 12;
-          ctx.strokeStyle = 'rgba(45,212,191,' + (0.5 + pulse * 0.4) + ')';
+          ctx.shadowColor = 'rgba(31,157,85,0.55)';
+          ctx.shadowBlur = 8 + pulse * 10;
+          ctx.strokeStyle = 'rgba(31,157,85,' + (0.55 + pulse * 0.35) + ')';
           ctx.lineWidth = 2;
           roundRect(ctx, t.x + 6, t.y + 6, cell - 12, cell - 12, 6);
           ctx.stroke();
           ctx.restore();
           // flag icon
           const fh = cell * 0.42, pole = cx - cell * 0.13;
-          ctx.strokeStyle = '#7ff0e0'; ctx.lineWidth = Math.max(2, cell * 0.04);
+          ctx.strokeStyle = '#15703f'; ctx.lineWidth = Math.max(2, cell * 0.04);
           ctx.beginPath(); ctx.moveTo(pole, cy - fh / 2); ctx.lineTo(pole, cy + fh / 2); ctx.stroke();
-          ctx.fillStyle = '#2dd4bf';
+          ctx.fillStyle = '#1f9d55';
           ctx.beginPath();
           ctx.moveTo(pole, cy - fh / 2);
           ctx.lineTo(pole + cell * 0.26, cy - fh / 2 + fh * 0.18);
@@ -984,12 +1048,12 @@ items.length;      <span class="tok-com">// 3 (how many)</span>
           const cx = t.x + cell / 2, cy = t.y + cell / 2 + Math.sin(ts / 400 + gx + gy) * cell * 0.04;
           const r = cell * 0.16;
           ctx.save();
-          ctx.shadowColor = 'rgba(251,191,36,0.8)'; ctx.shadowBlur = 12;
-          ctx.fillStyle = '#fbbf24';
+          ctx.shadowColor = 'rgba(210,150,10,0.45)'; ctx.shadowBlur = 8;
+          ctx.fillStyle = '#eaa60a';
           ctx.beginPath();
           ctx.moveTo(cx, cy - r); ctx.lineTo(cx + r * 0.72, cy); ctx.lineTo(cx, cy + r); ctx.lineTo(cx - r * 0.72, cy);
           ctx.closePath(); ctx.fill();
-          ctx.strokeStyle = 'rgba(255,240,200,0.9)'; ctx.lineWidth = 1;
+          ctx.strokeStyle = 'rgba(120,80,0,0.35)'; ctx.lineWidth = 1;
           ctx.stroke();
           ctx.restore();
         });
@@ -1001,28 +1065,28 @@ items.length;      <span class="tok-com">// 3 (how many)</span>
         ctx.save();
         ctx.translate(rcx, rcy);
         // shadow
-        ctx.fillStyle = 'rgba(0,0,0,0.28)';
+        ctx.fillStyle = 'rgba(30,40,60,0.14)';
         ctx.beginPath(); ctx.ellipse(0, rr * 0.9, rr * 0.9, rr * 0.35, 0, 0, Math.PI * 2); ctx.fill();
         ctx.rotate(S.disp.angle);
         // direction pointer
-        ctx.fillStyle = '#7dd3fc';
+        ctx.fillStyle = '#f6a68f';
         ctx.beginPath();
         ctx.moveTo(rr * 1.15, 0); ctx.lineTo(rr * 0.45, -rr * 0.5); ctx.lineTo(rr * 0.45, rr * 0.5);
         ctx.closePath(); ctx.fill();
         // body
         const bg = ctx.createLinearGradient(0, -rr, 0, rr);
-        bg.addColorStop(0, '#5cc8ff'); bg.addColorStop(1, '#2b8fd6');
+        bg.addColorStop(0, '#ff8168'); bg.addColorStop(1, '#e64d2c');
         ctx.fillStyle = bg;
-        ctx.shadowColor = 'rgba(56,189,248,0.55)'; ctx.shadowBlur = 14;
+        ctx.shadowColor = 'rgba(230,77,44,0.3)'; ctx.shadowBlur = 12;
         roundRect(ctx, -rr, -rr, rr * 2, rr * 2, rr * 0.55);
         ctx.fill();
         ctx.shadowBlur = 0;
         // visor
-        ctx.fillStyle = '#08243b';
+        ctx.fillStyle = '#5a1c10';
         roundRect(ctx, -rr * 0.45, -rr * 0.35, rr * 1.1, rr * 0.7, rr * 0.25);
         ctx.fill();
         // eyes
-        ctx.fillStyle = '#8bf3ff';
+        ctx.fillStyle = '#ffe1d6';
         ctx.beginPath(); ctx.arc(rr * 0.08, 0, rr * 0.14, 0, Math.PI * 2); ctx.fill();
         ctx.beginPath(); ctx.arc(rr * 0.42, 0, rr * 0.12, 0, Math.PI * 2); ctx.fill();
         ctx.restore();
@@ -1124,7 +1188,7 @@ items.length;      <span class="tok-com">// 3 (how many)</span>
       //  RUN / STEP
       // ============================================================
       function levelPayload() {
-        const l = LEVELS[S.current];
+        const l = curLevel();
         return { grid: l.grid, startDir: l.startDir || 1, requireAllGems: !!l.requireAllGems, signs: l.signs || null, expectSay: l.expectSay || null };
       }
 
@@ -1248,7 +1312,11 @@ items.length;      <span class="tok-com">// 3 (how many)</span>
           logErr('✗ Error: ' + res.error);
           return;
         }
-        const level = LEVELS[S.current];
+        if (S.sandbox) {
+          logOk('✓ Ran. Tinker away — nothing to solve here.');
+          return;
+        }
+        const level = curLevel();
         if (res.success) {
           logOk('✓ Success! You solved it.');
           onWin();
@@ -1320,7 +1388,7 @@ items.length;      <span class="tok-com">// 3 (how many)</span>
       function updateStatus(atGoal, got, total) {
         $('goalStatus').textContent = atGoal ? 'On the flag!' : 'Not at flag';
         $('goalDot').style.background = atGoal ? 'var(--ok)' : 'var(--muted)';
-        const req = LEVELS[S.current] && LEVELS[S.current].requireAllGems;
+        const req = curLevel() && curLevel().requireAllGems;
         $('gemChip').style.display = (total > 0) ? '' : 'none';
         $('gemStatus').textContent = got + ' / ' + total;
         $('gemStatus').style.color = (req && got === total && total > 0) ? 'var(--ok)' : '';
@@ -1372,7 +1440,7 @@ items.length;      <span class="tok-com">// 3 (how many)</span>
           const b = document.createElement('button');
           const locked = i > unlocked;
           const isDone = done.indexOf(i) >= 0;
-          b.className = 'level-btn' + (i === S.current ? ' active' : '') + (locked ? ' locked' : '') + (isDone ? ' done' : '');
+          b.className = 'level-btn' + ((!S.sandbox && i === S.current) ? ' active' : '') + (locked ? ' locked' : '') + (isDone ? ' done' : '');
           b.innerHTML =
             '<span class="num">' + (locked ? '🔒' : (i + 1)) + '</span>' +
             '<span class="lb-title">' + esc(l.title) + '<div class="lb-concept">' + esc(l.concept) + '</div></span>' +
@@ -1412,19 +1480,22 @@ items.length;      <span class="tok-com">// 3 (how many)</span>
       $('runBtn').onclick = run;
       $('stepBtn').onclick = step;
       $('resetBtn').onclick = () => {
-        store.clearCode(S.current);
-        setCode(LEVELS[S.current].starter);
+        store.clearCode(codeKey());
+        setCode(curLevel().starter);
         resetWorld();
         clearConsole();
         logSys('Code reset to starter.');
       };
       $('solutionBtn').onclick = () => {
-        setCode(LEVELS[S.current].solution);
+        const sol = curLevel().solution;
+        if (!sol) { logSys('No solution here — the sandbox is yours to explore!'); return; }
+        setCode(sol);
         resetWorld();
         clearConsole();
         logSys('Solution loaded — read it, then press Run to watch it work.');
         switchTab('code');
       };
+      $('sandboxBtn').onclick = () => { if (!S.sandbox) enterSandbox(); };
       $('speed').oninput = (e) => { S.speed = parseFloat(e.target.value); };
       $('replayBtn').onclick = () => { $('modal').classList.remove('show'); run(); };
       $('nextBtn').onclick = () => { $('modal').classList.remove('show'); loadLevel(S.current + 1); };
