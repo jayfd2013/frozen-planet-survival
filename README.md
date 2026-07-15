@@ -4,6 +4,29 @@ A comprehensive guide and skeleton for building a Three.js game.
 
 ---
 
+## 🚀 Orbital Architect — Rocket Builder Game
+
+A second, standalone game lives in **[`rocket-architect.html`](./rocket-architect.html)** — a
+Kerbal-style rocket builder and flight simulator in a single self-contained HTML file. Open it
+directly in a browser (it loads Three.js from a CDN).
+
+**The loop:** assemble a rocket part-by-part in the hangar — every part adds real mass and shifts
+your center of mass — then set up staging, launch, fly a gravity turn to orbit, and come home under
+a parachute. The physics are modeled, not faked:
+
+- **Tsiolkovsky Δv** and **thrust-to-weight (TWR)** computed live as you build
+- **Center of mass vs. center of pressure** — an unbalanced rocket flips; add fins for stability
+- **Exponential atmosphere** with aerodynamic drag, dynamic pressure, and a **co-rotating air mass**
+- **Real orbital mechanics** (vis-viva) — apoapsis/periapsis, gravity turns, circularization
+- **Reentry heating** (bring a heat shield) and a **drogue → main parachute** descent
+
+**Controls:** `Z`/`X` full/cut throttle · `Shift`/`Ctrl` throttle · `A`/`D` pitch · `T` SAS ·
+`F` hold prograde · `Space` next stage · `M` map · `,`/`.` time warp.
+
+The rest of this document is the original Three.js learning guide for *Frozen Planet Survival*.
+
+---
+
 ## Table of Contents
 
 1. [Project Structure](#1-project-structure)

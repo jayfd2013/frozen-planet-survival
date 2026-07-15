@@ -882,7 +882,6 @@ function physStep(dt){
   const alt = r - PLANET.R;
   f.maxAlt = Math.max(f.maxAlt, alt);
   const mass = currentMassKg();
-  const speed = f.vel.length();
 
   // gravity (toward center)
   const gMag = PLANET.GM / (r*r);
@@ -947,7 +946,8 @@ function physStep(dt){
     const vDir = vAirVec.clone().normalize();
     const aoaDrag = Math.acos(clamp(nose.dot(vDir),-1,1));
     Cd += Math.sin(aoaDrag)*Math.sin(aoaDrag)*1.1;   // side-on = more drag
-    if(f.chuteState==='deployed'){ area += 40; Cd += 1.0; }
+    if(f.chuteState==='drogue'){ area += 15; Cd += 0.5; }       // partial: bleeds off high speed
+    else if(f.chuteState==='deployed'){ area += 160; Cd += 1.8; } // full canopy -> gentle descent
     const dragMag = Q*Cd*area / mass;
     dragAccel = vDir.multiplyScalar(-dragMag);
   }
@@ -997,8 +997,8 @@ function physStep(dt){
   f.omega = clamp(f.omega, -2, 2);
   f.angle += f.omega*dt;
 
-  // ---- heating ----
-  const heatFlux = rho * Math.pow(speed,3) * 1.7e-6;  // scaled
+  // ---- heating (air-relative) ----
+  const heatFlux = rho * Math.pow(airspeed,3) * 1.7e-6;  // scaled
   // heat shield protects if oriented retrograde (nose away from velocity -> shield at bottom faces flow)
   const retro = Math.cos(aoa) < -0.3;                 // moving mostly backward-ish
   if(heatFlux>0.5){
@@ -1016,25 +1016,29 @@ function physStep(dt){
   }
 
   // ---- structural / aero failure (flip apart) ----
-  if(Q>25000 && Math.abs(aoa)>60*DEG && speed>200 && !flight.dead){
+  if(Q>25000 && Math.abs(aoa)>60*DEG && airspeed>200 && !flight.dead){
     // ripping apart from shear when going sideways at high Q
     explode('AERODYNAMIC FAILURE — ripped apart');
   }
 
-  // ---- chute rip check ----
-  if(flight.chuteState==='deployed' && Q>18000){
+  // ---- parachute: armed -> drogue (partial, survives high speed) -> full canopy (once slow) ----
+  if(flight.chuteState==='armed' && alt<4000){
+    flight.chuteState='drogue'; flash('🪂 Drogue out — bleeding off speed');
+  }
+  if(flight.chuteState==='drogue' && airspeed<85){
+    flight.chuteState='deployed'; flash('🪂 Main chute deployed!');
+  }
+  if(flight.chuteState==='deployed' && Q>20000){
     flight.chuteState='ripped'; flash('Parachute ripped off — too fast!',2200);
   }
-  // auto-full-deploy chute low & slow
-  if(flight.chuteState==='armed' && alt<3000 && Q<8000){ flight.chuteState='deployed'; flash('Parachute deployed!'); }
 
   if(alt>100) flight.airborne=true;
 
   // ---- ground contact (only once we've actually left the pad) ----
   if(alt <= 0.5 && !flight.dead){
     if(flight.airborne){           // came back down
-      const vLand = Math.abs(speed);
-      if(vLand < 8) landSuccess();
+      const vLand = airspeed;      // impact speed relative to the (rotating) ground
+      if(vLand < 10) landSuccess();
       else explode('CRASHED — impact too hard ('+vLand.toFixed(0)+' m/s)');
     }
     // clamp to surface (resting on pad, or after landing)
@@ -1111,10 +1115,7 @@ function fireNextStage(){
   } else if(st.kind==='chute'){
     if(flight.chuteState==='stowed'||flight.chuteState==='none'){
       flight.chuteState='armed';
-      const alt=flight.pos.length()-PLANET.R;
-      const Q=0.5*densityAt(alt)*flight.vel.lengthSq();
-      if(Q>18000){ flight.chuteState='ripped'; flash('🪂 Parachute ripped — deployed too fast!',2400); }
-      else flash('🪂 Parachute armed — will open when slow & low');
+      flash('🪂 Parachute armed — drogue opens below 4 km, main when slow');
     }
   }
   refreshFlightStageUI();
@@ -1302,9 +1303,12 @@ function drawNavball(){
   // ship reference (fixed, pointing up = nose)
   nbx.strokeStyle='#ffd24a'; nbx.lineWidth=3;
   nbx.beginPath(); nbx.moveTo(-16,0); nbx.lineTo(-6,0); nbx.moveTo(6,0); nbx.lineTo(16,0); nbx.moveTo(0,-16); nbx.lineTo(0,-6); nbx.stroke();
-  // prograde marker (velocity direction relative to nose)
-  if(f.vel.length()>3){
-    const vDir=f.vel.clone().normalize();
+  // prograde marker — surface (air-relative) prograde in atmosphere, orbital prograde in space
+  const alt=r-PLANET.R;
+  let vRef=f.vel.clone();
+  if(alt<PLANET.atmoTop){ const Omega=PLANET.surfV/PLANET.R; vRef.sub(east.clone().multiplyScalar(Omega*r)); }
+  if(vRef.length()>3){
+    const vDir=vRef.normalize();
     const vAngle=Math.atan2(vDir.dot(east), vDir.dot(up)); // 0 = up
     const rel = vAngle - f.angle;
     const px=Math.sin(rel)*R*0.7, py=-Math.cos(rel)*R*0.7;
@@ -1389,11 +1393,15 @@ function fmtAlt(m){
 function updateHUD(){
   const f=flight; const r=f.pos.length(); const alt=r-PLANET.R;
   const up=f.pos.clone().normalize();
+  const east=new THREE.Vector2(up.y,-up.x);
   const vv=f.vel.dot(up);
   const orb=orbitElements();
-  const Q=0.5*densityAt(alt)*f.vel.lengthSq();
+  // air-relative speed in atmosphere (surface speed), orbital speed above
+  const inAtmo=alt<PLANET.atmoTop;
+  const vAir=inAtmo? f.vel.clone().sub(east.clone().multiplyScalar((PLANET.surfV/PLANET.R)*r)) : f.vel;
+  const Q=0.5*densityAt(alt)*vAir.lengthSq();
   document.getElementById('tAlt').textContent=fmtAlt(alt);
-  document.getElementById('tSpd').textContent=Math.round(f.vel.length())+' m/s';
+  document.getElementById('tSpd').textContent=Math.round(vAir.length())+' m/s'+(inAtmo?' ↝':'');
   document.getElementById('tVv').textContent=(vv>=0?'+':'')+Math.round(vv)+' m/s';
   document.getElementById('tAp').textContent = isFinite(orb.ap)&&orb.ap>0? fmtAlt(orb.ap):'—';
   document.getElementById('tPe').textContent = orb.pe>-PLANET.R? fmtAlt(orb.pe):'—';
