@@ -131,7 +131,7 @@
 
   <!-- ===================== BUILD MODE UI ===================== -->
   <div id="buildUI">
-    <div id="hint" class="mono">Click parts to stack them &bull; scroll to orbit view &bull; build a rocket that can reach space</div>
+    <div id="hint" class="mono">Click a spot on the rocket to aim, then pick a part &bull; drag to rotate &bull; scroll to zoom</div>
 
     <div id="catalog" class="panel">
       <div class="title">Vehicle Assembly</div>
@@ -368,6 +368,16 @@ scene.add(rocketGroup);
 const comMarker = new THREE.Mesh(new THREE.SphereGeometry(0.16,16,16),
   new THREE.MeshBasicMaterial({color:0xffd24a}));
 buildGroup.add(comMarker);
+// attach-point ring: shows where the next part will snap
+const attachMarker = new THREE.Mesh(new THREE.TorusGeometry(0.9,0.05,8,32),
+  new THREE.MeshBasicMaterial({color:0x35e08a, transparent:true, opacity:0.9}));
+attachMarker.rotation.x = Math.PI/2; attachMarker.visible=false;
+buildGroup.add(attachMarker);
+// faint hover ring
+const hoverMarker = new THREE.Mesh(new THREE.TorusGeometry(0.85,0.03,8,32),
+  new THREE.MeshBasicMaterial({color:0x9adfff, transparent:true, opacity:0.5}));
+hoverMarker.rotation.x = Math.PI/2; hoverMarker.visible=false;
+buildGroup.add(hoverMarker);
 
 /* -------- flight-mode planet (cosmetic, floating-origin) -------- */
 const flightGroup = new THREE.Group();
@@ -467,6 +477,10 @@ const build = {
   radials: [],          // radial groups (boosters/fins)
   symmetry: 1,
   activeCat: 'pod',
+  attach: null,         // {index, above}  chosen attach point on the stack (null = bottom)
+  hover: null,          // preview attach point under the cursor
+  userInteracted: false,
+  camAz: 0.6, camElev: 0.12, camZoom: 1,
 };
 
 function partStats(){
@@ -637,12 +651,19 @@ function rebuildRocketMesh(){
   rocketGroup.add(exhaust);
   const totalH = build.stack.reduce((s,p)=>s+p.def.h,0);
   let y = totalH;                       // top
-  for(const p of build.stack){
+  build.stack.forEach((p,i)=>{
     const mesh = buildPartMesh(p.def);
     mesh.position.y = y - p.def.h/2;
-    p.mesh = mesh; rocketGroup.add(mesh);
+    mesh.userData.stackIndex = i;       // for click-to-select raycasting
+    mesh.traverse(o=>{ o.userData.stackIndex = i; });
+    p.mesh = mesh; p.topY = y; p.botY = y - p.def.h; p.midY = y - p.def.h/2;
+    // highlight the currently selected part
+    if(build.attach && build.attach.index===i){
+      mesh.traverse(o=>{ if(o.material && o.material.emissive){ o.material = o.material.clone(); o.material.emissive.setHex(0x2a6cff); o.material.emissiveIntensity=0.5; } });
+    }
+    rocketGroup.add(mesh);
     y -= p.def.h;
-  }
+  });
   // radials
   for(const r of build.radials){
     r.meshes=[];
@@ -742,37 +763,115 @@ function addPart(id){
       }
     }
   }
-  // otherwise stack at bottom (append)
-  build.stack.push({id, def});
+  // insert into the vertical stack at the chosen attach point (or bottom by default)
+  let insertAt = build.stack.length;                 // default = bottom (append)
+  if(build.attach){
+    insertAt = build.attach.above ? build.attach.index : build.attach.index + 1;
+  }
+  build.stack.splice(insertAt, 0, {id, def});
+  // keep the attach point on the part we just added, so successive clicks chain downward
+  build.attach = {index: insertAt, above: false};
   commitBuild();
 }
-function commitBuild(){ rebuildRocketMesh(); refreshStatsUI(); frameBuildCamera(); }
+function commitBuild(){ rebuildRocketMesh(); refreshStatsUI(); frameBuildCamera(); updateAttachMarker(); }
 
 document.getElementById('btnUndo').onclick=()=>{
-  if(build.radials.length && build.stack.length===0){ build.radials.pop(); }
+  // remove the currently-selected part if any, else the last-added stack part
+  if(build.attach && build.stack[build.attach.index]){ build.stack.splice(build.attach.index,1); build.attach=null; }
   else if(build.stack.length){ build.stack.pop(); }
   else if(build.radials.length){ build.radials.pop(); }
+  if(build.attach && build.attach.index>=build.stack.length) build.attach=null;
   commitBuild();
 };
-document.getElementById('btnClear').onclick=()=>{ build.stack=[]; build.radials=[]; commitBuild(); };
+document.getElementById('btnClear').onclick=()=>{ build.stack=[]; build.radials=[]; build.attach=null; commitBuild(); };
 document.querySelectorAll('#symSel .s').forEach(s=>{
   s.onclick=()=>{ document.querySelectorAll('#symSel .s').forEach(x=>x.classList.remove('on')); s.classList.add('on'); build.symmetry=+s.dataset.s; };
 });
 
-/* ---------- build camera framing ---------- */
+/* ---------- build camera (drag to orbit, scroll to zoom) ---------- */
 let buildCamTarget = new THREE.Vector3(0,3,0);
 function frameBuildCamera(){
   const h = Math.max(4, build.stack.reduce((s,p)=>s+p.def.h,0));
   buildCamTarget.set(0, h*0.5, 0);
 }
-let buildCamAngle = 0.5, buildCamDist = 14, buildCamHeight=0;
 function updateBuildCamera(dt){
-  buildCamAngle += dt*0.12;
+  if(!build.userInteracted) build.camAz += dt*0.12;   // gentle idle spin until you grab it
   const h = Math.max(5, build.stack.reduce((s,p)=>s+p.def.h,0));
-  const dist = clamp(h*1.4+6, 10, 40);
-  camera.position.set(Math.sin(buildCamAngle)*dist, buildCamTarget.y+h*0.15, Math.cos(buildCamAngle)*dist);
+  const dist = clamp((h*1.4+6)*build.camZoom, 8, 60);
+  const el = clamp(build.camElev, -0.4, 1.2);
+  camera.position.set(Math.sin(build.camAz)*dist*Math.cos(el), buildCamTarget.y + Math.sin(el)*dist + h*0.05, Math.cos(build.camAz)*dist*Math.cos(el));
   camera.lookAt(buildCamTarget);
 }
+
+/* ---------- pointer: drag-orbit + click-to-place ---------- */
+const raycaster = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+let ptr = {down:false, dragging:false, x:0, y:0, moved:0};
+function pickPart(clientX, clientY){
+  const rect = canvas.getBoundingClientRect();
+  ndc.x = ((clientX-rect.left)/rect.width)*2 - 1;
+  ndc.y = -((clientY-rect.top)/rect.height)*2 + 1;
+  raycaster.setFromCamera(ndc, camera);
+  const hits = raycaster.intersectObjects(rocketGroup.children, true);
+  for(const hit of hits){
+    let o = hit.object;
+    while(o && o.userData.stackIndex===undefined) o = o.parent;
+    if(o){ return {index:o.userData.stackIndex, point:hit.point}; }
+  }
+  return null;
+}
+function attachFromHit(hit){
+  if(!hit) return null;
+  const p = build.stack[hit.index];
+  const above = hit.point.y > p.midY;    // clicked upper half -> attach above, lower half -> below
+  return {index:hit.index, above};
+}
+function attachY(a){
+  if(!a) return {y:0, r:0.9};
+  const p = build.stack[a.index];
+  return {y: a.above ? p.topY : p.botY, r: Math.max(0.45, p.def.r*1.35)};
+}
+function updateAttachMarker(){
+  if(build.attach && build.stack[build.attach.index]){
+    const {y,r} = attachY(build.attach);
+    attachMarker.position.set(0,y,0); attachMarker.scale.setScalar(r/0.9); attachMarker.visible=true;
+  } else { attachMarker.visible=false; }
+}
+canvas.addEventListener('pointerdown', e=>{
+  if(flight.active) return;
+  ptr.down=true; ptr.dragging=false; ptr.x=e.clientX; ptr.y=e.clientY; ptr.moved=0;
+});
+canvas.addEventListener('pointermove', e=>{
+  if(flight.active) return;
+  if(ptr.down){
+    const dx=e.clientX-ptr.x, dy=e.clientY-ptr.y; ptr.x=e.clientX; ptr.y=e.clientY;
+    ptr.moved += Math.abs(dx)+Math.abs(dy);
+    if(ptr.moved>4){ ptr.dragging=true; build.userInteracted=true;
+      build.camAz -= dx*0.008; build.camElev = clamp(build.camElev + dy*0.006, -0.4, 1.2);
+      hoverMarker.visible=false;
+    }
+  } else {
+    // hover preview
+    const a = attachFromHit(pickPart(e.clientX, e.clientY));
+    if(a){ const {y,r}=attachY(a); hoverMarker.position.set(0,y,0); hoverMarker.scale.setScalar(r/0.85); hoverMarker.visible=true; canvas.style.cursor='pointer'; }
+    else { hoverMarker.visible=false; canvas.style.cursor='grab'; }
+  }
+});
+addEventListener('pointerup', e=>{
+  if(flight.active){ ptr.down=false; return; }
+  if(ptr.down && !ptr.dragging){
+    // a click (not a drag): select an attach point, or clear if clicking empty space
+    const a = attachFromHit(pickPart(e.clientX, e.clientY));
+    build.attach = a;                    // null clears -> next part goes to bottom
+    rebuildRocketMesh(); updateAttachMarker();
+  }
+  ptr.down=false; ptr.dragging=false;
+});
+canvas.addEventListener('wheel', e=>{
+  if(flight.active) return;
+  e.preventDefault(); build.userInteracted=true;
+  build.camZoom = clamp(build.camZoom * (e.deltaY>0?1.1:0.9), 0.4, 3);
+}, {passive:false});
 
 /* =====================================================================
    FLIGHT SIMULATION
@@ -845,7 +944,15 @@ function startFlight(){
   rocketGroup.rotation.set(0,0,0);
   rebuildRocketMesh();
   refreshFlightStageUI();
-  flash('Liftoff clear — press Z for full throttle, then Space to stage', 2600);
+  // AUTO-LAUNCH: ignite the first stage and go to full throttle so the vehicle
+  // actually leaves the pad the moment you hit Launch.
+  flight.throttle = 1;
+  if(flight.stages.length && (flight.stages[0].kind==='burn' || flight.stages[0].kind==='boosters')){
+    fireNextStage();
+    flash('🔥 LIFTOFF!  A/D steer · T autopilot · Space next stage', 3400);
+  } else {
+    flash('Press Space to fire stage 1', 3000);
+  }
 }
 
 function revertToBuild(){
@@ -856,7 +963,7 @@ function revertToBuild(){
   buildGroup.visible=true; flightGroup.visible=false;
   exhEnabled=false;
   // restore all part meshes visible
-  rebuildRocketMesh(); refreshStatsUI();
+  rebuildRocketMesh(); refreshStatsUI(); updateAttachMarker();
   hideBanner();
 }
 document.getElementById('btnRevert').onclick=revertToBuild;
