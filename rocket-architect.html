@@ -957,11 +957,21 @@ function startFlight(){
 
 function revertToBuild(){
   flight.active=false;
+  flight.dead=false; flight.landed=false;
   document.getElementById('flightUI').classList.add('hidden');
   document.getElementById('buildUI').classList.remove('hidden');
-  document.getElementById('mapView').classList.add('hidden');
+  document.getElementById('mapView').classList.add('hidden'); mapOpen=false;
   buildGroup.visible=true; flightGroup.visible=false;
-  exhEnabled=false;
+  scene.background.setHex(0x05070d);     // restore dark VAB sky (flight left it sky-blue)
+  stars.material.opacity=0.9;
+  // fully reset the rocket transform — a crash can leave it tumbling/upside-down
+  rocketGroup.rotation.set(0,0,0);
+  rocketGroup.position.set(0,0,0);
+  // clear any leftover explosion/exhaust particles and reset the plume material
+  exploding=false; exhMode='thrust'; exhEnabled=false;
+  for(let i=0;i<EXH_N;i++){ exhLife[i]=0; exhPos[i*3+1]=9999; }
+  exhGeo.attributes.position.needsUpdate=true;
+  exhaust.material.color.set(0xffb057); exhaust.material.size=0.5;
   // restore all part meshes visible
   rebuildRocketMesh(); refreshStatsUI(); updateAttachMarker();
   hideBanner();
