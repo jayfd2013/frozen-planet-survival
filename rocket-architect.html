@@ -166,7 +166,9 @@
           <div class="s" data-s="3">3x</div><div class="s" data-s="4">4x</div>
         </div>
       </div>
-      <div class="btn mini danger" id="btnUndo">Remove last</div>
+      <div class="btn mini" id="btnMoveUp" title="Move selected part up (W)">▲ Up</div>
+      <div class="btn mini" id="btnMoveDn" title="Move selected part down (S)">▼ Down</div>
+      <div class="btn mini danger" id="btnUndo">Remove</div>
       <div class="btn mini danger" id="btnClear">Clear</div>
       <div class="btn primary" id="btnLaunch">🚀 Launch</div>
     </div>
@@ -657,9 +659,9 @@ function rebuildRocketMesh(){
     mesh.userData.stackIndex = i;       // for click-to-select raycasting
     mesh.traverse(o=>{ o.userData.stackIndex = i; });
     p.mesh = mesh; p.topY = y; p.botY = y - p.def.h; p.midY = y - p.def.h/2;
-    // highlight the currently selected part
+    // highlight the currently selected part (bright cyan glow)
     if(build.attach && build.attach.index===i){
-      mesh.traverse(o=>{ if(o.material && o.material.emissive){ o.material = o.material.clone(); o.material.emissive.setHex(0x2a6cff); o.material.emissiveIntensity=0.5; } });
+      mesh.traverse(o=>{ if(o.material && o.material.emissive){ o.material = o.material.clone(); o.material.emissive.setHex(0x27e0ff); o.material.emissiveIntensity=0.9; } });
     }
     rocketGroup.add(mesh);
     y -= p.def.h;
@@ -773,7 +775,7 @@ function addPart(id){
   build.attach = {index: insertAt, above: false};
   commitBuild();
 }
-function commitBuild(){ rebuildRocketMesh(); refreshStatsUI(); frameBuildCamera(); updateAttachMarker(); }
+function commitBuild(){ rebuildRocketMesh(); refreshStatsUI(); frameBuildCamera(); updateAttachMarker(); updateBuildHint(); }
 
 document.getElementById('btnUndo').onclick=()=>{
   // remove the currently-selected part if any, else the last-added stack part
@@ -837,8 +839,18 @@ function updateAttachMarker(){
     attachMarker.position.set(0,y,0); attachMarker.scale.setScalar(r/0.9); attachMarker.visible=true;
   } else { attachMarker.visible=false; }
 }
+const hintEl = document.getElementById('hint');
+function updateBuildHint(){
+  if(build.attach && build.stack[build.attach.index]){
+    const nm = build.stack[build.attach.index].def.name;
+    hintEl.innerHTML = `<b style="color:var(--accent)">Selected: ${nm}</b> &nbsp;·&nbsp; <kbd>W</kbd>/<kbd>S</kbd> or ▲/▼ move &nbsp;·&nbsp; <kbd>Del</kbd> remove &nbsp;·&nbsp; pick a part to add below`;
+  } else {
+    hintEl.innerHTML = 'Click a part to select it &bull; then <kbd>W</kbd>/<kbd>S</kbd> move it &bull; pick catalog parts to add &bull; drag to rotate, scroll to zoom';
+  }
+}
 canvas.addEventListener('pointerdown', e=>{
   if(flight.active) return;
+  build.userInteracted=true;               // stop the idle spin so the model holds still while building
   ptr.down=true; ptr.dragging=false; ptr.x=e.clientX; ptr.y=e.clientY; ptr.moved=0;
 });
 canvas.addEventListener('pointermove', e=>{
@@ -863,7 +875,7 @@ addEventListener('pointerup', e=>{
     // a click (not a drag): select an attach point, or clear if clicking empty space
     const a = attachFromHit(pickPart(e.clientX, e.clientY));
     build.attach = a;                    // null clears -> next part goes to bottom
-    rebuildRocketMesh(); updateAttachMarker();
+    rebuildRocketMesh(); updateAttachMarker(); updateBuildHint();
   }
   ptr.down=false; ptr.dragging=false;
 });
@@ -1569,19 +1581,26 @@ const input={pitch:0, keys:{}};
 
 // ---- BUILD MODE: move the selected part up/down the stack with W/S (or arrows) ----
 function moveSelected(dir){                 // dir -1 = toward top, +1 = toward bottom
-  if(!build.attach || build.stack[build.attach.index]==null) return false;
+  if(!build.attach || build.stack[build.attach.index]==null){
+    flash('Click a part on the rocket first, then move it', 2000);
+    return false;
+  }
   const i = build.attach.index, j = i + dir;
-  if(j < 0 || j >= build.stack.length) return false;
+  if(j < 0 || j >= build.stack.length){ flash('Already at the '+(dir<0?'top':'bottom'), 1200); return false; }
   const t = build.stack[i]; build.stack[i] = build.stack[j]; build.stack[j] = t;
   build.attach.index = j;
   commitBuild(); updateAttachMarker();
   return true;
 }
+document.getElementById('btnMoveUp').onclick = ()=>moveSelected(-1);
+document.getElementById('btnMoveDn').onclick = ()=>moveSelected(1);
 addEventListener('keydown', e=>{
   if(flight.active) return;                 // build-mode keys only
+  const tag = (e.target && e.target.tagName) || '';
+  if(tag==='INPUT' || tag==='TEXTAREA') return;
   const k = e.key.toLowerCase();
-  if(k==='w' || k==='arrowup'){ if(moveSelected(-1)) e.preventDefault(); return; }
-  if(k==='s' || k==='arrowdown'){ if(moveSelected(1)) e.preventDefault(); return; }
+  if(k==='w' || k==='arrowup'){ e.preventDefault(); moveSelected(-1); return; }
+  if(k==='s' || k==='arrowdown'){ e.preventDefault(); moveSelected(1); return; }
   if(k==='delete' || k==='backspace'){       // quick-delete the selected part
     if(build.attach && build.stack[build.attach.index]){ build.stack.splice(build.attach.index,1); build.attach=null; commitBuild(); e.preventDefault(); }
   }
