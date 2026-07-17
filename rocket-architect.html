@@ -213,7 +213,8 @@
       <div class="statrow"><span class="k">Time warp</span><span class="v mono" id="tWarp">1×</span></div>
       <div class="statrow"><span class="k">SAS</span><span class="v mono" id="tSAS">OFF</span></div>
       <div class="statrow"><span class="k">Crew</span><span class="v mono" id="tCrew">—</span></div>
-      <div class="btn mini" id="btnRevert" style="margin-top:4px; text-align:center">↩ Revert to VAB</div>
+      <div class="btn mini" id="btnAuto" style="margin-top:6px; text-align:center">🛰 Auto-Orbit: OFF</div>
+      <div class="btn mini" id="btnRevert" style="margin-top:6px; text-align:center">↩ Revert to VAB</div>
     </div>
 
     <div id="navballWrap">
@@ -224,7 +225,8 @@
       <b>Controls</b><br/>
       <kbd>Z</kbd>/<kbd>X</kbd> full / cut throttle &bull; <kbd>Shift</kbd>/<kbd>Ctrl</kbd> throttle<br/>
       <kbd>A</kbd>/<kbd>D</kbd> pitch W/E &bull; <kbd>T</kbd> SAS &bull; <kbd>F</kbd> hold prograde<br/>
-      <kbd>Space</kbd> next stage &bull; <kbd>M</kbd> map &bull; <kbd>,</kbd>/<kbd>.</kbd> warp
+      <kbd>Space</kbd> next stage &bull; <kbd>M</kbd> map &bull; <kbd>,</kbd>/<kbd>.</kbd> warp<br/>
+      <kbd>O</kbd> auto-orbit (autopilot flies to orbit for you)
     </div>
   </div>
 
@@ -915,6 +917,7 @@ const flight = {
   gforce:1,
   objSpace:false, objOrbit:false, objReturn:false,
   airborne:false, flameoutWarned:false, curStageFuelMax:0,
+  autopilot:false, apPhase:'ascent', apTarget:0,
 };
 
 function totalStackHeightM(){ return build.stack.reduce((s,p)=>s+p.def.h,0); }
@@ -931,6 +934,8 @@ function startFlight(){
   flight.skinTemp=290; flight.gforce=1;
   flight.objSpace=flight.objOrbit=flight.objReturn=false;
   flight.airborne=false; flight.flameoutWarned=false; flight.curStageFuelMax=0;
+  flight.autopilot=false; flight.apPhase='ascent'; flight.apTarget=0;
+  clearDebris();
   // start on surface: r = R, at "equator", moving east at surface speed
   flight.pos.set(0, PLANET.R+ (totalStackHeightM()/2));
   flight.vel.set(PLANET.surfV, 0);      // eastward tangential
@@ -956,6 +961,7 @@ function startFlight(){
   rocketGroup.rotation.set(0,0,0);
   rebuildRocketMesh();
   refreshFlightStageUI();
+  updateAutopilotBtn();
   // AUTO-LAUNCH: ignite the first stage and go to full throttle so the vehicle
   // actually leaves the pad the moment you hit Launch.
   flight.throttle = 1;
@@ -974,6 +980,7 @@ function revertToBuild(){
   document.getElementById('buildUI').classList.remove('hidden');
   document.getElementById('mapView').classList.add('hidden'); mapOpen=false;
   buildGroup.visible=true; flightGroup.visible=false;
+  flight.autopilot=false; flight.apPhase='ascent'; clearDebris();
   scene.background.setHex(0x05070d);     // restore dark VAB sky (flight left it sky-blue)
   stars.material.opacity=0.9;
   // fully reset the rocket transform — a crash can leave it tumbling/upside-down
@@ -989,6 +996,7 @@ function revertToBuild(){
   hideBanner();
 }
 document.getElementById('btnRevert').onclick=revertToBuild;
+document.getElementById('btnAuto').onclick=()=>toggleAutopilot();
 
 /* ---------- current mass / active thrust ---------- */
 function currentMassKg(){
@@ -1109,22 +1117,30 @@ function physStep(dt){
   ctrlAuth *= 1000; // scale
   // gimbal adds control when thrusting
   if(burning) ctrlAuth *= 1.6;
-  let ctrlInput = input.pitch;  // -1..1
-  if(f.sas){
-    if(f.sasHold==='prograde'){
-      // steer toward prograde
-      let err = -aoa; ctrlInput = clamp(err*3 - f.omega*2, -1,1);
-    } else {
-      // stability assist: kill rotation
-      ctrlInput = clamp(input.pitch - f.omega*3, -1,1);
+  if(f.autopilot){
+    // autopilot has direct attitude authority — slew toward its target heading
+    let da = f.apTarget - f.angle; while(da>Math.PI)da-=2*Math.PI; while(da<-Math.PI)da+=2*Math.PI;
+    const slew = 2.2*dt;
+    f.angle += clamp(da, -slew, slew);
+    f.omega = 0;
+  } else {
+    let ctrlInput = input.pitch;  // -1..1
+    if(f.sas){
+      if(f.sasHold==='prograde'){
+        // steer toward prograde
+        let err = -aoa; ctrlInput = clamp(err*3 - f.omega*2, -1,1);
+      } else {
+        // stability assist: kill rotation
+        ctrlInput = clamp(input.pitch - f.omega*3, -1,1);
+      }
     }
+    torque += ctrlInput * ctrlAuth;
+    // damping
+    torque += -f.omega * I * 0.6;
+    f.omega += torque/I * dt;
+    f.omega = clamp(f.omega, -2, 2);
+    f.angle += f.omega*dt;
   }
-  torque += ctrlInput * ctrlAuth;
-  // damping
-  torque += -f.omega * I * 0.6;
-  f.omega += torque/I * dt;
-  f.omega = clamp(f.omega, -2, 2);
-  f.angle += f.omega*dt;
 
   // ---- heating (air-relative) ----
   const heatFlux = rho * Math.pow(airspeed,3) * 1.7e-6;  // scaled
@@ -1228,24 +1244,30 @@ function fireNextStage(){
     if(f.throttle===0) f.throttle=1;
     flash('🔥 '+st.label);
   } else if(st.kind==='decouple'){
-    // jettison spent stuff below
+    // jettison spent stuff below (tumbles away as debris)
     if(st.target==='boosters'){
-      for(const r of f.radials){ if(r.def.solid && !r.jettisoned){ r.jettisoned=true; r.meshes.forEach(m=>m.visible=false); } }
+      for(const r of f.radials){ if(r.def.solid && !r.jettisoned){ r.jettisoned=true; r.meshes.forEach(m=>jettisonDebris(m)); r.meshes=[]; } }
       f.activeEngines=f.activeEngines.filter(e=>e.kind!=='booster');
       flash('✂️ Boosters jettisoned');
     } else if(st.decouplerIdx!=null){
-      // jettison everything from decouplerIdx downward that's spent
       for(let i=st.decouplerIdx; i<f.parts.length; i++){
-        const p=f.parts[i]; if(p && !p.jettisoned && p.def.cat!=='pod'){ p.jettisoned=true; if(p.mesh)p.mesh.visible=false; }
+        const p=f.parts[i]; if(p && !p.jettisoned && p.def.cat!=='pod'){ p.jettisoned=true; jettisonDebris(p.mesh); p.mesh=null; }
       }
       f.activeEngines=f.activeEngines.filter(e=>!(e.ref&&e.ref.jettisoned));
-      flash('✂️ Stage decoupled');
+      flash('✂️ Stage separated');
     }
+    relayoutFlightRocket();
   } else if(st.kind==='chute'){
     if(flight.chuteState==='stowed'||flight.chuteState==='none'){
       flight.chuteState='armed';
       flash('🪂 Parachute armed — drogue opens below 4 km, main when slow');
     }
+  }
+  // KSP-style: dropping a spent stage immediately lights the next engine in ONE press,
+  // so the vehicle keeps flying instead of coasting dead.
+  if(st.kind==='decouple' && f.stages[f.stageIdx+1] && f.stages[f.stageIdx+1].kind==='burn'){
+    fireNextStage();
+    return;
   }
   refreshFlightStageUI();
 }
@@ -1332,6 +1354,38 @@ function spawnExplosion(){
 }
 
 /* ---------- exhaust update ---------- */
+/* ---------- separation debris: dropped stages tumble away ---------- */
+const debris=[];
+function jettisonDebris(mesh){
+  if(!mesh) return;
+  mesh.updateWorldMatrix(true,false);
+  const wp=new THREE.Vector3(), wq=new THREE.Quaternion(), ws=new THREE.Vector3();
+  mesh.matrixWorld.decompose(wp,wq,ws);
+  if(mesh.parent) mesh.parent.remove(mesh);
+  scene.add(mesh);
+  mesh.position.copy(wp); mesh.quaternion.copy(wq); mesh.scale.copy(ws); mesh.visible=true;
+  debris.push({mesh,
+    vel:new THREE.Vector3((Math.random()-0.5)*1.2, -1.6-Math.random()*1.6, (Math.random()-0.5)*1.2),
+    ang:new THREE.Vector3((Math.random()-0.5)*2,(Math.random()-0.5)*2,(Math.random()-0.5)*2), life:3.4});
+}
+function updateDebris(dt){
+  for(let i=debris.length-1;i>=0;i--){
+    const d=debris[i]; d.life-=dt;
+    d.vel.y -= dt*1.5;                 // gentle "fall behind" as the ship accelerates away
+    d.mesh.position.addScaledVector(d.vel, dt*4);
+    d.mesh.rotation.x+=d.ang.x*dt; d.mesh.rotation.y+=d.ang.y*dt; d.mesh.rotation.z+=d.ang.z*dt;
+    if(d.life<=0){ scene.remove(d.mesh); debris.splice(i,1); }
+  }
+}
+function clearDebris(){ for(const d of debris) scene.remove(d.mesh); debris.length=0; }
+// after dropping a stage, slide the remaining rocket down so the live engine sits at the bottom
+function relayoutFlightRocket(){
+  const remaining = flight.parts.filter(p=>!p.jettisoned && p.mesh);
+  let totalH = remaining.reduce((s,p)=>s+p.def.h,0);
+  let y=totalH;
+  for(const p of remaining){ p.mesh.position.y = y - p.def.h/2; y-=p.def.h; }
+}
+
 function updateExhaust(dt){
   if(exhMode==='boom'){
     for(let i=0;i<EXH_N;i++){
@@ -1618,6 +1672,7 @@ addEventListener('keydown', e=>{
   if(k==='x'){ flight.throttle=0; }
   if(k==='t'){ flight.sas=!flight.sas; if(flight.sas&&flight.sasHold==='prograde')flight.sasHold='stab'; }
   if(k==='f'){ flight.sas=true; flight.sasHold = flight.sasHold==='prograde'?'stab':'prograde'; }
+  if(k==='o'){ toggleAutopilot(); }
   if(k==='m'){ toggleMap(); }
   if(k==='.'){ flight.warp=Math.min(50, flight.warp*2 || 1); if(flight.warp<1)flight.warp=1; }
   if(k===','){ flight.warp=Math.max(1, Math.floor(flight.warp/2)); }
@@ -1634,6 +1689,89 @@ function toggleMap(){ mapOpen=!mapOpen; document.getElementById('mapView').class
 document.getElementById('mapClose').onclick=toggleMap;
 
 /* =====================================================================
+   AUTOPILOT — flies the ascent, gravity turn, and circularization to orbit
+   ===================================================================== */
+function anyEngineHasFuel(){
+  for(const e of flight.activeEngines){
+    if(e.kind==='booster'){ if(e.ref.solid>0) return true; }
+    else if(e.fuelSource && e.fuelSource.some(t=>t.fuel>0)) return true;
+  }
+  return false;
+}
+// is there still a powered stage ahead we could ignite?
+function hasFutureEngine(){
+  for(let i=flight.stageIdx+1;i<flight.stages.length;i++){
+    const k=flight.stages[i].kind; if(k==='burn'||k==='boosters') return true;
+  }
+  return false;
+}
+// auto-stage only when it leads to another engine (never strand by decoupling into a chute)
+function autopilotStageIfDry(){
+  const f=flight;
+  if(anyEngineHasFuel()) return;
+  const next=f.stages[f.stageIdx+1];
+  if(!next) return;
+  if(next.kind==='burn' || next.kind==='boosters') fireNextStage();
+  else if(next.kind==='decouple' && f.stages[f.stageIdx+2] && f.stages[f.stageIdx+2].kind==='burn') fireNextStage();
+}
+function toggleAutopilot(){
+  flight.autopilot=!flight.autopilot;
+  if(flight.autopilot){
+    if(flight.apPhase==='done') flight.apPhase='ascent';
+    flight.sas=false;
+    flash('🛰 Autopilot engaged — sit back and watch',2200,'var(--accent)');
+  } else flash('Autopilot off — manual control',1500,'var(--warn)');
+  updateAutopilotBtn();
+}
+function updateAutopilotBtn(){
+  const b=document.getElementById('btnAuto'); if(!b) return;
+  b.textContent='🛰 Auto-Orbit: '+(flight.autopilot?'ON':'OFF');
+  b.classList.toggle('primary', flight.autopilot);
+}
+function updateAutopilot(dt){
+  const f=flight;
+  if(!f.autopilot || f.dead || f.landed) return;
+  const up=f.pos.clone().normalize();
+  const east=new THREE.Vector2(up.y,-up.x);
+  const r=f.pos.length(), alt=r-PLANET.R;
+  const orb=orbitElements();
+  const vv=f.vel.dot(up);
+  if(f.throttle>0) autopilotStageIfDry();
+  // prograde heading (surface-relative in atmosphere, orbital above)
+  let vref=f.vel.clone();
+  if(alt<PLANET.atmoTop) vref.sub(east.clone().multiplyScalar((PLANET.surfV/PLANET.R)*r));
+  let progradeAngle = vref.length()>1 ? Math.atan2(vref.clone().normalize().dot(east), vref.clone().normalize().dot(up)) : 0;
+  const HORIZ = Math.PI/2;   // point at the eastern horizon (efficient circularization heading)
+
+  if(f.apPhase==='ascent'){
+    f.throttle=1;
+    // pitch SCHEDULE: command the nose ahead of prograde to actively turn the
+    // trajectory over (a real gravity-turn schedule), building lots of horizontal
+    // speed so little circularization is needed. Limit angle-of-attack vs prograde
+    // so we don't flip in the thick lower atmosphere.
+    let prog = alt<1500 ? 0 : clamp((alt-1500)/(40000-1500),0,1) * (80*DEG);
+    const maxAoA = (alt<12000 ? 10 : alt<28000 ? 25 : 55) * DEG;
+    f.apTarget = clamp(prog, progradeAngle-maxAoA, progradeAngle+maxAoA);
+    if(orb.ap>78000){ f.throttle=0; f.apPhase='coast'; flash('🛰 Apoapsis 78 km — coasting to circularize',1800,'var(--accent)'); }
+  } else if(f.apPhase==='coast'){
+    f.throttle=0; f.apTarget=progradeAngle;
+    // start the burn as we near the top (still ascending) so the prograde burn "chases"
+    // apoapsis upward — a low-thrust upper stage circularizes without falling back.
+    if(alt >= orb.ap-4000 || vv<0){ f.apPhase='circ'; flash('🛰 Circularization burn',1600,'var(--accent)'); }
+  } else if(f.apPhase==='circ'){
+    // near/before apoapsis, prograde ≈ horizontal and keeps the orbit rising as it rounds out
+    f.apTarget=progradeAngle; f.throttle=1;
+    if(orb.pe>PLANET.atmoTop+2000){
+      f.throttle=0; f.autopilot=false; f.apPhase='done';
+      flash('🛰 Stable orbit achieved by autopilot!',3200,'var(--good)'); updateAutopilotBtn();
+    } else if(!anyEngineHasFuel() && !hasFutureEngine()){
+      f.autopilot=false; f.apPhase='done';
+      flash('Out of fuel before orbit — add more Δv and try again',3200,'var(--warn)'); updateAutopilotBtn();
+    }
+  }
+}
+
+/* =====================================================================
    MAIN LOOP
    ===================================================================== */
 document.getElementById('btnLaunch').onclick=startFlight;
@@ -1647,6 +1785,7 @@ function loop(now){
   } else {
     pollInput();
     if(!flight.dead && !flight.landed){
+      updateAutopilot(dt);
       // physics substeps with warp
       const powered = flight.activeEngines.length>0 && flight.throttle>0;
       const subDt = powered? 0.02 : 0.05;
@@ -1654,8 +1793,8 @@ function loop(now){
       let steps=Math.ceil(target/subDt); steps=clamp(steps,1,60);
       const sdt=target/steps;
       for(let i=0;i<steps && !flight.dead && !flight.landed;i++) physStep(sdt);
-      // auto burnout detection: if active engine ran dry, notify once
     }
+    updateDebris(dt);
     updateExhaust(dt);
     updateFlightRender();
     updateHUD();
