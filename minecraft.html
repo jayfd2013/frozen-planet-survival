@@ -143,6 +143,34 @@
         font-size: 15px; text-align: center;
         background: rgba(0,0,0,0.55); padding: 14px 22px; border-radius: 12px;
       }
+      #godpanel {
+        position: fixed; top: 12px; right: 12px; z-index: 20;
+        display: none; pointer-events: none;
+        font-size: 12px; line-height: 1.6;
+        padding: 10px 14px; border-radius: 12px;
+        background: linear-gradient(160deg, rgba(120,40,180,0.42), rgba(40,10,70,0.42));
+        border: 1px solid rgba(210,160,255,0.45);
+        box-shadow: 0 6px 20px rgba(80,0,140,0.35);
+        backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px);
+        text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+      }
+      #godpanel .gtitle {
+        font-size: 14px; font-weight: 800; letter-spacing: 1px;
+        color: #f0c8ff; margin-bottom: 4px;
+      }
+      #godpanel b { color: #ffe08a; }
+      #godpanel .k {
+        display: inline-block; min-width: 16px; text-align: center; padding: 1px 6px;
+        margin: 0 1px; border-radius: 5px; font-size: 11px;
+        background: rgba(255,255,255,0.16); border: 1px solid rgba(255,255,255,0.35);
+      }
+      #godpanel .dim { opacity: 0.8; }
+      #godToast {
+        position: fixed; top: 22%; left: 50%; transform: translateX(-50%);
+        z-index: 40; display: none; pointer-events: none;
+        font-size: 20px; font-weight: 800; letter-spacing: 1px; color: #f0c8ff;
+        text-shadow: 0 2px 10px rgba(120,0,200,0.8), 0 1px 2px rgba(0,0,0,0.8);
+      }
     </style>
   </head>
   <body>
@@ -155,6 +183,15 @@
     <div id="hotbar"></div>
     <div id="credit">VoxelCraft 3D · Made with AI</div>
 
+    <div id="godpanel">
+      <div class="gtitle">⚡ GOD MODE</div>
+      <div>Brush <b id="gbrush">3</b> <span class="dim"><span class="k">[</span><span class="k">]</span> size · <span class="k">L</span>dig <span class="k">R</span>fill</span></div>
+      <div>Noclip <b id="gnoclip">off</b> <span class="dim"><span class="k">V</span></span></div>
+      <div><span class="k">N</span> nuke chunk · <span class="k">C</span> clear area · <span class="k">T</span> tower</div>
+      <div class="dim">flight + super-speed on · <span class="k">G</span> exit</div>
+    </div>
+    <div id="godToast"></div>
+
     <div id="pauseHint">Paused — click to resume</div>
 
     <div id="overlay">
@@ -165,6 +202,7 @@
         <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move &nbsp;·&nbsp; <kbd>Space</kbd> Jump &nbsp;·&nbsp; <kbd>Shift</kbd> Sprint</div>
         <div><kbd>Mouse</kbd> Look &nbsp;·&nbsp; <kbd>L-Click</kbd> Mine &nbsp;·&nbsp; <kbd>R-Click</kbd> Place</div>
         <div><kbd>1</kbd>–<kbd>9</kbd> / <kbd>Scroll</kbd> Select block &nbsp;·&nbsp; <kbd>F</kbd> Toggle fly</div>
+        <div><kbd>G</kbd> ⚡ <b>God Mode</b> — giant brush, nuke chunks, noclip &amp; more</div>
         <div><kbd>Esc</kbd> Release mouse</div>
       </div>
     </div>
@@ -693,6 +731,7 @@
 
       function movePlayer(dt) {
         const p = player.pos, v = player.vel;
+        const phase = god.noclip;               // noclip = ignore all collision
 
         // gravity
         if (!player.fly) v.y -= 30 * dt;
@@ -700,14 +739,14 @@
 
         // integrate axis-by-axis with collision
         let nx = p.x + v.x * dt;
-        if (!collides(nx, p.y, p.z)) p.x = nx; else v.x = 0;
+        if (phase || !collides(nx, p.y, p.z)) p.x = nx; else v.x = 0;
 
         let nz = p.z + v.z * dt;
-        if (!collides(p.x, p.y, nz)) p.z = nz; else v.z = 0;
+        if (phase || !collides(p.x, p.y, nz)) p.z = nz; else v.z = 0;
 
         player.onGround = false;
         let ny = p.y + v.y * dt;
-        if (!collides(p.x, ny, p.z)) {
+        if (phase || !collides(p.x, ny, p.z)) {
           p.y = ny;
         } else {
           if (v.y < 0) player.onGround = true;
@@ -754,12 +793,88 @@
         player.pitch = Math.max(-lim, Math.min(lim, player.pitch));
       });
 
+      // ===================================================================
+      //  God Mode  ⚡
+      // ===================================================================
+      const god = { on: false, brush: 3, noclip: false };
+      const godPanel = document.getElementById('godpanel');
+      const godToastEl = document.getElementById('godToast');
+      let toastTimer = 0;
+      function toast(msg) {
+        godToastEl.textContent = msg;
+        godToastEl.style.display = 'block';
+        toastTimer = 1.1;
+      }
+      function updateGodPanel() {
+        godPanel.style.display = god.on ? 'block' : 'none';
+        document.getElementById('gbrush').textContent = god.brush;
+        document.getElementById('gnoclip').textContent = god.noclip ? 'on' : 'off';
+      }
+      function toggleGod() {
+        god.on = !god.on;
+        if (god.on) { player.fly = true; player.vel.set(0, 0, 0); toast('⚡ GOD MODE'); }
+        else { god.noclip = false; toast('mortal again'); }
+        updateGodPanel(); updateHud();
+      }
+
+      // Set a sphere of blocks around (cx,cy,cz) to `id`. Returns nothing.
+      function sphereEdit(cx, cy, cz, r, id) {
+        const r2 = (r + 0.35) * (r + 0.35);
+        for (let dx = -r; dx <= r; dx++)
+          for (let dy = -r; dy <= r; dy++)
+            for (let dz = -r; dz <= r; dz++)
+              if (dx * dx + dy * dy + dz * dz <= r2)
+                setBlock(cx + dx, cy + dy, cz + dz, id);
+      }
+
+      // Wipe every block in the chunk that contains world coords (wx,wz).
+      function nukeChunk(wx, wz) {
+        const cx = Math.floor(wx / CHUNK), cz = Math.floor(wz / CHUNK);
+        const c = getChunk(cx, cz);
+        if (!c) return;
+        c.blocks.fill(AIR);
+        markDirty(cx, cz);
+        markDirty(cx - 1, cz); markDirty(cx + 1, cz);
+        markDirty(cx, cz - 1); markDirty(cx, cz + 1);
+        toast('💥 chunk erased');
+      }
+
+      // Clear a big cube of air around the player (handy for carving rooms).
+      function clearArea(rad, rady) {
+        const px = Math.round(player.pos.x), py = Math.round(player.pos.y), pz = Math.round(player.pos.z);
+        for (let dx = -rad; dx <= rad; dx++)
+          for (let dz = -rad; dz <= rad; dz++)
+            for (let dy = 0; dy <= rady; dy++)
+              setBlock(px + dx, py + dy, pz + dz, AIR);
+        toast('🌀 area cleared');
+      }
+
+      // Raise a tower under the player and stand on top.
+      function towerUp() {
+        const px = Math.round(player.pos.x), pz = Math.round(player.pos.z);
+        const base = Math.floor(player.pos.y);
+        for (let i = 0; i < 12; i++) setBlock(px, base + i, pz, HOTBAR[selected]);
+        player.pos.set(px + 0.5, base + 12, pz + 0.5);
+        player.vel.set(0, 0, 0);
+        toast('🏗️ tower!');
+      }
+
       addEventListener('keydown', (e) => {
         keys[e.code] = true;
         if (e.code === 'KeyF') { player.fly = !player.fly; player.vel.y = 0; updateHud(); }
         if (e.code.startsWith('Digit')) {
           const n = parseInt(e.code.slice(5), 10);
           if (n >= 1 && n <= HOTBAR.length) selectSlot(n - 1);
+        }
+        if (!running) return;
+        if (e.code === 'KeyG') toggleGod();
+        if (god.on) {
+          if (e.code === 'KeyV') { god.noclip = !god.noclip; updateGodPanel(); toast(god.noclip ? 'noclip on' : 'noclip off'); }
+          if (e.code === 'BracketLeft')  { god.brush = Math.max(1, god.brush - 1); updateGodPanel(); }
+          if (e.code === 'BracketRight') { god.brush = Math.min(12, god.brush + 1); updateGodPanel(); }
+          if (e.code === 'KeyN') { const h = raycast(); const c = h ? h.block : [player.pos.x, 0, player.pos.z]; nukeChunk(c[0], c[2]); }
+          if (e.code === 'KeyC') clearArea(6, 6);
+          if (e.code === 'KeyT') towerUp();
         }
       });
       addEventListener('keyup', (e) => { keys[e.code] = false; });
@@ -775,18 +890,20 @@
         const hit = raycast();
         if (!hit) return;
         if (e.button === 0) {
-          // mine
-          setBlock(hit.block[0], hit.block[1], hit.block[2], AIR);
+          // mine — god mode digs a whole sphere
+          if (god.on && god.brush > 1) sphereEdit(hit.block[0], hit.block[1], hit.block[2], god.brush, AIR);
+          else setBlock(hit.block[0], hit.block[1], hit.block[2], AIR);
         } else if (e.button === 2) {
           // place at the empty cell before the hit
           if (!hit.place) return;
           const [x, y, z] = hit.place;
-          // don't place inside the player
+          if (god.on && god.brush > 1) { sphereEdit(x, y, z, god.brush, HOTBAR[selected]); return; }
+          // don't place inside the player (unless noclipping)
           const pminX = Math.floor(player.pos.x - HALF), pmaxX = Math.floor(player.pos.x + HALF);
           const pminY = Math.floor(player.pos.y), pmaxY = Math.floor(player.pos.y + player.height - 0.01);
           const pminZ = Math.floor(player.pos.z - HALF), pmaxZ = Math.floor(player.pos.z + HALF);
           const inside = x >= pminX && x <= pmaxX && y >= pminY && y <= pmaxY && z >= pminZ && z <= pmaxZ;
-          if (!inside) setBlock(x, y, z, HOTBAR[selected]);
+          if (!inside || god.noclip) setBlock(x, y, z, HOTBAR[selected]);
         }
       });
       renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -798,7 +915,8 @@
         camera.getWorldDirection(_d);
         let prev = null;
         const step = 0.05;
-        for (let t = 0; t < REACH; t += step) {
+        const reach = god.on ? 40 : REACH;      // god mode = long reach
+        for (let t = 0; t < reach; t += step) {
           const bx = Math.floor(_o.x + _d.x * t);
           const by = Math.floor(_o.y + _d.y * t);
           const bz = Math.floor(_o.z + _d.z * t);
@@ -910,7 +1028,7 @@
       const chunksEl = document.getElementById('chunks');
       const modeEl = document.getElementById('mode');
       function updateHud() {
-        modeEl.textContent = player.fly ? 'Fly / Creative' : 'Survival';
+        modeEl.textContent = god.on ? '⚡ God' : (player.fly ? 'Fly / Creative' : 'Survival');
       }
       updateHud();
 
@@ -934,7 +1052,8 @@
           let wx = -sin * fwd + cos * strafe;
           let wz = -cos * fwd - sin * strafe;
           const len = Math.hypot(wx, wz);
-          const speed = (keys['ShiftLeft'] || keys['ShiftRight']) ? 8.5 : 5;
+          const sprint = keys['ShiftLeft'] || keys['ShiftRight'];
+          const speed = god.on ? (sprint ? 30 : 14) : (sprint ? 8.5 : 5);
           if (len > 0) { wx = wx / len * speed; wz = wz / len * speed; }
           player.vel.x = wx;
           player.vel.z = wz;
@@ -951,6 +1070,9 @@
         }
 
         renderer.render(scene, camera);
+
+        // fade the god-mode toast
+        if (toastTimer > 0) { toastTimer -= dt; if (toastTimer <= 0) godToastEl.style.display = 'none'; }
 
         // hud (throttled)
         fpsTimer += dt; fpsFrames++;
