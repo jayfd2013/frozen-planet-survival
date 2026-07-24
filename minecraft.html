@@ -225,6 +225,7 @@
       const RENDER_DIST = 4;           // chunk radius around player (lower = less lag)
       const BUILD_PER_FRAME = 2;       // chunk meshes built per frame
       const REACH = 6;                 // block interaction reach
+      const WATER_FLOW = 4;            // how far water spreads from a source (Minecraft uses 7)
 
       // World seed — random every load, or pinned via ?seed=NUMBER in the URL
       const _seedParam = new URLSearchParams(location.search).get('seed');
@@ -563,11 +564,11 @@
           if (!source) {
             let target = 0;
             if (getWater(x, y + 1, z) > 0) {
-              target = 7;                              // fed from above (a falling column)
+              target = WATER_FLOW;                     // fed from above (a falling column)
             } else {
               for (const d of WATER_DIRS) {
                 const nl = getWater(x + d[0], y, z + d[1]);
-                const feed = nl === 8 ? 7 : nl - 1;    // a neighbour of level L feeds L-1
+                const feed = nl === 8 ? WATER_FLOW : nl - 1; // a neighbour of level L feeds L-1
                 if (feed > target) target = feed;
               }
             }
@@ -582,9 +583,9 @@
           // Flow: prefer straight down, otherwise spread sideways.
           const below = getBlock(x, y - 1, z);
           if (below === AIR) {
-            if (getWater(x, y - 1, z) < 7) { setWaterLevel(x, y - 1, z, 7); activateWater(x, y - 1, z); }
+            if (getWater(x, y - 1, z) < WATER_FLOW) { setWaterLevel(x, y - 1, z, WATER_FLOW); activateWater(x, y - 1, z); }
           } else if (below === WATER || isSolid(below)) {
-            const spread = source ? 7 : lvl - 1;
+            const spread = source ? WATER_FLOW : lvl - 1;
             if (spread >= 1) {
               for (const d of WATER_DIRS) {
                 const nx = x + d[0], nz = z + d[1];
