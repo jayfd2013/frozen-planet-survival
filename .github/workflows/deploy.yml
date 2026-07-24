@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: ['main', 'claude/threejs-game-skeleton-yWSEo']
+    branches: ['main', 'claude/threejs-game-skeleton-yWSEo', 'claude/game-design-test-uqm7z0']
   workflow_dispatch:
 
 permissions:
