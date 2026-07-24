@@ -219,6 +219,151 @@
       function isSeeThrough(id){ return id === AIR || id === WATER || id === GLASS; }
 
       // ===================================================================
+      //  Procedural texture atlas (drawn once to a canvas, no external files)
+      // ===================================================================
+      // Tile indices packed left-to-right into a single 16px-tall strip.
+      const TILE = {
+        GRASS_TOP:0, GRASS_SIDE:1, DIRT:2, STONE:3, COBBLE:4, LOG_SIDE:5,
+        LOG_TOP:6, LEAVES:7, SAND:8, PLANKS:9, GLASS:10, BRICK:11, WATER:12,
+      };
+      const TILE_COUNT = 13;
+      const TS = 16; // texels per tile
+
+      // pick the atlas tile for a block id + face (2=+Y top, 3=-Y bottom, else side)
+      function tileFor(id, f) {
+        const top = f === 2, bottom = f === 3;
+        switch (id) {
+          case GRASS:  return top ? TILE.GRASS_TOP : (bottom ? TILE.DIRT : TILE.GRASS_SIDE);
+          case DIRT:   return TILE.DIRT;
+          case STONE:  return TILE.STONE;
+          case COBBLE: return TILE.COBBLE;
+          case LOG:    return (top || bottom) ? TILE.LOG_TOP : TILE.LOG_SIDE;
+          case LEAVES: return TILE.LEAVES;
+          case SAND:   return TILE.SAND;
+          case PLANKS: return TILE.PLANKS;
+          case GLASS:  return TILE.GLASS;
+          case BRICK:  return TILE.BRICK;
+          case WATER:  return TILE.WATER;
+          default:     return TILE.STONE;
+        }
+      }
+
+      function makeAtlasCanvas() {
+        const cvs = document.createElement('canvas');
+        cvs.width = TILE_COUNT * TS; cvs.height = TS;
+        const ctx = cvs.getContext('2d');
+        const cl = (v) => (v < 0 ? 0 : v > 255 ? 255 : v | 0);
+        const R = () => Math.random();
+        const put = (ox, x, y, r, g, b) => { ctx.fillStyle = `rgb(${cl(r)},${cl(g)},${cl(b)})`; ctx.fillRect(ox + x, y, 1, 1); };
+        // fill a whole tile with a base colour + per-texel noise
+        const fill = (t, r, g, b, amp) => {
+          const ox = t * TS;
+          for (let y = 0; y < TS; y++) for (let x = 0; x < TS; x++) {
+            const n = (R() * 2 - 1) * amp;
+            put(ox, x, y, r + n, g + n, b + n);
+          }
+        };
+        const specks = (t, n, dr, dg, db, spread) => {
+          const ox = t * TS;
+          for (let i = 0; i < n; i++) {
+            const x = (R() * TS) | 0, y = (R() * TS) | 0, s = (R() * spread) | 0;
+            put(ox, x, y, dr + s, dg + s, db + s);
+          }
+        };
+
+        // Dirt
+        fill(TILE.DIRT, 138, 100, 62, 16); specks(TILE.DIRT, 22, 96, 66, 38, 30);
+        // Grass top
+        fill(TILE.GRASS_TOP, 96, 150, 66, 16); specks(TILE.GRASS_TOP, 26, 70, 120, 46, 40);
+        // Grass side = dirt with a jagged green cap
+        fill(TILE.GRASS_SIDE, 138, 100, 62, 16); specks(TILE.GRASS_SIDE, 14, 96, 66, 38, 26);
+        {
+          const ox = TILE.GRASS_SIDE * TS;
+          for (let x = 0; x < TS; x++) {
+            const h = 3 + ((R() * 2.5) | 0);
+            for (let y = 0; y < h; y++) { const n = (R() * 2 - 1) * 16; put(ox, x, y, 92 + n, 150 + n, 62 + n); }
+          }
+        }
+        // Stone with a couple of darker cracks
+        fill(TILE.STONE, 128, 128, 134, 9); specks(TILE.STONE, 16, 104, 104, 110, 18);
+        {
+          const ox = TILE.STONE * TS;
+          for (let k = 0; k < 2; k++) { let x = (R() * TS) | 0; for (let y = 2; y < 13; y++) { x += (R() < 0.5 ? -1 : 1); put(ox, ((x % TS) + TS) % TS, y, 96, 96, 102); } }
+        }
+        // Cobblestone: pebbles with dark mortar
+        fill(TILE.COBBLE, 96, 96, 102, 6);
+        {
+          const ox = TILE.COBBLE * TS;
+          const stones = [[1,1,6,5],[9,1,5,6],[1,8,4,6],[7,9,7,5],[6,1,3,3]];
+          for (const [sx, sy, sw, sh2] of stones)
+            for (let y = 0; y < sh2; y++) for (let x = 0; x < sw; x++) {
+              if (sx + x >= TS || sy + y >= TS) continue;
+              const n = (R() * 2 - 1) * 12; const base = 150 + n;
+              put(ox, sx + x, sy + y, base, base, base + 6);
+            }
+        }
+        // Log side: vertical grain
+        fill(TILE.LOG_SIDE, 108, 78, 46, 8);
+        {
+          const ox = TILE.LOG_SIDE * TS;
+          for (let x = 0; x < TS; x++) if (R() < 0.35) for (let y = 0; y < TS; y++) { const n = (R() * 2 - 1) * 6; put(ox, x, y, 86 + n, 60 + n, 34 + n); }
+        }
+        // Log top: rings
+        fill(TILE.LOG_TOP, 150, 112, 66, 8);
+        {
+          const ox = TILE.LOG_TOP * TS, cxp = 7.5, cyp = 7.5;
+          for (let y = 0; y < TS; y++) for (let x = 0; x < TS; x++) {
+            const d = Math.sqrt((x - cxp) ** 2 + (y - cyp) ** 2);
+            if ((d | 0) % 3 === 0) put(ox, x, y, 118, 84, 48);
+          }
+        }
+        // Leaves: green with darker gaps
+        fill(TILE.LEAVES, 64, 118, 52, 20); specks(TILE.LEAVES, 40, 40, 84, 30, 34);
+        // Sand
+        fill(TILE.SAND, 214, 202, 140, 9); specks(TILE.SAND, 18, 196, 186, 128, 16);
+        // Planks: horizontal wood boards with grain streaks
+        fill(TILE.PLANKS, 186, 145, 90, 6);
+        {
+          const ox = TILE.PLANKS * TS;
+          for (let y = 0; y < TS; y += 4) for (let x = 0; x < TS; x++) put(ox, x, y, 118, 88, 50); // board seams
+          for (let y = 0; y < TS; y++) {                       // horizontal grain within each board
+            if (y % 4 === 0) continue;
+            for (let x = 0; x < TS; x++) if (R() < 0.28) { const d = (R() * 2 - 1) * 16; put(ox, x, y, 186 + d, 145 + d * 0.8, 90 + d * 0.6); }
+          }
+        }
+        // Glass: mostly clear with a bright frame + highlight
+        fill(TILE.GLASS, 205, 222, 232, 4);
+        {
+          const ox = TILE.GLASS * TS;
+          for (let i = 0; i < TS; i++) { put(ox, i, 0, 240, 248, 252); put(ox, i, TS-1, 240, 248, 252); put(ox, 0, i, 240, 248, 252); put(ox, TS-1, i, 240, 248, 252); }
+          for (let i = 2; i < 8; i++) put(ox, i, i, 235, 245, 250);
+        }
+        // Brick: offset rows of bricks with light mortar
+        fill(TILE.BRICK, 150, 70, 60, 10);
+        {
+          const ox = TILE.BRICK * TS;
+          for (let y = 0; y < TS; y++) for (let x = 0; x < TS; x++) {
+            const row = (y / 4) | 0;
+            const offset = row % 2 ? 4 : 0;
+            if (y % 4 === 0 || (x + offset) % 8 === 0) put(ox, x, y, 196, 186, 176); // mortar
+          }
+        }
+        // Water
+        fill(TILE.WATER, 48, 108, 196, 12); specks(TILE.WATER, 14, 70, 130, 210, 20);
+
+        return cvs;
+      }
+
+      // UV rect for a tile, inset slightly to avoid sampling neighbouring tiles.
+      const UV_QUAD = [[0,0],[1,0],[1,1],[0,1]];
+      function tileUV(out, t, corner) {
+        const pad = 0.05;
+        const u0 = (t + pad) / TILE_COUNT, u1 = (t + 1 - pad) / TILE_COUNT;
+        const v0 = pad, v1 = 1 - pad;
+        out.push(UV_QUAD[corner][0] ? u1 : u0, UV_QUAD[corner][1] ? v1 : v0);
+      }
+
+      // ===================================================================
       //  Perlin noise (seeded)
       // ===================================================================
       const perm = new Uint8Array(512);
@@ -395,17 +540,10 @@
         { n: [ 0, 0,-1], c: [[0,0,0],[1,0,0],[1,1,0],[0,1,0]], s: 0.86 }, // -Z
       ];
 
-      function faceColor(id, faceIndex) {
-        let base = COLORS[id];
-        if (id === GRASS) base = faceIndex === 2 ? GRASS_TOP : (faceIndex === 3 ? COLORS[DIRT] : COLORS[GRASS]);
-        else if (id === LOG && (faceIndex === 2 || faceIndex === 3)) base = LOG_TOP;
-        return base;
-      }
-
       function buildChunkMesh(c) {
-        const sp = [], sc = [];   // solid positions / colors
-        const wp = [], wc = [];   // water positions / colors
-        const gp = [], gc = [];   // glass positions / colors
+        const sp = [], sc = [], su = [];   // solid positions / colors / uvs
+        const wp = [], wc = [], wu = [];   // water positions / colors / uvs
+        const gp = [], gc = [], gu = [];   // glass positions / colors / uvs
         const ox = c.cx * CHUNK, oz = c.cz * CHUNK;
 
         for (let y = 0; y < WORLD_HEIGHT; y++) {
@@ -431,17 +569,18 @@
                 }
                 if (!show) continue;
 
-                const col = faceColor(id, f);
-                const sh = FACES[f].s;
-                const r = col[0] * sh, g = col[1] * sh, bl = col[2] * sh;
+                const sh = FACES[f].s;                 // directional shade -> vertex color
+                const t = tileFor(id, f);              // atlas tile -> texture
                 const P = water ? wp : (glass ? gp : sp);
                 const C = water ? wc : (glass ? gc : sc);
+                const U = water ? wu : (glass ? gu : su);
                 const corners = FACES[f].c;
                 // two triangles: 0,1,2 and 0,2,3
                 for (const ti of [0, 1, 2, 0, 2, 3]) {
                   const cc = corners[ti];
                   P.push(wx + cc[0], wy + cc[1], wz + cc[2]);
-                  C.push(r, g, bl);
+                  C.push(sh, sh, sh);
+                  tileUV(U, t, ti);
                 }
               }
             }
@@ -455,6 +594,7 @@
           const g = new THREE.BufferGeometry();
           g.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3));
           g.setAttribute('color', new THREE.Float32BufferAttribute(sc, 3));
+          g.setAttribute('uv', new THREE.Float32BufferAttribute(su, 2));
           c.solidMesh = new THREE.Mesh(g, solidMat);
           c.solidMesh.frustumCulled = true;
           g.computeBoundingSphere();
@@ -464,6 +604,7 @@
           const g = new THREE.BufferGeometry();
           g.setAttribute('position', new THREE.Float32BufferAttribute(wp, 3));
           g.setAttribute('color', new THREE.Float32BufferAttribute(wc, 3));
+          g.setAttribute('uv', new THREE.Float32BufferAttribute(wu, 2));
           c.waterMesh = new THREE.Mesh(g, waterMat);
           g.computeBoundingSphere();
           scene.add(c.waterMesh);
@@ -472,6 +613,7 @@
           const g = new THREE.BufferGeometry();
           g.setAttribute('position', new THREE.Float32BufferAttribute(gp, 3));
           g.setAttribute('color', new THREE.Float32BufferAttribute(gc, 3));
+          g.setAttribute('uv', new THREE.Float32BufferAttribute(gu, 2));
           c.glassMesh = new THREE.Mesh(g, glassMat);
           g.computeBoundingSphere();
           scene.add(c.glassMesh);
@@ -500,13 +642,22 @@
       renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
       document.body.appendChild(renderer.domElement);
 
-      const solidMat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
+      // Procedural texture atlas — crisp pixel look (nearest filtering, no mipmaps)
+      const atlasCanvas = makeAtlasCanvas();
+      const atlas = new THREE.CanvasTexture(atlasCanvas);
+      atlas.magFilter = THREE.NearestFilter;
+      atlas.minFilter = THREE.NearestFilter;
+      atlas.generateMipmaps = false;
+      atlas.colorSpace = THREE.SRGBColorSpace;
+
+      // vertexColors carries per-face directional shading; the atlas supplies colour.
+      const solidMat = new THREE.MeshBasicMaterial({ map: atlas, vertexColors: true, side: THREE.DoubleSide });
       const waterMat = new THREE.MeshBasicMaterial({
-        vertexColors: true, transparent: true, opacity: 0.68,
+        map: atlas, vertexColors: true, transparent: true, opacity: 0.72,
         depthWrite: false, side: THREE.DoubleSide,
       });
       const glassMat = new THREE.MeshBasicMaterial({
-        vertexColors: true, transparent: true, opacity: 0.28,
+        map: atlas, vertexColors: true, transparent: true, opacity: 0.34,
         depthWrite: false, side: THREE.DoubleSide,
       });
 
@@ -663,11 +814,16 @@
       // ===================================================================
       let selected = 0;
       const hotbarEl = document.getElementById('hotbar');
+      const atlasURL = atlasCanvas.toDataURL();       // reuse the same textures as the world
       HOTBAR.forEach((id, i) => {
-        const c = COLORS[id];
+        const t = tileFor(id, 2);                      // show the block's top texture
         const div = document.createElement('div');
         div.className = 'slot';
-        div.style.background = `rgb(${c[0]*255|0},${c[1]*255|0},${c[2]*255|0})`;
+        div.style.backgroundImage = `url(${atlasURL})`;
+        div.style.backgroundRepeat = 'no-repeat';
+        div.style.backgroundSize = `${TILE_COUNT * 100}% 100%`;
+        div.style.backgroundPosition = `${(t / (TILE_COUNT - 1)) * 100}% 0`;
+        div.style.imageRendering = 'pixelated';
         div.innerHTML = `<span class="num">${i+1}</span><span class="label">${NAMES[id]}</span>`;
         div.addEventListener('click', () => selectSlot(i));
         hotbarEl.appendChild(div);
