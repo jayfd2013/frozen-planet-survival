@@ -136,6 +136,11 @@
         font-size: 11px; opacity: 0.6; pointer-events: none;
         text-shadow: 0 1px 2px rgba(0,0,0,0.6);
       }
+      #seedinfo {
+        margin-top: 18px; font-size: 13px; opacity: 0.85;
+        background: rgba(0,0,0,0.22); padding: 8px 16px; border-radius: 10px;
+      }
+      #seedinfo b { color: #ffe08a; }
       #pauseHint {
         position: fixed; top: 50%; left: 50%;
         transform: translate(-50%, calc(-50% - 60px));
@@ -196,7 +201,7 @@
 
     <div id="overlay">
       <h1><span class="a">Voxel</span><span class="b">Craft</span> 3D</h1>
-      <div class="sub">An infinite blocky world. Mine it, build it, make it yours.</div>
+      <div class="sub">A fresh blocky world every time you load. Mine it, build it, make it yours.</div>
       <button id="play">Play</button>
       <div id="controls">
         <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move &nbsp;·&nbsp; <kbd>Space</kbd> Jump &nbsp;·&nbsp; <kbd>Shift</kbd> Sprint</div>
@@ -205,6 +210,7 @@
         <div><kbd>G</kbd> ⚡ <b>God Mode</b> — giant brush, nuke chunks, noclip &amp; more</div>
         <div><kbd>Esc</kbd> Release mouse</div>
       </div>
+      <div id="seedinfo"></div>
     </div>
 
     <script type="module">
@@ -219,6 +225,12 @@
       const RENDER_DIST = 4;           // chunk radius around player (lower = less lag)
       const BUILD_PER_FRAME = 2;       // chunk meshes built per frame
       const REACH = 6;                 // block interaction reach
+
+      // World seed — random every load, or pinned via ?seed=NUMBER in the URL
+      const _seedParam = new URLSearchParams(location.search).get('seed');
+      const WORLD_SEED = (_seedParam !== null && _seedParam.trim() !== '' && Number.isFinite(+_seedParam))
+        ? ((+_seedParam) >>> 0)
+        : (Math.floor(Math.random() * 4294967296) >>> 0);
 
       // Block IDs
       const AIR = 0, GRASS = 1, DIRT = 2, STONE = 3, LOG = 4, LEAVES = 5,
@@ -407,7 +419,7 @@
       const perm = new Uint8Array(512);
       (function () {
         const p = Array.from({ length: 256 }, (_, i) => i);
-        let seed = 987654321;
+        let seed = (WORLD_SEED % 2147483646) + 1;   // seed the shuffle from the world seed
         const rng = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
         for (let i = 255; i > 0; i--) {
           const j = Math.floor(rng() * (i + 1));
@@ -448,7 +460,7 @@
       }
       // deterministic hash -> [0,1)
       function hash2(x, z) {
-        let h = (x | 0) * 374761393 + (z | 0) * 668265263;
+        let h = (x | 0) * 374761393 + (z | 0) * 668265263 + (WORLD_SEED | 0);
         h = (h ^ (h >> 13)) * 1274126177;
         return ((h ^ (h >> 16)) >>> 0) / 4294967296;
       }
@@ -1103,20 +1115,31 @@
       //  Boot: generate spawn area, drop player onto surface
       // ===================================================================
       function boot() {
-        // generate a small area synchronously and mesh it so we don't fall through
-        const R0 = 2;
-        for (let dz = -R0; dz <= R0; dz++)
-          for (let dx = -R0; dx <= R0; dx++)
-            createChunk(dx, dz);
-        for (let dz = -R0; dz <= R0; dz++)
-          for (let dx = -R0; dx <= R0; dx++)
-            buildChunkMesh(getChunk(dx, dz));
+        // find a dry-land spawn near the origin (so random maps don't drop you in the sea)
+        let sx = 0, sz = 0;
+        search:
+        for (let r = 0; r <= 28; r++) {
+          for (let dx = -r; dx <= r; dx++)
+            for (let dz = -r; dz <= r; dz++) {
+              if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue; // only the new ring
+              if (terrainHeight(dx, dz) >= SEA_LEVEL + 2) { sx = dx; sz = dz; break search; }
+            }
+        }
 
-        // spawn on the column at (0,0)
+        // generate a small area around the spawn and mesh it so we don't fall through
+        const scx = Math.floor(sx / CHUNK), scz = Math.floor(sz / CHUNK), R0 = 2;
+        for (let dz = -R0; dz <= R0; dz++)
+          for (let dx = -R0; dx <= R0; dx++)
+            createChunk(scx + dx, scz + dz);
+        for (let dz = -R0; dz <= R0; dz++)
+          for (let dx = -R0; dx <= R0; dx++)
+            buildChunkMesh(getChunk(scx + dx, scz + dz));
+
+        // drop the player onto the surface of the chosen column
         let sy = WORLD_HEIGHT - 1;
-        while (sy > 0 && !isSolid(getBlock(0, sy, 0))) sy--;
-        player.pos.set(0.5, sy + 1, 0.5);
-        camera.position.set(0.5, sy + 1 + player.eye, 0.5);
+        while (sy > 0 && !isSolid(getBlock(sx, sy, sz))) sy--;
+        player.pos.set(sx + 0.5, sy + 1, sz + 0.5);
+        camera.position.set(sx + 0.5, sy + 1 + player.eye, sz + 0.5);
       }
 
       // ===================================================================
@@ -1193,6 +1216,11 @@
           started = true;
         }
       });
+
+      // show the world seed on the start screen (shareable via ?seed=)
+      document.getElementById('seedinfo').innerHTML =
+        `🌱 World seed <b>${WORLD_SEED}</b> &nbsp;·&nbsp; new map every load` +
+        (_seedParam ? ' (pinned by URL)' : '');
 
       boot();
       frame();
