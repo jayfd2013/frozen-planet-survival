@@ -880,18 +880,27 @@
       const pauseHint = document.getElementById('pauseHint');
       let running = false;
 
-      document.getElementById('play').addEventListener('click', () => {
-        renderer.domElement.requestPointerLock();
-      });
+      // Requesting pointer lock can reject transiently (e.g. the browser's
+      // ~1s cooldown right after Esc); swallow that so it can be retried.
+      function requestLock() {
+        const p = renderer.domElement.requestPointerLock();
+        if (p && typeof p.catch === 'function') p.catch(() => {});
+      }
+      document.getElementById('play').addEventListener('click', requestLock);
+      // Clicking the canvas while paused (or before starting) resumes the game.
       renderer.domElement.addEventListener('click', () => {
-        if (running && document.pointerLockElement !== renderer.domElement)
-          renderer.domElement.requestPointerLock();
+        if (document.pointerLockElement !== renderer.domElement) requestLock();
+      });
+      // If a resume click hits the post-Esc cooldown, nudge the player to click again.
+      document.addEventListener('pointerlockerror', () => {
+        if (started) pauseHint.textContent = 'Click again to resume';
       });
 
       document.addEventListener('pointerlockchange', () => {
         running = document.pointerLockElement === renderer.domElement;
         overlay.style.display = running ? 'none' : (started ? 'none' : 'flex');
         pauseHint.style.display = (started && !running) ? 'block' : 'none';
+        if (!running) pauseHint.textContent = 'Paused — click to resume';
       });
 
       let started = false;
