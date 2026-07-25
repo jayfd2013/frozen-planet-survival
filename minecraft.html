@@ -222,7 +222,7 @@
       const CHUNK = 16;                // chunk width/depth in blocks
       const WORLD_HEIGHT = 64;         // vertical block limit
       const SEA_LEVEL = 24;
-      const RENDER_DIST = 4;           // chunk radius around player (lower = less lag)
+      const RENDER_DIST = 3;           // chunk radius around player (lower = less lag)
       const BUILD_PER_FRAME = 2;       // chunk meshes built per frame
       const REACH = 6;                 // block interaction reach
       const WATER_FLOW = 4;            // how far water spreads from a source (Minecraft uses 7)
@@ -536,6 +536,7 @@
         const lx = wx - cx * CHUNK, lz = wz - cz * CHUNK, li = idx(lx, wy, lz);
         c.blocks[li] = id;
         c.water[li] = (id === WATER) ? 8 : 0; // placed water = source; anything else clears water
+        if (id !== AIR && wy > (c.maxY || 0)) c.maxY = wy; // keep meshing bound current
         markDirty(cx, cz);
         // rebuild neighbour chunk if we touched a border block
         if (lx === 0) markDirty(cx - 1, cz);
@@ -581,6 +582,7 @@
         if (c.water[li] === level) return;
         c.water[li] = level;
         c.blocks[li] = level > 0 ? WATER : (b === WATER ? AIR : b);
+        if (level > 0 && y > (c.maxY || 0)) c.maxY = y;
         markDirty(cx, cz);
         if (lx === 0) markDirty(cx - 1, cz);
         if (lx === CHUNK - 1) markDirty(cx + 1, cz);
@@ -695,6 +697,12 @@
         }
         c.generated = true;
         genFeatures(c);
+        // highest non-air block, so meshing can stop before empty sky
+        let my = 0;
+        for (let i = c.blocks.length - 1; i >= 0; i--) {
+          if (c.blocks[i] !== AIR) { my = (i / (CHUNK * CHUNK)) | 0; break; }
+        }
+        c.maxY = my;
       }
 
       // trees / cacti / huts / boulders, chosen by biome
@@ -794,11 +802,19 @@
         const wp = [], wc = [], wu = [];   // water positions / colors / uvs
         const gp = [], gc = [], gu = [];   // glass positions / colors / uvs
         const ox = c.cx * CHUNK, oz = c.cz * CHUNK;
+        const B = c.blocks;
+        const yMax = Math.min((c.maxY || WORLD_HEIGHT - 1) + 1, WORLD_HEIGHT - 1);
+        // fast neighbour read: local array for same-chunk cells, getBlock only at borders
+        const nbAt = (lx, ny, lz, wx2, wz2) => {
+          if (lx >= 0 && lx < CHUNK && lz >= 0 && lz < CHUNK)
+            return (ny < 0 || ny >= WORLD_HEIGHT) ? AIR : B[idx(lx, ny, lz)];
+          return getBlock(wx2, ny, wz2);
+        };
 
-        for (let y = 0; y < WORLD_HEIGHT; y++) {
+        for (let y = 0; y <= yMax; y++) {
           for (let z = 0; z < CHUNK; z++) {
             for (let x = 0; x < CHUNK; x++) {
-              const id = c.blocks[idx(x, y, z)];
+              const id = B[idx(x, y, z)];
               if (id === AIR) continue;
               const wx = ox + x, wy = y, wz = oz + z;
               const water = id === WATER;
@@ -806,7 +822,7 @@
 
               for (let f = 0; f < 6; f++) {
                 const n = FACES[f].n;
-                const nb = getBlock(wx + n[0], wy + n[1], wz + n[2]);
+                const nb = nbAt(x + n[0], y + n[1], z + n[2], wx + n[0], wz + n[2]);
                 let show;
                 if (water) {
                   show = nb === AIR;                 // water only meets air
@@ -902,14 +918,16 @@
       atlas.colorSpace = THREE.SRGBColorSpace;
 
       // vertexColors carries per-face directional shading; the atlas supplies colour.
-      const solidMat = new THREE.MeshBasicMaterial({ map: atlas, vertexColors: true, side: THREE.DoubleSide });
+      // BackSide gives correct facing for our winding while culling the hidden
+      // half of every quad — roughly halves the terrain fragment load.
+      const solidMat = new THREE.MeshBasicMaterial({ map: atlas, vertexColors: true, side: THREE.BackSide });
       const waterMat = new THREE.MeshBasicMaterial({
         map: atlas, vertexColors: true, transparent: true, opacity: 0.72,
-        depthWrite: false, side: THREE.DoubleSide,
+        depthWrite: false, side: THREE.BackSide,
       });
       const glassMat = new THREE.MeshBasicMaterial({
         map: atlas, vertexColors: true, transparent: true, opacity: 0.34,
-        depthWrite: false, side: THREE.DoubleSide,
+        depthWrite: false, side: THREE.BackSide,
       });
 
       addEventListener('resize', () => {
