@@ -141,6 +141,15 @@
         background: rgba(0,0,0,0.22); padding: 8px 16px; border-radius: 10px;
       }
       #seedinfo b { color: #ffe08a; }
+      #nighttint {
+        position: fixed; inset: 0; z-index: 5; pointer-events: none;
+        background: #0a1030; opacity: 0;
+      }
+      #celestial {
+        position: fixed; z-index: 6; pointer-events: none;
+        font-size: 42px; line-height: 1; left: 10%; top: 70%;
+        filter: drop-shadow(0 0 14px rgba(255,240,180,0.55));
+      }
       #pauseHint {
         position: fixed; top: 50%; left: 50%;
         transform: translate(-50%, calc(-50% - 60px));
@@ -179,6 +188,8 @@
     </style>
   </head>
   <body>
+    <div id="nighttint"></div>
+    <div id="celestial">☀️</div>
     <div id="crosshair"></div>
     <div id="hud">
       <div>FPS <b id="fps">–</b> &nbsp; Chunks <b id="chunks">–</b></div>
@@ -206,7 +217,7 @@
       <div id="controls">
         <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move &nbsp;·&nbsp; <kbd>Space</kbd> Jump &nbsp;·&nbsp; <kbd>Shift</kbd> Sprint</div>
         <div><kbd>Mouse</kbd> Look &nbsp;·&nbsp; <kbd>L-Click</kbd> Mine &nbsp;·&nbsp; <kbd>R-Click</kbd> Place</div>
-        <div><kbd>1</kbd>–<kbd>9</kbd> / <kbd>Scroll</kbd> Select block &nbsp;·&nbsp; <kbd>F</kbd> Toggle fly</div>
+        <div><kbd>1</kbd>–<kbd>9</kbd> / <kbd>Scroll</kbd> Select block &nbsp;·&nbsp; <kbd>F</kbd> Fly &nbsp;·&nbsp; <kbd>M</kbd> Mute</div>
         <div><kbd>G</kbd> ⚡ <b>God Mode</b> — giant brush, nuke chunks, noclip &amp; more</div>
         <div><kbd>Esc</kbd> Release mouse</div>
       </div>
@@ -787,6 +798,7 @@
       // ===================================================================
       //  Mesh building (per chunk, greedy-free but face-culled)
       // ===================================================================
+      const AO_LEVELS = [0.48, 0.68, 0.84, 1.0]; // corner darkening by occlusion count
       // face: normal + 4 corner offsets + shade
       const FACES = [
         { n: [ 1, 0, 0], c: [[1,0,0],[1,0,1],[1,1,1],[1,1,0]], s: 0.72 }, // +X
@@ -840,11 +852,38 @@
                 const C = water ? wc : (glass ? gc : sc);
                 const U = water ? wu : (glass ? gu : su);
                 const corners = FACES[f].c;
+
+                // ambient occlusion: darken each corner by nearby solid neighbours
+                let ao0 = 1, ao1 = 1, ao2 = 1, ao3 = 1;
+                if (!water && !glass) {
+                  const axisN = n[0] ? 0 : (n[1] ? 1 : 2);
+                  const axisU = (axisN + 1) % 3, axisV = (axisN + 2) % 3;
+                  const occ = (dx, dy, dz) => {
+                    const b = nbAt(x + dx, y + dy, z + dz, wx + dx, wz + dz);
+                    return (b !== AIR && b !== WATER && b !== GLASS) ? 1 : 0;
+                  };
+                  const aoB = [0, 0, 0, 0];
+                  for (let k = 0; k < 4; k++) {
+                    const cc = corners[k];
+                    const du = cc[axisU] ? 1 : -1, dv = cc[axisV] ? 1 : -1;
+                    const su = [n[0], n[1], n[2]]; su[axisU] += du;
+                    const sv = [n[0], n[1], n[2]]; sv[axisV] += dv;
+                    const sd = [n[0], n[1], n[2]]; sd[axisU] += du; sd[axisV] += dv;
+                    const s1 = occ(su[0], su[1], su[2]), s2 = occ(sv[0], sv[1], sv[2]);
+                    const s3 = (s1 && s2) ? 1 : occ(sd[0], sd[1], sd[2]);
+                    const lvl = (s1 && s2) ? 0 : 3 - (s1 + s2 + s3);
+                    aoB[k] = AO_LEVELS[lvl];
+                  }
+                  ao0 = aoB[0]; ao1 = aoB[1]; ao2 = aoB[2]; ao3 = aoB[3];
+                }
+                const aoByIdx = [ao0, ao1, ao2, ao3];
+
                 // two triangles: 0,1,2 and 0,2,3
                 for (const ti of [0, 1, 2, 0, 2, 3]) {
                   const cc = corners[ti];
+                  const b = sh * aoByIdx[ti];
                   P.push(wx + cc[0], wy + cc[1], wz + cc[2]);
-                  C.push(sh, sh, sh);
+                  C.push(b, b, b);
                   tileUV(U, t, ti);
                 }
               }
@@ -1003,6 +1042,7 @@
       // Requesting pointer lock can reject transiently (e.g. the browser's
       // ~1s cooldown right after Esc); swallow that so it can be retried.
       function requestLock() {
+        ensureAudio();   // browsers require a user gesture to start audio
         const p = renderer.domElement.requestPointerLock();
         if (p && typeof p.catch === 'function') p.catch(() => {});
       }
@@ -1107,6 +1147,7 @@
           if (n >= 1 && n <= HOTBAR.length) selectSlot(n - 1);
         }
         if (!running) return;
+        if (e.code === 'KeyM') { muted = !muted; toast(muted ? '🔇 muted' : '🔊 sound on'); }
         if (e.code === 'KeyG') toggleGod();
         if (god.on) {
           if (e.code === 'KeyV') { god.noclip = !god.noclip; updateGodPanel(); toast(god.noclip ? 'noclip on' : 'noclip off'); }
@@ -1130,25 +1171,30 @@
         // left-click first checks for a mob under the crosshair (attack)
         if (e.button === 0) {
           const mob = mobUnderCrosshair();
-          if (mob) { removeMob(mob); toast('🐾 ' + mob.def.name + '!'); return; }
+          if (mob) { removeMob(mob); sfx.hit(); toast('🐾 ' + mob.def.name + '!'); return; }
         }
         const hit = raycast();
         if (!hit) return;
         if (e.button === 0) {
           // mine — god mode digs a whole sphere
-          if (god.on && god.brush > 1) sphereEdit(hit.block[0], hit.block[1], hit.block[2], god.brush, AIR);
-          else setBlock(hit.block[0], hit.block[1], hit.block[2], AIR);
+          if (god.on && god.brush > 1) { sphereEdit(hit.block[0], hit.block[1], hit.block[2], god.brush, AIR); sfx.mine(); }
+          else {
+            const bid = getBlock(hit.block[0], hit.block[1], hit.block[2]);
+            setBlock(hit.block[0], hit.block[1], hit.block[2], AIR);
+            spawnBreakParticles(hit.block[0], hit.block[1], hit.block[2], bid);
+            sfx.mine();
+          }
         } else if (e.button === 2) {
           // place at the empty cell before the hit
           if (!hit.place) return;
           const [x, y, z] = hit.place;
-          if (god.on && god.brush > 1) { sphereEdit(x, y, z, god.brush, HOTBAR[selected]); return; }
+          if (god.on && god.brush > 1) { sphereEdit(x, y, z, god.brush, HOTBAR[selected]); sfx.place(); return; }
           // don't place inside the player (unless noclipping)
           const pminX = Math.floor(player.pos.x - HALF), pmaxX = Math.floor(player.pos.x + HALF);
           const pminY = Math.floor(player.pos.y), pmaxY = Math.floor(player.pos.y + player.height - 0.01);
           const pminZ = Math.floor(player.pos.z - HALF), pmaxZ = Math.floor(player.pos.z + HALF);
           const inside = x >= pminX && x <= pmaxX && y >= pminY && y <= pmaxY && z >= pminZ && z <= pmaxZ;
-          if (!inside || god.noclip) setBlock(x, y, z, HOTBAR[selected]);
+          if (!inside || god.noclip) { setBlock(x, y, z, HOTBAR[selected]); sfx.place(); }
         }
       });
       renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -1513,6 +1559,13 @@
             m.state = Math.random() < 0.28 ? 'idle' : 'wander';
             if (m.state === 'wander') m.yaw = Math.random() * Math.PI * 2;
           }
+          // the cat trots over to you when you're nearby
+          if (def.name === 'Cat') {
+            const dxp = player.pos.x - p.x, dzp = player.pos.z - p.z;
+            const d = Math.hypot(dxp, dzp);
+            if (d > 1.6 && d < 9) { m.state = 'wander'; m.yaw = Math.atan2(dxp, dzp); }
+            else if (d <= 1.6) m.state = 'idle';
+          }
           const fx = Math.sin(m.yaw), fz = Math.cos(m.yaw);
           // avoid marching into water or off cliffs: peek at the block ahead
           if (m.state === 'wander') {
@@ -1576,10 +1629,104 @@
       }
 
       // ===================================================================
+      //  Day / night cycle
+      // ===================================================================
+      const nightTintEl = document.getElementById('nighttint');
+      const celestialEl = document.getElementById('celestial');
+      let dayTime = 0.28;                 // 0..1 (0=sunrise, .25=noon, .5=sunset, .75=midnight)
+      const DAY_LEN = 240;                // seconds per full day
+      const SKY_STOPS   = [[0,0x24344f],[0.05,0xef9d55],[0.14,0x87ceeb],[0.45,0x87ceeb],[0.5,0xef7a3c],[0.56,0x2b2450],[0.64,0x0a1030],[0.95,0x0a1030],[1,0x24344f]];
+      const LIGHT_STOPS = [[0,0.28],[0.05,0.5],[0.14,1],[0.45,1],[0.5,0.62],[0.56,0.32],[0.64,0.12],[0.95,0.12],[1,0.28]];
+      function stopPair(stops, u) {
+        for (let i = 0; i < stops.length - 1; i++)
+          if (u >= stops[i][0] && u <= stops[i + 1][0]) {
+            const f = (u - stops[i][0]) / (stops[i + 1][0] - stops[i][0]);
+            return [stops[i][1], stops[i + 1][1], f];
+          }
+        return [stops[0][1], stops[0][1], 0];
+      }
+      const _skyA = new THREE.Color(), _skyB = new THREE.Color();
+      function updateDayNight(dt) {
+        dayTime = (dayTime + dt / DAY_LEN) % 1;
+        const [ca, cb, f] = stopPair(SKY_STOPS, dayTime);
+        _skyA.setHex(ca); _skyB.setHex(cb);
+        scene.background.copy(_skyA).lerp(_skyB, f);
+        scene.fog.color.copy(scene.background);
+        const [la, lb, lf] = stopPair(LIGHT_STOPS, dayTime);
+        const L = la + (lb - la) * lf;
+        nightTintEl.style.opacity = ((1 - L) * 0.6).toFixed(3);
+        const day = dayTime < 0.5;
+        const tt = day ? dayTime / 0.5 : (dayTime - 0.5) / 0.5;
+        celestialEl.textContent = day ? '☀️' : '🌙';
+        celestialEl.style.left = (8 + tt * 84) + '%';
+        celestialEl.style.top = (80 - Math.sin(tt * Math.PI) * 64) + '%';
+      }
+
+      // ===================================================================
+      //  Sound (WebAudio synth — no asset files)
+      // ===================================================================
+      let audioCtx = null, muted = false;
+      function ensureAudio() {
+        if (!audioCtx) { try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+        if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+      }
+      function tone(freq, dur, type, vol, slideTo) {
+        if (muted || !audioCtx) return;
+        const t = audioCtx.currentTime, o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type = type; o.frequency.setValueAtTime(freq, t);
+        if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+        g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
+        o.connect(g).connect(audioCtx.destination); o.start(t); o.stop(t + dur + 0.02);
+      }
+      function noise(dur, vol, cutoff) {
+        if (muted || !audioCtx) return;
+        const t = audioCtx.currentTime, n = (audioCtx.sampleRate * dur) | 0;
+        const buf = audioCtx.createBuffer(1, n, audioCtx.sampleRate), d = buf.getChannelData(0);
+        for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+        const s = audioCtx.createBufferSource(); s.buffer = buf;
+        const g = audioCtx.createGain(); g.gain.value = vol;
+        const fl = audioCtx.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = cutoff;
+        s.connect(fl).connect(g).connect(audioCtx.destination); s.start(t);
+      }
+      const sfx = {
+        mine:  () => noise(0.13, 0.22, 700),
+        place: () => tone(300, 0.09, 'square', 0.14, 170),
+        jump:  () => tone(300, 0.12, 'sine', 0.12, 520),
+        step:  () => noise(0.05, 0.06, 320),
+        hit:   () => tone(520, 0.10, 'sawtooth', 0.14, 130),
+      };
+
+      // ===================================================================
+      //  Break particles
+      // ===================================================================
+      const particles = [];
+      const PART_MAX = 140;
+      const partGeo = new THREE.BoxGeometry(0.14, 0.14, 0.14);
+      function spawnBreakParticles(x, y, z, id) {
+        const col = COLORS[id] || [0.6, 0.6, 0.6];
+        for (let i = 0; i < 8 && particles.length < PART_MAX; i++) {
+          const m = new THREE.Mesh(partGeo, new THREE.MeshBasicMaterial({ color: new THREE.Color(col[0], col[1], col[2]) }));
+          m.position.set(x + 0.5 + (Math.random() - 0.5) * 0.7, y + 0.5 + (Math.random() - 0.5) * 0.7, z + 0.5 + (Math.random() - 0.5) * 0.7);
+          scene.add(m);
+          particles.push({ mesh: m, vx: (Math.random() - 0.5) * 3.5, vy: 2 + Math.random() * 3, vz: (Math.random() - 0.5) * 3.5, life: 0.55 + Math.random() * 0.35 });
+        }
+      }
+      function updateParticles(dt) {
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const p = particles[i];
+          p.vy -= 15 * dt;
+          p.mesh.position.x += p.vx * dt; p.mesh.position.y += p.vy * dt; p.mesh.position.z += p.vz * dt;
+          p.life -= dt;
+          p.mesh.scale.setScalar(Math.max(0.05, Math.min(1, p.life * 2)));
+          if (p.life <= 0) { scene.remove(p.mesh); p.mesh.material.dispose(); particles.splice(i, 1); }
+        }
+      }
+
+      // ===================================================================
       //  Main loop
       // ===================================================================
       const clock = new THREE.Clock();
-      let fpsAccum = 0, fpsFrames = 0, fpsTimer = 0, waterTimer = 0;
+      let fpsAccum = 0, fpsFrames = 0, fpsTimer = 0, waterTimer = 0, stepTimer = 0, bobT = 0;
 
       function frame() {
         requestAnimationFrame(frame);
@@ -1605,13 +1752,25 @@
             const up = (keys['Space'] ? 1 : 0) - ((keys['ShiftLeft'] || keys['ControlLeft']) ? 1 : 0);
             player.vel.y = up * speed;
           } else if (keys['Space'] && player.onGround) {
-            player.vel.y = 9;
+            player.vel.y = 9; sfx.jump();
           }
 
           movePlayer(dt);
           updateChunks();
           updateMobs(dt);
+
+          // footsteps + subtle view-bob while walking on the ground
+          const walking = len > 0 && player.onGround && !player.fly;
+          if (walking) {
+            bobT += dt * (sprint ? 13 : 9.5);
+            camera.position.y += Math.sin(bobT) * 0.05;
+            stepTimer -= dt;
+            if (stepTimer <= 0) { sfx.step(); stepTimer = sprint ? 0.28 : 0.38; }
+          } else { stepTimer = 0; }
         }
+
+        updateDayNight(dt);
+        updateParticles(dt);
 
         // tick water flow a few times a second (independent of framerate)
         waterTimer += dt;
