@@ -886,9 +886,11 @@
       const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.1, 1000);
       camera.rotation.order = 'YXZ';
 
-      const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+      // antialias off + pixel ratio capped at 1 = far fewer fragments to shade (big FPS win,
+      // especially on high-DPI / laptop / mobile screens). Blocky look suits it anyway.
+      const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
       renderer.setSize(innerWidth, innerHeight);
-      renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+      renderer.setPixelRatio(1);
       document.body.appendChild(renderer.domElement);
 
       // Procedural texture atlas — crisp pixel look (nearest filtering, no mipmaps)
@@ -1184,21 +1186,26 @@
         const pcx = Math.floor(player.pos.x / CHUNK);
         const pcz = Math.floor(player.pos.z / CHUNK);
 
-        // ensure data + queue meshes within render distance
+        // collect missing chunks in range, then generate only the nearest few per frame
+        // (throttling generation removes the stutter when crossing into new terrain)
+        const missing = [];
         for (let dz = -RENDER_DIST; dz <= RENDER_DIST; dz++) {
           for (let dx = -RENDER_DIST; dx <= RENDER_DIST; dx++) {
-            if (dx * dx + dz * dz > RENDER_DIST * RENDER_DIST) continue;
+            const d2 = dx * dx + dz * dz;
+            if (d2 > RENDER_DIST * RENDER_DIST) continue;
             const cx = pcx + dx, cz = pcz + dz;
-            if (!getChunk(cx, cz)) {
-              // generate this chunk + its neighbours' data (so borders cull right)
-              createChunk(cx, cz);
-              for (const [ax, az] of [[1,0],[-1,0],[0,1],[0,-1]])
-                if (!getChunk(cx+ax, cz+az)) createChunk(cx+ax, cz+az);
-              buildQueue.add(keyOf(cx, cz));
-              // neighbours may now need re-mesh at the shared border
-              for (const [ax, az] of [[1,0],[-1,0],[0,1],[0,-1]]) markDirty(cx+ax, cz+az);
-            }
+            if (!getChunk(cx, cz)) missing.push([d2, cx, cz]);
           }
+        }
+        missing.sort((a, b) => a[0] - b[0]);
+        const GEN_PER_FRAME = 2;
+        for (let i = 0; i < GEN_PER_FRAME && i < missing.length; i++) {
+          const cx = missing[i][1], cz = missing[i][2];
+          createChunk(cx, cz);
+          for (const [ax, az] of [[1,0],[-1,0],[0,1],[0,-1]])
+            if (!getChunk(cx+ax, cz+az)) createChunk(cx+ax, cz+az);
+          buildQueue.add(keyOf(cx, cz));
+          for (const [ax, az] of [[1,0],[-1,0],[0,1],[0,-1]]) markDirty(cx+ax, cz+az);
         }
 
         // unload distant chunks
@@ -1273,34 +1280,103 @@
       //  Mobs — blocky wandering animals
       // ===================================================================
       const MOB_DEFS = [
-        { name:'Pig',     body:[0.95,0.55,0.60], head:0.42, color:0xe79aa6, headColor:0xe08e9b, legColor:0xc07f88, legLen:0.35, legW:0.18, hw:0.40, speed:1.7 },
-        { name:'Sheep',   body:[0.95,0.70,0.62], head:0.40, color:0xeeeee6, headColor:0xd8d0c6, legColor:0x4a4038, legLen:0.40, legW:0.18, hw:0.42, speed:1.5 },
-        { name:'Cow',     body:[1.05,0.62,0.62], head:0.44, color:0x6b4a33, headColor:0x8a6a50, legColor:0x362a1f, legLen:0.42, legW:0.20, hw:0.45, speed:1.4 },
-        { name:'Chicken', body:[0.40,0.40,0.50], head:0.30, color:0xf2f2f2, headColor:0xffffff, legColor:0xe0a020, legLen:0.28, legW:0.10, hw:0.28, speed:2.1 },
+        // body is [width(x), height(y), length(z)]; length is the facing axis (+Z = forward)
+        { name:'Pig',     body:[0.62,0.52,0.95], head:0.52, color:0xefa3ad, headColor:0xefa3ad, legColor:0xe0929c, legLen:0.30, legW:0.20, hw:0.42, speed:1.7 },
+        { name:'Sheep',   body:[0.60,0.64,0.90], head:0.42, color:0xeeece6, headColor:0xd9cfc4, legColor:0x4a4038, legLen:0.42, legW:0.18, hw:0.42, speed:1.5 },
+        { name:'Cow',     body:[0.66,0.62,1.05], head:0.50, color:0x4a3a2a, headColor:0x4a3a2a, legColor:0x33261a, legLen:0.44, legW:0.22, hw:0.46, speed:1.4 },
+        { name:'Chicken', body:[0.40,0.42,0.50], head:0.34, color:0xf3f3f3, headColor:0xf3f3f3, legColor:0xe0a11a, legLen:0.26, legW:0.10, hw:0.28, speed:2.1 },
       ];
       const MAX_MOBS = 8;
       const mobs = [];
       let mobSpawnTimer = 0;
+      const mobMat = new THREE.MeshBasicMaterial({ vertexColors: true }); // one material for all mobs
 
-      function boxMesh(w, h, d, color) {
-        return new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshBasicMaterial({ color }));
+      // a non-indexed box geometry, translated, with a flat per-vertex colour
+      function coloredBoxGeo(w, h, d, color, tx = 0, ty = 0, tz = 0) {
+        const g = new THREE.BoxGeometry(w, h, d).toNonIndexed();
+        if (tx || ty || tz) g.translate(tx, ty, tz);
+        const n = g.attributes.position.count, c = new THREE.Color(color);
+        const arr = new Float32Array(n * 3);
+        for (let i = 0; i < n; i++) { arr[i*3] = c.r; arr[i*3+1] = c.g; arr[i*3+2] = c.b; }
+        g.setAttribute('color', new THREE.BufferAttribute(arr, 3));
+        return g;
       }
+      // merge several coloured geometries into one BufferGeometry (few draw calls)
+      function mergeGeos(geos) {
+        let total = 0; for (const g of geos) total += g.attributes.position.count;
+        const pos = new Float32Array(total * 3), col = new Float32Array(total * 3);
+        let o = 0;
+        for (const g of geos) {
+          pos.set(g.attributes.position.array, o * 3);
+          col.set(g.attributes.color.array, o * 3);
+          o += g.attributes.position.count; g.dispose();
+        }
+        const out = new THREE.BufferGeometry();
+        out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+        out.setAttribute('color', new THREE.BufferAttribute(col, 3));
+        return out;
+      }
+
+      // per-type detail boxes: [w,h,d, x,y,z, color]
+      function mobDetails(def, a) {
+        const { bw, bh, bL, legLen, hs, headY, headZ, bodyY } = a;
+        const front = headZ + hs / 2;
+        if (def.name === 'Pig') return [
+          [0.26,0.18,0.10, 0, headY-0.05, front+0.02, 0xd98892],       // snout
+          [0.07,0.07,0.05, 0.08, headY-0.02, front+0.03, 0x99565f],    // nostril
+          [0.07,0.07,0.05, -0.08, headY-0.02, front+0.03, 0x99565f],
+          [0.12,0.10,0.05, 0.17, headY+hs*0.42, headZ, 0xe0929c],      // ears
+          [0.12,0.10,0.05, -0.17, headY+hs*0.42, headZ, 0xe0929c],
+          [0.08,0.14,0.08, 0, bodyY+bh*0.1, -bL/2-0.02, 0xe0929c],     // tail
+        ];
+        if (def.name === 'Cow') return [
+          [0.36,0.24,0.10, 0, headY-0.07, front+0.01, 0xd8cfc0],       // white muzzle
+          [0.10,0.10,0.20, 0.20, headY+hs*0.40, headZ, 0xd8d0c6],      // horns
+          [0.10,0.10,0.20, -0.20, headY+hs*0.40, headZ, 0xd8d0c6],
+          [bw*0.72,0.10,bL*0.5, 0.06, bodyY+bh/2, -0.06, 0xe8e2d8],    // white back patch
+          [bw*0.5,0.10,bL*0.3, -0.10, bodyY+bh/2, bL*0.25, 0xe8e2d8],  // 2nd patch
+          [0.22,0.16,0.22, 0, legLen-0.02, bL*0.18, 0xd98892],         // udder
+          [0.07,0.22,0.07, 0, bodyY, -bL/2-0.03, 0x33261a],            // tail
+        ];
+        if (def.name === 'Sheep') return [
+          [bw+0.10, bh+0.10, bL+0.06, 0, bodyY, 0, 0xeeece6],          // fluffy wool over-body
+          [0.09,0.08,0.05, 0.14, headY+0.05, headZ, 0xcabfb2],         // ears
+          [0.09,0.08,0.05, -0.14, headY+0.05, headZ, 0xcabfb2],
+          [0.16,0.16,0.12, 0, bodyY+bh*0.2, -bL/2-0.02, 0xeeece6],     // wool tail
+        ];
+        // Chicken
+        return [
+          [0.14,0.09,0.14, 0, headY-0.02, front+0.02, 0xe6a11a],       // beak
+          [0.08,0.10,0.05, 0, headY-0.13, front-0.01, 0xcf2b2b],       // wattle
+          [0.12,0.10,0.06, 0, headY+hs*0.5, headZ, 0xcf2b2b],          // comb
+          [0.05,0.24,0.34, bw/2+0.01, bodyY+0.02, 0, 0xe6e6e6],        // wings
+          [0.05,0.24,0.34, -bw/2-0.01, bodyY+0.02, 0, 0xe6e6e6],
+          [0.12,0.20,0.10, 0, bodyY+bh*0.4, -bL/2-0.02, 0xe6e6e6],     // tail
+        ];
+      }
+
       function buildMobMesh(def) {
         const g = new THREE.Group();
-        const [bw, bh, bd] = def.body;
-        const body = boxMesh(bw, bh, bd, def.color);
-        body.position.set(0, def.legLen + bh / 2, 0);
-        g.add(body);
-        const head = boxMesh(def.head, def.head, def.head, def.headColor);
-        head.position.set(0, def.legLen + bh * 0.75, bd / 2 + def.head * 0.35); // +Z is forward
-        g.add(head);
+        const [bw, bh, bL] = def.body;
+        const legLen = def.legLen, legW = def.legW, hs = def.head;
+        const bodyY = legLen + bh / 2;
+        const headY = legLen + bh * 0.55 + hs * 0.42;
+        const headZ = bL / 2 + hs / 2 - 0.03;
+        // static parts (body + head + details) merged into a single mesh
+        const parts = [
+          coloredBoxGeo(bw, bh, bL, def.color, 0, bodyY, 0),
+          coloredBoxGeo(hs, hs, hs, def.headColor, 0, headY, headZ),
+        ];
+        for (const d of mobDetails(def, { bw, bh, bL, legLen, hs, headY, headZ, bodyY }))
+          parts.push(coloredBoxGeo(d[0], d[1], d[2], d[6], d[3], d[4], d[5]));
+        g.add(new THREE.Mesh(mergeGeos(parts), mobMat));
+        // 4 animatable legs (front legs at +Z)
         const legs = [];
-        const lx = bw / 2 - def.legW / 2, lz = bd / 2 - def.legW / 2;
+        const offX = bw / 2 - legW / 2, offZ = bL / 2 - legW / 2;
         for (const [sx, sz] of [[-1, 1], [1, 1], [-1, -1], [1, -1]]) {
-          const geo = new THREE.BoxGeometry(def.legW, def.legLen, def.legW);
-          geo.translate(0, -def.legLen / 2, 0);                 // pivot at the hip
-          const leg = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: def.legColor }));
-          leg.position.set(sx * lx, def.legLen, sz * lz);
+          const geo = coloredBoxGeo(legW, legLen, legW, def.legColor, 0, -legLen / 2, 0); // hip pivot
+          const leg = new THREE.Mesh(geo, mobMat);
+          leg.position.set(sx * offX, legLen, sz * offZ);
           g.add(leg); legs.push(leg);
         }
         return { group: g, legs };
@@ -1351,7 +1427,7 @@
 
       function removeMob(mob) {
         scene.remove(mob.group);
-        mob.group.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
+        mob.group.traverse((o) => { if (o.isMesh) o.geometry.dispose(); }); // mobMat is shared
         const i = mobs.indexOf(mob);
         if (i >= 0) mobs.splice(i, 1);
       }
