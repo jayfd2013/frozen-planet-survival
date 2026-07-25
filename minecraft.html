@@ -1303,6 +1303,7 @@
         { name:'Sheep',   body:[0.60,0.64,0.90], head:0.42, color:0xeeece6, headColor:0xd9cfc4, legColor:0x4a4038, legLen:0.42, legW:0.18, hw:0.42, speed:1.5 },
         { name:'Cow',     body:[0.66,0.62,1.05], head:0.50, color:0x4a3a2a, headColor:0x4a3a2a, legColor:0x33261a, legLen:0.44, legW:0.22, hw:0.46, speed:1.4 },
         { name:'Chicken', body:[0.40,0.42,0.50], head:0.34, color:0xf3f3f3, headColor:0xf3f3f3, legColor:0xe0a11a, legLen:0.26, legW:0.10, hw:0.28, speed:2.1, legCount:2 },
+        { name:'Cat', body:[0.34,0.34,0.70], head:0.36, color:0xf6f6f3, headColor:0xf6f6f3, legColor:0xf1f1ee, legLen:0.30, legW:0.11, hw:0.28, speed:1.7 },
         // biped: head sits on top, walks upright. Deliberately goofy-looking.
         { name:'Villager', body:[0.50,0.70,0.34], head:0.50, color:0x7a5c3e, headColor:0xc39a6b, legColor:0x45403a, legLen:0.42, legW:0.16, hw:0.32, speed:1.05, legCount:2, biped:true },
       ];
@@ -1363,6 +1364,24 @@
           [0.09,0.08,0.05, 0.14, headY+0.05, headZ, 0xcabfb2],         // ears
           [0.09,0.08,0.05, -0.14, headY+0.05, headZ, 0xcabfb2],
           [0.16,0.16,0.12, 0, bodyY+bh*0.2, -bL/2-0.02, 0xeeece6],     // wool tail
+        ];
+        if (def.name === 'Cat') return [
+          // big brown eyes with a white sparkle
+          [0.12,0.15,0.04, 0.09, headY+0.03, front, 0x5b3a1e],
+          [0.12,0.15,0.04, -0.09, headY+0.03, front, 0x5b3a1e],
+          [0.045,0.06,0.03, 0.115, headY+0.08, front+0.01, 0xffffff],
+          [0.045,0.06,0.03, -0.065, headY+0.08, front+0.01, 0xffffff],
+          [0.06,0.05,0.04, 0, headY-0.07, front+0.01, 0xff9ec4],      // pink nose
+          // ears (white outer, pink inner)
+          [0.11,0.14,0.06, 0.12, headY+hs*0.5, headZ, 0xf6f6f3],
+          [0.11,0.14,0.06, -0.12, headY+hs*0.5, headZ, 0xf6f6f3],
+          [0.05,0.08,0.05, 0.12, headY+hs*0.5, headZ+0.02, 0xffb3d1],
+          [0.05,0.08,0.05, -0.12, headY+hs*0.5, headZ+0.02, 0xffb3d1],
+          [0.10,0.36,0.10, 0, bodyY+0.18, -bL/2-0.03, 0xf1f1ee],      // upright tail
+          // pink bow where the neck meets the back
+          [0.09,0.10,0.11, 0, bodyY+bh/2+0.04, bL*0.30, 0xff7ab0],     // knot
+          [0.13,0.15,0.09, 0.13, bodyY+bh/2+0.04, bL*0.30, 0xffa6cf],  // left loop
+          [0.13,0.15,0.09, -0.13, bodyY+bh/2+0.04, bL*0.30, 0xffa6cf], // right loop
         ];
         if (def.name === 'Villager') {
           const cy = headY;                        // head centre
