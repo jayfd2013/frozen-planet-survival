@@ -1285,6 +1285,8 @@
         { name:'Sheep',   body:[0.60,0.64,0.90], head:0.42, color:0xeeece6, headColor:0xd9cfc4, legColor:0x4a4038, legLen:0.42, legW:0.18, hw:0.42, speed:1.5 },
         { name:'Cow',     body:[0.66,0.62,1.05], head:0.50, color:0x4a3a2a, headColor:0x4a3a2a, legColor:0x33261a, legLen:0.44, legW:0.22, hw:0.46, speed:1.4 },
         { name:'Chicken', body:[0.40,0.42,0.50], head:0.34, color:0xf3f3f3, headColor:0xf3f3f3, legColor:0xe0a11a, legLen:0.26, legW:0.10, hw:0.28, speed:2.1, legCount:2 },
+        // biped: head sits on top, walks upright. Deliberately goofy-looking.
+        { name:'Villager', body:[0.50,0.70,0.34], head:0.50, color:0x7a5c3e, headColor:0xc39a6b, legColor:0x45403a, legLen:0.42, legW:0.16, hw:0.32, speed:1.05, legCount:2, biped:true },
       ];
       const MAX_MOBS = 8;
       const mobs = [];
@@ -1344,6 +1346,23 @@
           [0.09,0.08,0.05, -0.14, headY+0.05, headZ, 0xcabfb2],
           [0.16,0.16,0.12, 0, bodyY+bh*0.2, -bL/2-0.02, 0xeeece6],     // wool tail
         ];
+        if (def.name === 'Villager') {
+          const cy = headY;                        // head centre
+          return [
+            [0.16,0.34,0.36, 0, cy-0.05, front+0.16, 0xbb8f62],        // GIANT dumb nose
+            [0.44,0.08,0.05, 0, cy+0.15, front-0.01, 0x463322],        // unibrow
+            [0.13,0.13,0.04, 0.13, cy+0.05, front, 0xffffff],          // googly eye (high)
+            [0.13,0.13,0.04, -0.13, cy-0.02, front, 0xffffff],         // googly eye (low = derp)
+            [0.05,0.05,0.03, 0.08, cy+0.05, front+0.02, 0x201810],     // pupil looks inward
+            [0.05,0.05,0.03, -0.08, cy-0.02, front+0.02, 0x201810],    // cross-eyed
+            [0.16,0.05,0.03, 0, cy-0.22, front, 0x2e2016],             // dopey open mouth
+            [0.15,0.16,0.44, 0.32, bodyY+bh*0.16, bL/2+0.16, 0x7a5c3e],// arms out front (left)
+            [0.15,0.16,0.44, -0.32, bodyY+bh*0.16, bL/2+0.16, 0x7a5c3e],// arms out front (right)
+            [0.16,0.16,0.11, 0.32, bodyY+bh*0.16, bL/2+0.40, 0xc39a6b],// hands
+            [0.16,0.16,0.11, -0.32, bodyY+bh*0.16, bL/2+0.40, 0xc39a6b],
+            [bw+0.03,0.22,bL+0.03, 0, bodyY-0.03, 0, 0x5a7d4a],        // green sash
+          ];
+        }
         // Chicken
         return [
           [0.14,0.09,0.14, 0, headY-0.02, front+0.02, 0xe6a11a],       // beak
@@ -1360,8 +1379,9 @@
         const [bw, bh, bL] = def.body;
         const legLen = def.legLen, legW = def.legW, hs = def.head;
         const bodyY = legLen + bh / 2;
-        const headY = legLen + bh * 0.55 + hs * 0.42;
-        const headZ = bL / 2 + hs / 2 - 0.03;
+        // quadrupeds carry the head out front; bipeds (villager) carry it on top
+        const headY = def.biped ? (legLen + bh + hs / 2 - 0.04) : (legLen + bh * 0.55 + hs * 0.42);
+        const headZ = def.biped ? 0 : (bL / 2 + hs / 2 - 0.03);
         // static parts (body + head + details) merged into a single mesh
         const parts = [
           coloredBoxGeo(bw, bh, bL, def.color, 0, bodyY, 0),
