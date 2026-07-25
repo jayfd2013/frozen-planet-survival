@@ -1284,7 +1284,7 @@
         { name:'Pig',     body:[0.62,0.52,0.95], head:0.52, color:0xefa3ad, headColor:0xefa3ad, legColor:0xe0929c, legLen:0.30, legW:0.20, hw:0.42, speed:1.7 },
         { name:'Sheep',   body:[0.60,0.64,0.90], head:0.42, color:0xeeece6, headColor:0xd9cfc4, legColor:0x4a4038, legLen:0.42, legW:0.18, hw:0.42, speed:1.5 },
         { name:'Cow',     body:[0.66,0.62,1.05], head:0.50, color:0x4a3a2a, headColor:0x4a3a2a, legColor:0x33261a, legLen:0.44, legW:0.22, hw:0.46, speed:1.4 },
-        { name:'Chicken', body:[0.40,0.42,0.50], head:0.34, color:0xf3f3f3, headColor:0xf3f3f3, legColor:0xe0a11a, legLen:0.26, legW:0.10, hw:0.28, speed:2.1 },
+        { name:'Chicken', body:[0.40,0.42,0.50], head:0.34, color:0xf3f3f3, headColor:0xf3f3f3, legColor:0xe0a11a, legLen:0.26, legW:0.10, hw:0.28, speed:2.1, legCount:2 },
       ];
       const MAX_MOBS = 8;
       const mobs = [];
@@ -1370,10 +1370,13 @@
         for (const d of mobDetails(def, { bw, bh, bL, legLen, hs, headY, headZ, bodyY }))
           parts.push(coloredBoxGeo(d[0], d[1], d[2], d[6], d[3], d[4], d[5]));
         g.add(new THREE.Mesh(mergeGeos(parts), mobMat));
-        // 4 animatable legs (front legs at +Z)
+        // animatable legs — 4 at the corners, or 2 centered (chicken)
         const legs = [];
-        const offX = bw / 2 - legW / 2, offZ = bL / 2 - legW / 2;
-        for (const [sx, sz] of [[-1, 1], [1, 1], [-1, -1], [1, -1]]) {
+        const two = def.legCount === 2;
+        const positions = two ? [[-1, 0], [1, 0]] : [[-1, 1], [1, 1], [-1, -1], [1, -1]];
+        const offX = two ? legW * 1.2 : bw / 2 - legW / 2;
+        const offZ = bL / 2 - legW / 2;
+        for (const [sx, sz] of positions) {
           const geo = coloredBoxGeo(legW, legLen, legW, def.legColor, 0, -legLen / 2, 0); // hip pivot
           const leg = new THREE.Mesh(geo, mobMat);
           leg.position.set(sx * offX, legLen, sz * offZ);
@@ -1490,7 +1493,7 @@
           // animate + place mesh
           if (moving && m.onGround) { m.phase += dt * 9; } else { m.phase *= 0.8; }
           const sw = Math.sin(m.phase) * 0.5;
-          if (m.legs.length === 4) { m.legs[0].rotation.x = sw; m.legs[3].rotation.x = sw; m.legs[1].rotation.x = -sw; m.legs[2].rotation.x = -sw; }
+          for (let k = 0; k < m.legs.length; k++) m.legs[k].rotation.x = (k === 0 || k === 3) ? sw : -sw;
           m.group.position.set(p.x, p.y, p.z);
           m.group.rotation.y = m.yaw;
         }
