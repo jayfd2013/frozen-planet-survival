@@ -145,11 +145,6 @@
         position: fixed; inset: 0; z-index: 5; pointer-events: none;
         background: #0a1030; opacity: 0;
       }
-      #celestial {
-        position: fixed; z-index: 6; pointer-events: none;
-        font-size: 42px; line-height: 1; left: 10%; top: 70%;
-        filter: drop-shadow(0 0 14px rgba(255,240,180,0.55));
-      }
       #pauseHint {
         position: fixed; top: 50%; left: 50%;
         transform: translate(-50%, calc(-50% - 60px));
@@ -189,7 +184,6 @@
   </head>
   <body>
     <div id="nighttint"></div>
-    <div id="celestial">☀️</div>
     <div id="crosshair"></div>
     <div id="hud">
       <div>FPS <b id="fps">–</b> &nbsp; Chunks <b id="chunks">–</b></div>
@@ -1632,7 +1626,6 @@
       //  Day / night cycle
       // ===================================================================
       const nightTintEl = document.getElementById('nighttint');
-      const celestialEl = document.getElementById('celestial');
       let dayTime = 0.28;                 // 0..1 (0=sunrise, .25=noon, .5=sunset, .75=midnight)
       const DAY_LEN = 240;                // seconds per full day
       const SKY_STOPS   = [[0,0x24344f],[0.05,0xef9d55],[0.14,0x87ceeb],[0.45,0x87ceeb],[0.5,0xef7a3c],[0.56,0x2b2450],[0.64,0x0a1030],[0.95,0x0a1030],[1,0x24344f]];
@@ -1655,11 +1648,6 @@
         const [la, lb, lf] = stopPair(LIGHT_STOPS, dayTime);
         const L = la + (lb - la) * lf;
         nightTintEl.style.opacity = ((1 - L) * 0.6).toFixed(3);
-        const day = dayTime < 0.5;
-        const tt = day ? dayTime / 0.5 : (dayTime - 0.5) / 0.5;
-        celestialEl.textContent = day ? '☀️' : '🌙';
-        celestialEl.style.left = (8 + tt * 84) + '%';
-        celestialEl.style.top = (80 - Math.sin(tt * Math.PI) * 64) + '%';
       }
 
       // ===================================================================
