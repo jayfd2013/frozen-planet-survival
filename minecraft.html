@@ -1113,9 +1113,21 @@
         const c = getChunk(cx, cz);
         if (!c) return;
         c.blocks.fill(AIR);
+        c.water.fill(0);   // clear stale water levels so the pit is truly empty
+        c.maxY = 0;        // the whole chunk is air now
         markDirty(cx, cz);
         markDirty(cx - 1, cz); markDirty(cx + 1, cz);
         markDirty(cx, cz - 1); markDirty(cx, cz + 1);
+        // wake any water touching the pit's edges so it pours in and falls
+        const ox = cx * CHUNK, oz = cz * CHUNK;
+        for (let y = 0; y < WORLD_HEIGHT; y++) {
+          for (let i = 0; i < CHUNK; i++) {
+            if (getBlock(ox + i, y, oz - 1) === WATER)         activateWater(ox + i, y, oz - 1);
+            if (getBlock(ox + i, y, oz + CHUNK) === WATER)     activateWater(ox + i, y, oz + CHUNK);
+            if (getBlock(ox - 1, y, oz + i) === WATER)         activateWater(ox - 1, y, oz + i);
+            if (getBlock(ox + CHUNK, y, oz + i) === WATER)     activateWater(ox + CHUNK, y, oz + i);
+          }
+        }
         toast('💥 chunk erased');
       }
 
