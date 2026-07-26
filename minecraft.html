@@ -714,6 +714,11 @@
       function genFeatures(c) {
         const b = c.blocks;
         const set = (lx, y, lz, id) => { if (y >= 0 && y < WORLD_HEIGHT) b[idx(lx, y, lz)] = id; };
+        const trees = [];  // placed trunk columns, for spacing
+        const farFromTrees = (lx, lz) => {
+          for (const t of trees) if (Math.abs(t[0] - lx) < 4 && Math.abs(t[1] - lz) < 4) return false;
+          return true;
+        };
         for (let lx = 2; lx < CHUNK - 2; lx++) {
           for (let lz = 2; lz < CHUNK - 2; lz++) {
             const wx = c.cx * CHUNK + lx, wz = c.cz * CHUNK + lz;
@@ -724,6 +729,8 @@
               if (bl !== AIR && bl !== WATER) { sy = y; surf = bl; break; }
             }
             if (sy < 0) continue;
+            // column already has vegetation/structure on top — never build on it
+            if (surf === LEAVES || surf === LOG || surf === CACTUS) continue;
             const biome = biomeAt(wx, wz);
             const r = hash2(wx * 7, wz * 13);
 
@@ -734,11 +741,11 @@
               }
             } else if (biome === B_MOUNTAIN) {
               if (surf === STONE && r < 0.010) placeBoulder(set, lx, sy, lz, wx, wz);
-              else if (surf === GRASS && r < 0.012) placeTree(set, lx, sy, lz, false);
+              else if (surf === GRASS && r < 0.012 && farFromTrees(lx, lz)) { placeTree(set, lx, sy, lz); trees.push([lx, lz]); }
             } else { // plains, forest, snowy
               const treeChance = biome === B_FOREST ? 0.060 : (biome === B_SNOWY ? 0.022 : 0.012);
-              if ((surf === GRASS || surf === SNOW) && r < treeChance) {
-                placeTree(set, lx, sy, lz, biome === B_SNOWY);
+              if ((surf === GRASS || surf === SNOW) && r < treeChance && farFromTrees(lx, lz)) {
+                placeTree(set, lx, sy, lz); trees.push([lx, lz]);
               } else if (biome !== B_SNOWY && surf === GRASS && lx < CHUNK - 6 && lz < CHUNK - 6
                          && hash2(wx * 31, wz * 17) < 0.0011) {
                 placeHut(set, lx, sy, lz);
@@ -748,7 +755,7 @@
         }
       }
 
-      function placeTree(set, lx, sy, lz, snowy) {
+      function placeTree(set, lx, sy, lz) {
         const th = 4 + Math.floor(hash2(lx * 13 + sy, lz * 7) * 3);
         for (let dy = th - 2; dy <= th + 1; dy++) {
           const rad = dy >= th ? 1 : 2;
@@ -757,7 +764,6 @@
               if (ox === 0 && oz === 0 && dy < th) continue;
               if (Math.abs(ox) === rad && Math.abs(oz) === rad && rad === 2) continue;
               set(lx + ox, sy + dy, lz + oz, LEAVES);
-              if (snowy && dy === th + 1) set(lx + ox, sy + dy + 1, lz + oz, SNOW); // snow-dusted top
             }
         }
         for (let dy = 1; dy <= th; dy++) set(lx, sy + dy, lz, LOG);
