@@ -145,6 +145,11 @@
         position: fixed; inset: 0; z-index: 5; pointer-events: none;
         background: #0a1030; opacity: 0;
       }
+      #underwater {
+        position: fixed; inset: 0; z-index: 7; pointer-events: none;
+        background: radial-gradient(circle at 50% 45%, rgba(30,90,150,0.30), rgba(12,50,95,0.62));
+        opacity: 0; transition: opacity 0.25s linear;
+      }
       #pauseHint {
         position: fixed; top: 50%; left: 50%;
         transform: translate(-50%, calc(-50% - 60px));
@@ -184,6 +189,7 @@
   </head>
   <body>
     <div id="nighttint"></div>
+    <div id="underwater"></div>
     <div id="crosshair"></div>
     <div id="hud">
       <div>FPS <b id="fps">–</b> &nbsp; Chunks <b id="chunks">–</b></div>
@@ -412,7 +418,12 @@
           }
         }
         // Water
-        fill(TILE.WATER, 48, 108, 196, 12); specks(TILE.WATER, 14, 70, 130, 210, 20);
+        fill(TILE.WATER, 40, 100, 185, 8);
+        {
+          const ox = TILE.WATER * TS;
+          for (let y = 0; y < TS; y++) if (y % 4 === 1) for (let x = 0; x < TS; x++) if (R() < 0.7) put(ox, x, y, 78, 150, 220); // wave streaks
+          for (let i = 0; i < 12; i++) put(ox, (R() * TS) | 0, (R() * TS) | 0, 150, 200, 240);                                    // sparkles
+        }
         // Snow: bright white with faint sparkle
         fill(TILE.SNOW, 236, 242, 250, 6); specks(TILE.SNOW, 12, 250, 252, 255, 6);
         // Snow side: dirt with a thick snow cap on top
@@ -831,6 +842,8 @@
               const wx = ox + x, wy = y, wz = oz + z;
               const water = id === WATER;
               const glass = id === GLASS;
+              // surface water sits a bit below a full block (nicer waterline); submerged water is full
+              const waterTop = water ? (nbAt(x, y + 1, z, wx, wz) === AIR ? 0.88 : 1) : 1;
 
               for (let f = 0; f < 6; f++) {
                 const n = FACES[f].n;
@@ -882,7 +895,8 @@
                 for (const ti of [0, 1, 2, 0, 2, 3]) {
                   const cc = corners[ti];
                   const b = sh * aoByIdx[ti];
-                  P.push(wx + cc[0], wy + cc[1], wz + cc[2]);
+                  const vy = wy + (water && cc[1] === 1 ? waterTop : cc[1]);
+                  P.push(wx + cc[0], vy, wz + cc[2]);
                   C.push(b, b, b);
                   tileUV(U, t, ti);
                 }
@@ -985,6 +999,7 @@
         fly: false,
         yaw: 0, pitch: 0,
         width: 0.6, height: 1.8, eye: 1.62,
+        inWater: false, headUnderwater: false,
       };
       const HALF = player.width / 2;
 
@@ -1003,9 +1018,16 @@
         const p = player.pos, v = player.vel;
         const phase = god.noclip;               // noclip = ignore all collision
 
-        // gravity
-        if (!player.fly) v.y -= 30 * dt;
-        else v.y *= Math.pow(0.001, dt); // damp vertical when flying
+        // vertical physics: flying, swimming (buoyant), or normal gravity
+        if (player.fly) {
+          v.y *= Math.pow(0.001, dt);
+        } else if (player.inWater) {
+          v.y -= 9 * dt;                        // weak gravity underwater
+          v.y *= Math.pow(0.12, dt);            // heavy drag -> gentle sink, easy to swim
+          if (v.y < -3) v.y = -3;               // terminal sink speed
+        } else {
+          v.y -= 30 * dt;
+        }
 
         // integrate axis-by-axis with collision
         let nx = p.x + v.x * dt;
@@ -1644,6 +1666,8 @@
       //  Day / night cycle
       // ===================================================================
       const nightTintEl = document.getElementById('nighttint');
+      const underwaterEl = document.getElementById('underwater');
+      const FOG_NEAR = (RENDER_DIST - 1.5) * CHUNK, FOG_FAR = (RENDER_DIST + 0.5) * CHUNK;
       let dayTime = 0.28;                 // 0..1 (0=sunrise, .25=noon, .5=sunset, .75=midnight)
       const DAY_LEN = 240;                // seconds per full day
       const SKY_STOPS   = [[0,0x24344f],[0.05,0xef9d55],[0.14,0x87ceeb],[0.45,0x87ceeb],[0.5,0xef7a3c],[0.56,0x2b2450],[0.64,0x0a1030],[0.95,0x0a1030],[1,0x24344f]];
@@ -1732,7 +1756,7 @@
       //  Main loop
       // ===================================================================
       const clock = new THREE.Clock();
-      let fpsAccum = 0, fpsFrames = 0, fpsTimer = 0, waterTimer = 0, stepTimer = 0, bobT = 0;
+      let fpsAccum = 0, fpsFrames = 0, fpsTimer = 0, waterTimer = 0, stepTimer = 0, bobT = 0, waveT = 0;
 
       function frame() {
         requestAnimationFrame(frame);
@@ -1740,6 +1764,12 @@
         if (dt > 0.05) dt = 0.05; // clamp to avoid tunnelling on lag spikes
 
         if (running) {
+          // water state: body in water => swimming; head in water => underwater view
+          const fx0 = Math.floor(player.pos.x), fz0 = Math.floor(player.pos.z);
+          player.inWater = getBlock(fx0, Math.floor(player.pos.y + 0.9), fz0) === WATER
+                        || getBlock(fx0, Math.floor(player.pos.y + 0.2), fz0) === WATER;
+          player.headUnderwater = getBlock(fx0, Math.floor(player.pos.y + player.eye), fz0) === WATER;
+
           // desired horizontal movement from yaw
           const fwd = (keys['KeyW'] ? 1 : 0) - (keys['KeyS'] ? 1 : 0);
           const strafe = (keys['KeyD'] ? 1 : 0) - (keys['KeyA'] ? 1 : 0);
@@ -1749,7 +1779,8 @@
           let wz = -cos * fwd - sin * strafe;
           const len = Math.hypot(wx, wz);
           const sprint = keys['ShiftLeft'] || keys['ShiftRight'];
-          const speed = god.on ? (sprint ? 30 : 14) : (sprint ? 8.5 : 5);
+          let speed = god.on ? (sprint ? 30 : 14) : (sprint ? 8.5 : 5);
+          if (player.inWater && !god.on) speed *= 0.6; // slower in water
           if (len > 0) { wx = wx / len * speed; wz = wz / len * speed; }
           player.vel.x = wx;
           player.vel.z = wz;
@@ -1757,6 +1788,8 @@
           if (player.fly) {
             const up = (keys['Space'] ? 1 : 0) - ((keys['ShiftLeft'] || keys['ControlLeft']) ? 1 : 0);
             player.vel.y = up * speed;
+          } else if (player.inWater) {
+            if (keys['Space']) player.vel.y = 4.2;               // swim up
           } else if (keys['Space'] && player.onGround) {
             player.vel.y = 9; sfx.jump();
           }
@@ -1777,6 +1810,19 @@
 
         updateDayNight(dt);
         updateParticles(dt);
+
+        // gentle sea swell: bob all water surfaces together (seam-free)
+        waveT += dt;
+        const waveY = Math.sin(waveT * 1.1) * 0.03;
+        for (const c of chunks.values()) if (c.waterMesh) c.waterMesh.position.y = waveY;
+
+        // underwater view: blue tint + murky fog when the head is submerged
+        underwaterEl.style.opacity = player.headUnderwater ? '1' : '0';
+        if (player.headUnderwater) {
+          scene.fog.color.setHex(0x14508c); scene.fog.near = 0.1; scene.fog.far = 22;
+        } else {
+          scene.fog.near = FOG_NEAR; scene.fog.far = FOG_FAR;
+        }
 
         // tick water flow a few times a second (independent of framerate)
         waterTimer += dt;
