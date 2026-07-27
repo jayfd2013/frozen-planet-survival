@@ -962,6 +962,14 @@
       renderer.setPixelRatio(1);
       document.body.appendChild(renderer.domElement);
 
+      // outline box drawn around the block under the crosshair
+      const blockOutline = new THREE.LineSegments(
+        new THREE.EdgesGeometry(new THREE.BoxGeometry(1.001, 1.001, 1.001)),
+        new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.4 })
+      );
+      blockOutline.visible = false;
+      scene.add(blockOutline);
+
       // Procedural texture atlas — crisp pixel look (nearest filtering, no mipmaps)
       const atlasCanvas = makeAtlasCanvas();
       const atlas = new THREE.CanvasTexture(atlasCanvas);
@@ -1082,7 +1090,7 @@
         running = document.pointerLockElement === renderer.domElement;
         overlay.style.display = running ? 'none' : (started ? 'none' : 'flex');
         pauseHint.style.display = (started && !running) ? 'block' : 'none';
-        if (!running) pauseHint.textContent = 'Paused — click to resume';
+        if (!running) { pauseHint.textContent = 'Paused — click to resume'; held.left = held.right = false; }
       });
 
       let started = false;
@@ -1200,37 +1208,44 @@
       }, { passive: true });
 
       // mining / placing
-      renderer.domElement.addEventListener('mousedown', (e) => {
-        if (!running) return;
-        // left-click first checks for a mob under the crosshair (attack)
-        if (e.button === 0) {
-          const mob = mobUnderCrosshair();
-          if (mob) { removeMob(mob); sfx.hit(); toast('🐾 ' + mob.def.name + '!'); return; }
-        }
+      const held = { left: false, right: false };
+      let actionTimer = 0;
+
+      function tryMine() {
         const hit = raycast();
         if (!hit) return;
+        if (god.on && god.brush > 1) { sphereEdit(hit.block[0], hit.block[1], hit.block[2], god.brush, AIR); sfx.mine(); }
+        else {
+          const bid = getBlock(hit.block[0], hit.block[1], hit.block[2]);
+          setBlock(hit.block[0], hit.block[1], hit.block[2], AIR);
+          spawnBreakParticles(hit.block[0], hit.block[1], hit.block[2], bid);
+          sfx.mine();
+        }
+      }
+      function tryPlace() {
+        const hit = raycast();
+        if (!hit || !hit.place) return;
+        const [x, y, z] = hit.place;
+        if (god.on && god.brush > 1) { sphereEdit(x, y, z, god.brush, HOTBAR[selected]); sfx.place(); return; }
+        // don't place inside the player (unless noclipping)
+        const pminX = Math.floor(player.pos.x - HALF), pmaxX = Math.floor(player.pos.x + HALF);
+        const pminY = Math.floor(player.pos.y), pmaxY = Math.floor(player.pos.y + player.height - 0.01);
+        const pminZ = Math.floor(player.pos.z - HALF), pmaxZ = Math.floor(player.pos.z + HALF);
+        const inside = x >= pminX && x <= pmaxX && y >= pminY && y <= pmaxY && z >= pminZ && z <= pmaxZ;
+        if (!inside || god.noclip) { setBlock(x, y, z, HOTBAR[selected]); sfx.place(); }
+      }
+
+      renderer.domElement.addEventListener('mousedown', (e) => {
+        if (!running) return;
         if (e.button === 0) {
-          // mine — god mode digs a whole sphere
-          if (god.on && god.brush > 1) { sphereEdit(hit.block[0], hit.block[1], hit.block[2], god.brush, AIR); sfx.mine(); }
-          else {
-            const bid = getBlock(hit.block[0], hit.block[1], hit.block[2]);
-            setBlock(hit.block[0], hit.block[1], hit.block[2], AIR);
-            spawnBreakParticles(hit.block[0], hit.block[1], hit.block[2], bid);
-            sfx.mine();
-          }
+          const mob = mobUnderCrosshair();     // left-click: attack a mob if aimed at one
+          if (mob) { removeMob(mob); sfx.hit(); toast('🐾 ' + mob.def.name + '!'); return; }
+          held.left = true; actionTimer = 0.24; tryMine();
         } else if (e.button === 2) {
-          // place at the empty cell before the hit
-          if (!hit.place) return;
-          const [x, y, z] = hit.place;
-          if (god.on && god.brush > 1) { sphereEdit(x, y, z, god.brush, HOTBAR[selected]); sfx.place(); return; }
-          // don't place inside the player (unless noclipping)
-          const pminX = Math.floor(player.pos.x - HALF), pmaxX = Math.floor(player.pos.x + HALF);
-          const pminY = Math.floor(player.pos.y), pmaxY = Math.floor(player.pos.y + player.height - 0.01);
-          const pminZ = Math.floor(player.pos.z - HALF), pmaxZ = Math.floor(player.pos.z + HALF);
-          const inside = x >= pminX && x <= pmaxX && y >= pminY && y <= pmaxY && z >= pminZ && z <= pmaxZ;
-          if (!inside || god.noclip) { setBlock(x, y, z, HOTBAR[selected]); sfx.place(); }
+          held.right = true; actionTimer = 0.24; tryPlace();
         }
       });
+      addEventListener('mouseup', (e) => { if (e.button === 0) held.left = false; if (e.button === 2) held.right = false; });
       renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
 
       // voxel raycast (fine-step; only runs on click)
@@ -1806,6 +1821,24 @@
             stepTimer -= dt;
             if (stepTimer <= 0) { sfx.step(); stepTimer = sprint ? 0.28 : 0.38; }
           } else { stepTimer = 0; }
+
+          // hold mouse to keep mining / placing
+          if (held.left || held.right) {
+            actionTimer -= dt;
+            if (actionTimer <= 0) { actionTimer = 0.2; if (held.left) tryMine(); else tryPlace(); }
+          }
+
+          // subtle FOV kick while sprinting on foot
+          const targetFov = (sprint && len > 0 && player.onGround && !player.fly && !player.inWater) ? 80 : 72;
+          if (Math.abs(camera.fov - targetFov) > 0.05) {
+            camera.fov += (targetFov - camera.fov) * Math.min(1, dt * 8);
+            camera.updateProjectionMatrix();
+          }
+
+          // highlight the block under the crosshair
+          const look = raycast();
+          if (look) { blockOutline.position.set(look.block[0] + 0.5, look.block[1] + 0.5, look.block[2] + 0.5); blockOutline.visible = true; }
+          else blockOutline.visible = false;
         }
 
         updateDayNight(dt);
