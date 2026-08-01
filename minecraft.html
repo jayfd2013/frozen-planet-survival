@@ -185,19 +185,95 @@
         font-size: 20px; font-weight: 800; letter-spacing: 1px; color: #f0c8ff;
         text-shadow: 0 2px 10px rgba(120,0,200,0.8), 0 1px 2px rgba(0,0,0,0.8);
       }
+
+      /* ---------- Health / hunger stats ---------- */
+      #stats {
+        position: fixed; bottom: 78px; left: 50%; transform: translateX(-50%);
+        z-index: 20; pointer-events: none;
+        display: flex; justify-content: space-between; width: 372px;
+      }
+      #stats .row { display: flex; gap: 1px; }
+      #hunger.row { flex-direction: row-reverse; }
+      .icon {
+        position: relative; width: 16px; height: 16px;
+        font-size: 15px; line-height: 16px; text-align: center;
+        filter: drop-shadow(0 1px 1px rgba(0,0,0,0.9));
+      }
+      .icon .back { position: absolute; inset: 0; color: #3a3a3a; }
+      .icon .front { position: absolute; inset: 0; overflow: hidden; white-space: nowrap; }
+      #bubbles {
+        position: fixed; bottom: 96px; left: 50%; transform: translateX(-50%);
+        z-index: 20; pointer-events: none; display: none; gap: 1px;
+      }
+
+      /* ---------- Damage / weather full-screen tints ---------- */
+      #damage {
+        position: fixed; inset: 0; z-index: 8; pointer-events: none;
+        background: radial-gradient(circle at 50% 50%, rgba(180,0,0,0) 40%, rgba(150,0,0,0.55) 100%);
+        opacity: 0;
+      }
+      #weathertint {
+        position: fixed; inset: 0; z-index: 4; pointer-events: none;
+        background: #2a2e36; opacity: 0; transition: opacity 1.2s linear;
+      }
+
+      /* ---------- Creative inventory (E) ---------- */
+      #inventory {
+        position: fixed; inset: 0; z-index: 45;
+        display: none; flex-direction: column;
+        align-items: center; justify-content: center;
+        background: rgba(0,0,0,0.55); backdrop-filter: blur(3px);
+      }
+      #invpanel {
+        background: rgba(20,22,30,0.92);
+        border: 2px solid rgba(255,255,255,0.25);
+        border-radius: 14px; padding: 18px 20px;
+        box-shadow: 0 16px 50px rgba(0,0,0,0.5);
+        max-width: 560px;
+      }
+      #invpanel h2 { font-size: 18px; margin-bottom: 4px; }
+      #invpanel .hint { font-size: 12px; opacity: 0.7; margin-bottom: 14px; }
+      #invgrid { display: grid; grid-template-columns: repeat(8, 56px); gap: 8px; }
+      .invcell {
+        width: 56px; height: 56px; border-radius: 8px;
+        border: 2px solid rgba(255,255,255,0.2);
+        position: relative; cursor: pointer;
+        transition: transform .1s ease, border-color .1s ease;
+      }
+      .invcell:hover { transform: translateY(-3px) scale(1.05); border-color: #fff; }
+      .invcell .ilabel {
+        position: absolute; bottom: 1px; left: 0; right: 0;
+        font-size: 8px; text-align: center; color: #fff;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.95);
+      }
     </style>
   </head>
   <body>
+    <div id="weathertint"></div>
     <div id="nighttint"></div>
     <div id="underwater"></div>
+    <div id="damage"></div>
     <div id="crosshair"></div>
     <div id="hud">
       <div>FPS <b id="fps">–</b> &nbsp; Chunks <b id="chunks">–</b></div>
       <div>XYZ <b id="pos">0 0 0</b> &nbsp; <b id="biome">–</b></div>
-      <div>Mode <b id="mode">Survival</b></div>
+      <div>Mode <b id="mode">Survival</b> &nbsp; Weather <b id="weather">Clear</b></div>
+    </div>
+    <div id="bubbles"></div>
+    <div id="stats">
+      <div class="row" id="health"></div>
+      <div class="row" id="hunger"></div>
     </div>
     <div id="hotbar"></div>
     <div id="credit">VoxelCraft 3D · Made with AI</div>
+
+    <div id="inventory">
+      <div id="invpanel">
+        <h2>🎒 Creative Inventory</h2>
+        <div class="hint">Click a block to load it into hotbar slot <b id="invslot">1</b> · press <kbd>E</kbd> or <kbd>Esc</kbd> to close</div>
+        <div id="invgrid"></div>
+      </div>
+    </div>
 
     <div id="godpanel">
       <div class="gtitle">⚡ GOD MODE</div>
@@ -215,9 +291,10 @@
       <div class="sub">A fresh blocky world every time you load. Mine it, build it, make it yours.</div>
       <button id="play">Play</button>
       <div id="controls">
-        <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move &nbsp;·&nbsp; <kbd>Space</kbd> Jump &nbsp;·&nbsp; <kbd>Shift</kbd> Sprint</div>
+        <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move &nbsp;·&nbsp; <kbd>Space</kbd> Jump &nbsp;·&nbsp; <kbd>Ctrl</kbd> Sprint &nbsp;·&nbsp; <kbd>Shift</kbd> Sneak</div>
         <div><kbd>Mouse</kbd> Look &nbsp;·&nbsp; <kbd>L-Click</kbd> Mine &nbsp;·&nbsp; <kbd>R-Click</kbd> Place</div>
-        <div><kbd>1</kbd>–<kbd>9</kbd> / <kbd>Scroll</kbd> Select block &nbsp;·&nbsp; <kbd>F</kbd> Fly &nbsp;·&nbsp; <kbd>M</kbd> Mute</div>
+        <div><kbd>1</kbd>–<kbd>9</kbd> / <kbd>Scroll</kbd> Hotbar &nbsp;·&nbsp; <kbd>E</kbd> Inventory &nbsp;·&nbsp; <kbd>F5</kbd> View</div>
+        <div><kbd>F</kbd> Fly &nbsp;·&nbsp; <kbd>M</kbd> Mute &nbsp;·&nbsp; ⛏️ Dig ore, ❤️ survive falls, 🌧 weather</div>
         <div><kbd>G</kbd> ⚡ <b>God Mode</b> — giant brush, nuke chunks, noclip &amp; more</div>
         <div><kbd>Esc</kbd> Release mouse</div>
       </div>
@@ -247,9 +324,15 @@
       // Block IDs
       const AIR = 0, GRASS = 1, DIRT = 2, STONE = 3, LOG = 4, LEAVES = 5,
             SAND = 6, WATER = 7, PLANKS = 8, GLASS = 9, COBBLE = 10, BRICK = 11,
-            SNOW = 12, CACTUS = 13;
+            SNOW = 12, CACTUS = 13,
+            // ores
+            COAL = 14, IRON = 15, GOLD = 16, DIAMOND = 17, REDSTONE = 18,
+            // building / decoration
+            GRAVEL = 19, GLOWSTONE = 20, BOOKSHELF = 21, CRAFTING = 22, FURNACE = 23,
+            PUMPKIN = 24, TNT = 25, WOOL_W = 26, WOOL_R = 27, WOOL_B = 28, WOOL_Y = 29,
+            OBSIDIAN = 30, MOSSY = 31;
 
-      // Base colors (0..1 rgb)
+      // Base colors (0..1 rgb) — used for break particles
       const COLORS = {
         [GRASS]:  [0.36, 0.62, 0.28],
         [DIRT]:   [0.55, 0.40, 0.25],
@@ -264,25 +347,58 @@
         [BRICK]:  [0.62, 0.30, 0.26],
         [SNOW]:   [0.92, 0.95, 0.98],
         [CACTUS]: [0.30, 0.52, 0.26],
+        [COAL]:   [0.22, 0.22, 0.24],
+        [IRON]:   [0.72, 0.62, 0.54],
+        [GOLD]:   [0.90, 0.76, 0.32],
+        [DIAMOND]:[0.55, 0.88, 0.90],
+        [REDSTONE]:[0.75, 0.18, 0.18],
+        [GRAVEL]: [0.52, 0.50, 0.50],
+        [GLOWSTONE]:[0.96, 0.86, 0.46],
+        [BOOKSHELF]:[0.55, 0.40, 0.25],
+        [CRAFTING]:[0.60, 0.42, 0.24],
+        [FURNACE]:[0.40, 0.40, 0.42],
+        [PUMPKIN]:[0.87, 0.55, 0.14],
+        [TNT]:    [0.78, 0.24, 0.20],
+        [WOOL_W]: [0.93, 0.93, 0.93],
+        [WOOL_R]: [0.76, 0.22, 0.22],
+        [WOOL_B]: [0.24, 0.36, 0.76],
+        [WOOL_Y]: [0.90, 0.82, 0.26],
+        [OBSIDIAN]:[0.16, 0.13, 0.22],
+        [MOSSY]:  [0.40, 0.48, 0.40],
       };
       // seconds to break each block by hand (Minecraft-style mining time)
       const HARDNESS = {
-        [GRASS]:0.55,[DIRT]:0.5,[SAND]:0.5,[SNOW]:0.4,[LEAVES]:0.3,[CACTUS]:0.5,
-        [PLANKS]:1.1,[LOG]:1.3,[GLASS]:0.35,[STONE]:2.1,[COBBLE]:2.2,[BRICK]:2.2,
+        [GRASS]:0.55,[DIRT]:0.5,[SAND]:0.5,[SNOW]:0.4,[LEAVES]:0.3,[CACTUS]:0.5,[GRAVEL]:0.6,
+        [PLANKS]:1.1,[LOG]:1.3,[GLASS]:0.35,[STONE]:2.1,[COBBLE]:2.2,[BRICK]:2.2,[MOSSY]:2.2,
+        [COAL]:3.0,[IRON]:3.3,[GOLD]:3.3,[DIAMOND]:3.6,[REDSTONE]:3.3,
+        [GLOWSTONE]:0.4,[BOOKSHELF]:1.5,[CRAFTING]:1.3,[FURNACE]:2.3,[PUMPKIN]:0.6,[TNT]:0.5,
+        [WOOL_W]:0.5,[WOOL_R]:0.5,[WOOL_B]:0.5,[WOOL_Y]:0.5,[OBSIDIAN]:9.0,
       };
       const GRASS_TOP = [0.40, 0.66, 0.30];
       const LOG_TOP   = [0.55, 0.42, 0.25];
 
-      // What a block is called in the hotbar
+      // Display name for each block (hotbar + inventory)
       const NAMES = {
         [GRASS]:'Grass',[DIRT]:'Dirt',[STONE]:'Stone',[COBBLE]:'Cobble',
-        [PLANKS]:'Wood',[LOG]:'Log',[LEAVES]:'Leaf',[SAND]:'Sand',
+        [PLANKS]:'Planks',[LOG]:'Log',[LEAVES]:'Leaves',[SAND]:'Sand',
         [GLASS]:'Glass',[BRICK]:'Brick',[WATER]:'Water',
         [SNOW]:'Snow',[CACTUS]:'Cactus',
+        [COAL]:'Coal Ore',[IRON]:'Iron Ore',[GOLD]:'Gold Ore',[DIAMOND]:'Diamond',[REDSTONE]:'Redstone',
+        [GRAVEL]:'Gravel',[GLOWSTONE]:'Glowstone',[BOOKSHELF]:'Bookshelf',[CRAFTING]:'Crafting',
+        [FURNACE]:'Furnace',[PUMPKIN]:'Pumpkin',[TNT]:'TNT',
+        [WOOL_W]:'White Wool',[WOOL_R]:'Red Wool',[WOOL_B]:'Blue Wool',[WOOL_Y]:'Yellow Wool',
+        [OBSIDIAN]:'Obsidian',[MOSSY]:'Mossy',
       };
 
-      // Blocks you can place from the hotbar
-      const HOTBAR = [GRASS, DIRT, STONE, COBBLE, PLANKS, LOG, LEAVES, SAND, GLASS, WATER];
+      // Hotbar = 9 assignable quick-slots (reassign from the E inventory)
+      let HOTBAR = [GRASS, DIRT, STONE, COBBLE, PLANKS, GLASS, LOG, SAND, WATER];
+      // Everything you can pull into a slot from the creative inventory (E)
+      const PALETTE = [
+        GRASS, DIRT, STONE, COBBLE, MOSSY, GRAVEL, SAND, LOG, PLANKS, LEAVES,
+        BOOKSHELF, CRAFTING, FURNACE, BRICK, GLASS, GLOWSTONE, PUMPKIN, TNT,
+        CACTUS, SNOW, WOOL_W, WOOL_R, WOOL_B, WOOL_Y,
+        COAL, IRON, GOLD, DIAMOND, REDSTONE, OBSIDIAN, WATER,
+      ];
 
       // A block is "solid" for physics if it's not air and not water.
       function isSolid(id){ return id !== AIR && id !== WATER; }
@@ -297,8 +413,12 @@
         GRASS_TOP:0, GRASS_SIDE:1, DIRT:2, STONE:3, COBBLE:4, LOG_SIDE:5,
         LOG_TOP:6, LEAVES:7, SAND:8, PLANKS:9, GLASS:10, BRICK:11, WATER:12,
         SNOW:13, CACTUS:14, SNOW_SIDE:15,
+        COAL:16, IRON:17, GOLD:18, DIAMOND:19, REDSTONE:20, GRAVEL:21, GLOWSTONE:22,
+        BOOKSHELF:23, CRAFT_TOP:24, CRAFT_SIDE:25, FURNACE_FRONT:26, FURNACE_SIDE:27,
+        PUMPKIN_TOP:28, PUMPKIN_SIDE:29, TNT_TOP:30, TNT_SIDE:31,
+        WOOL_W:32, WOOL_R:33, WOOL_B:34, WOOL_Y:35, OBSIDIAN:36, MOSSY:37,
       };
-      const TILE_COUNT = 16;
+      const TILE_COUNT = 38;
       const TS = 16; // texels per tile
 
       // pick the atlas tile for a block id + face (2=+Y top, 3=-Y bottom, else side)
@@ -318,6 +438,24 @@
           case WATER:  return TILE.WATER;
           case SNOW:   return top ? TILE.SNOW : (bottom ? TILE.DIRT : TILE.SNOW_SIDE);
           case CACTUS: return TILE.CACTUS;
+          case COAL:     return TILE.COAL;
+          case IRON:     return TILE.IRON;
+          case GOLD:     return TILE.GOLD;
+          case DIAMOND:  return TILE.DIAMOND;
+          case REDSTONE: return TILE.REDSTONE;
+          case GRAVEL:   return TILE.GRAVEL;
+          case GLOWSTONE:return TILE.GLOWSTONE;
+          case OBSIDIAN: return TILE.OBSIDIAN;
+          case MOSSY:    return TILE.MOSSY;
+          case BOOKSHELF:return (top || bottom) ? TILE.PLANKS : TILE.BOOKSHELF;
+          case CRAFTING: return top ? TILE.CRAFT_TOP : (bottom ? TILE.PLANKS : TILE.CRAFT_SIDE);
+          case FURNACE:  return (top || bottom) ? TILE.FURNACE_SIDE : TILE.FURNACE_FRONT;
+          case PUMPKIN:  return (top || bottom) ? TILE.PUMPKIN_TOP : TILE.PUMPKIN_SIDE;
+          case TNT:      return (top || bottom) ? TILE.TNT_TOP : TILE.TNT_SIDE;
+          case WOOL_W:   return TILE.WOOL_W;
+          case WOOL_R:   return TILE.WOOL_R;
+          case WOOL_B:   return TILE.WOOL_B;
+          case WOOL_Y:   return TILE.WOOL_Y;
           default:     return TILE.STONE;
         }
       }
@@ -444,6 +582,128 @@
           for (let y = 0; y < TS; y++) { put(ox, 2, y, 44, 88, 40); put(ox, 13, y, 44, 88, 40); put(ox, 7, y, 82, 140, 70); put(ox, 8, y, 82, 140, 70); }
         }
 
+        // ---- Ores: stone base + clustered coloured nuggets ----
+        const stoneBase = (t) => { fill(t, 128, 128, 134, 9); specks(t, 12, 104, 104, 110, 16); };
+        const oreBlobs = (t, r, g, b, blobs, sparkle) => {
+          const ox = t * TS;
+          for (let i = 0; i < blobs; i++) {
+            const bx = 2 + ((R() * 11) | 0), by = 2 + ((R() * 11) | 0), sz = 1 + ((R() * 2) | 0);
+            for (let dy = 0; dy <= sz; dy++) for (let dx = 0; dx <= sz; dx++) {
+              if (R() < 0.25) continue;
+              const n = (R() * 2 - 1) * 22;
+              put(ox, Math.min(15, bx + dx), Math.min(15, by + dy), r + n, g + n, b + n);
+            }
+            if (sparkle) put(ox, Math.min(15, bx), Math.min(15, by), 250, 250, 250);
+          }
+        };
+        stoneBase(TILE.COAL);     oreBlobs(TILE.COAL, 34, 34, 40, 6, false);
+        stoneBase(TILE.IRON);     oreBlobs(TILE.IRON, 190, 150, 120, 6, false);
+        stoneBase(TILE.GOLD);     oreBlobs(TILE.GOLD, 232, 196, 80, 6, true);
+        stoneBase(TILE.DIAMOND);  oreBlobs(TILE.DIAMOND, 120, 224, 226, 6, true);
+        stoneBase(TILE.REDSTONE); oreBlobs(TILE.REDSTONE, 200, 40, 40, 7, true);
+
+        // Gravel: mixed grey pebbles
+        fill(TILE.GRAVEL, 130, 126, 124, 4);
+        specks(TILE.GRAVEL, 44, 92, 90, 88, 60);
+        specks(TILE.GRAVEL, 20, 170, 168, 166, 24);
+
+        // Glowstone: glowing yellow speckle
+        fill(TILE.GLOWSTONE, 226, 190, 90, 10);
+        specks(TILE.GLOWSTONE, 40, 250, 232, 150, 8);
+        specks(TILE.GLOWSTONE, 16, 180, 130, 40, 20);
+
+        // Obsidian: near-black with faint purple sheen
+        fill(TILE.OBSIDIAN, 34, 26, 48, 6);
+        specks(TILE.OBSIDIAN, 14, 70, 52, 100, 18);
+
+        // Mossy cobble: cobble with green moss patches
+        fill(TILE.MOSSY, 96, 96, 100, 6);
+        {
+          const ox = TILE.MOSSY * TS;
+          const stones = [[1,1,6,5],[9,1,5,6],[1,8,4,6],[7,9,7,5],[6,1,3,3]];
+          for (const [sx, sy, sw, sh2] of stones)
+            for (let y = 0; y < sh2; y++) for (let x = 0; x < sw; x++) {
+              if (sx + x >= TS || sy + y >= TS) continue;
+              const moss = R() < 0.4;
+              const n = (R() * 2 - 1) * 12;
+              if (moss) put(ox, sx + x, sy + y, 70 + n, 110 + n, 60 + n);
+              else { const base = 150 + n; put(ox, sx + x, sy + y, base, base, base + 6); }
+            }
+        }
+
+        // Bookshelf: planks frame with colourful vertical book spines
+        fill(TILE.BOOKSHELF, 150, 112, 66, 6);
+        {
+          const ox = TILE.BOOKSHELF * TS;
+          for (let x = 0; x < TS; x++) { put(ox, x, 0, 118, 88, 50); put(ox, x, 7, 118, 88, 50); put(ox, x, 15, 118, 88, 50); }
+          const spine = [[200,60,60],[60,120,200],[80,180,90],[210,190,70],[170,90,190],[220,140,60]];
+          for (const row of [1, 8]) {
+            let x = 1;
+            while (x < 15) {
+              const w = 1 + ((R() * 2) | 0), c = spine[(R() * spine.length) | 0];
+              for (let dx = 0; dx < w && x < 15; dx++, x++) for (let y = row; y < row + 6; y++) { const n = (R() * 2 - 1) * 18; put(ox, x, y, c[0] + n, c[1] + n, c[2] + n); }
+              x += 1;
+            }
+          }
+        }
+
+        // Crafting table top: planks with a dark 3x3 grid + tools
+        fill(TILE.CRAFT_TOP, 170, 130, 80, 6);
+        {
+          const ox = TILE.CRAFT_TOP * TS;
+          for (let i = 0; i <= TS; i += 5) for (let y = 0; y < TS; y++) { put(ox, Math.min(15, i), y, 96, 70, 40); put(ox, y, Math.min(15, i), 96, 70, 40); }
+        }
+        // Crafting table side: planks with a saw/tool motif
+        fill(TILE.CRAFT_SIDE, 160, 122, 74, 6);
+        {
+          const ox = TILE.CRAFT_SIDE * TS;
+          for (let x = 2; x < 8; x++) put(ox, x, 4, 90, 90, 96);      // saw blade
+          for (let x = 8; x < 13; x++) put(ox, x, 10, 120, 60, 40);   // handle
+        }
+
+        // Furnace front: stone with a dark firebox
+        fill(TILE.FURNACE_FRONT, 118, 118, 124, 6);
+        specks(TILE.FURNACE_FRONT, 18, 96, 96, 102, 16);
+        {
+          const ox = TILE.FURNACE_FRONT * TS;
+          for (let y = 6; y < 13; y++) for (let x = 4; x < 12; x++) put(ox, x, y, 30, 26, 24); // opening
+          for (let x = 5; x < 11; x++) { put(ox, x, 11, 210, 120, 30); put(ox, x, 12, 240, 170, 50); } // embers
+        }
+        fill(TILE.FURNACE_SIDE, 112, 112, 118, 6);
+        specks(TILE.FURNACE_SIDE, 18, 92, 92, 98, 16);
+
+        // Pumpkin top: orange with a stem
+        fill(TILE.PUMPKIN_TOP, 214, 128, 34, 8);
+        { const ox = TILE.PUMPKIN_TOP * TS; for (let y = 6; y < 10; y++) for (let x = 6; x < 10; x++) put(ox, x, y, 96, 132, 52); }
+        // Pumpkin side: ridged orange with a carved jack-o'-lantern face
+        fill(TILE.PUMPKIN_SIDE, 218, 130, 30, 8);
+        {
+          const ox = TILE.PUMPKIN_SIDE * TS;
+          for (const x of [3, 8, 13]) for (let y = 0; y < TS; y++) put(ox, x, y, 170, 96, 20); // ridges
+          const eye = [[3,5],[4,5],[3,6],[10,5],[11,5],[12,5],[11,6]];
+          for (const [x, y] of eye) put(ox, x, y, 40, 26, 14);
+          for (let x = 4; x < 12; x++) put(ox, x, 11, 40, 26, 14);
+          for (const [x, y] of [[5,10],[7,12],[9,12],[11,10]]) put(ox, x, y, 40, 26, 14); // jagged grin
+        }
+
+        // TNT: red body with white 'TNT' band top & bottom, dark fuse top
+        fill(TILE.TNT_SIDE, 196, 54, 40, 6);
+        {
+          const ox = TILE.TNT_SIDE * TS;
+          for (let x = 0; x < TS; x++) { put(ox, x, 0, 210, 210, 210); put(ox, x, 15, 210, 210, 210); put(ox, x, 1, 200, 200, 200); put(ox, x, 14, 200, 200, 200); }
+          const letters = [[3,6],[3,7],[3,8],[3,9],[2,6],[4,6],[7,6],[7,7],[7,8],[7,9],[6,6],[8,6],[11,6],[11,7],[11,8],[11,9],[10,6],[12,6]];
+          for (const [x, y] of letters) put(ox, x, y, 40, 40, 40);
+        }
+        fill(TILE.TNT_TOP, 190, 60, 46, 6);
+        { const ox = TILE.TNT_TOP * TS; for (let y = 6; y < 10; y++) for (let x = 6; x < 10; x++) put(ox, x, y, 60, 50, 44); put(ox, 7, 4, 40, 40, 40); put(ox, 8, 3, 40, 40, 40); }
+
+        // Wool: soft solid colours with a little fibre noise
+        const wool = (t, r, g, b) => { fill(t, r, g, b, 8); specks(t, 22, r - 18, g - 18, b - 18, 14); };
+        wool(TILE.WOOL_W, 226, 226, 230);
+        wool(TILE.WOOL_R, 186, 60, 56);
+        wool(TILE.WOOL_B, 62, 92, 190);
+        wool(TILE.WOOL_Y, 222, 200, 66);
+
         return cvs;
       }
 
@@ -506,6 +766,21 @@
         let h = (x | 0) * 374761393 + (z | 0) * 668265263 + (WORLD_SEED | 0);
         h = (h ^ (h >> 13)) * 1274126177;
         return ((h ^ (h >> 16)) >>> 0) / 4294967296;
+      }
+      function hash3(x, y, z) {
+        let h = (x | 0) * 374761393 + (y | 0) * 668265263 + (z | 0) * 2147483647 + (WORLD_SEED | 0);
+        h = (h ^ (h >> 13)) * 1274126177;
+        return ((h ^ (h >> 16)) >>> 0) / 4294967296;
+      }
+      // what a deep stone voxel becomes: mostly stone, sometimes ore (rarer + richer with depth)
+      function oreFor(wx, wy, wz) {
+        const r = hash3(wx, wy, wz);
+        if (wy < 14 && r < 0.006) return DIAMOND;
+        if (wy < 20 && r < 0.015) return REDSTONE;
+        if (wy < 24 && r < 0.014) return GOLD;
+        if (wy < 40 && r < 0.030) return IRON;
+        if (r < 0.048) return COAL;
+        return STONE;
       }
 
       // ---- Biomes ----
@@ -707,7 +982,7 @@
               else if (y === 0)   id = STONE;
               else if (y === h)   id = topId;
               else if (y > h - 4) id = subId;
-              else                id = STONE;
+              else                id = oreFor(wx, y, wz);   // deep interior stone, sprinkled with ore
               if (id !== AIR) {
                 const li = idx(lx, y, lz);
                 b[li] = id;
@@ -1085,8 +1360,12 @@
         yaw: 0, pitch: 0,
         width: 0.6, height: 1.8, eye: 1.62,
         inWater: false, headUnderwater: false,
+        airY: 40, crouch: false,
       };
       const HALF = player.width / 2;
+      const eyePos = new THREE.Vector3();     // where interactions originate (stays at the eye in 3rd person)
+      const spawnPoint = new THREE.Vector3(); // set in boot(), used for respawn
+      let viewMode = 0;                       // 0 = first person, 1 = third person (behind)
 
       function collides(px, py, pz) {
         const minX = Math.floor(px - HALF), maxX = Math.floor(px + HALF);
@@ -1099,9 +1378,20 @@
         return false;
       }
 
+      // is there solid ground directly beneath the player's footprint at (px,pz)?
+      function groundUnder(px, pz) {
+        const fy = Math.floor(player.pos.y - 0.06);
+        for (const cx of [px - HALF, px + HALF])
+          for (const cz of [pz - HALF, pz + HALF])
+            if (isSolid(getBlock(Math.floor(cx), fy, Math.floor(cz)))) return true;
+        return false;
+      }
+
       function movePlayer(dt) {
         const p = player.pos, v = player.vel;
         const phase = god.noclip;               // noclip = ignore all collision
+        const wasAir = !player.onGround;
+        const sneaking = player.crouch && player.onGround && !player.fly && !player.inWater;
 
         // vertical physics: flying, swimming (buoyant), or normal gravity
         if (player.fly) {
@@ -1114,12 +1404,12 @@
           v.y -= 30 * dt;
         }
 
-        // integrate axis-by-axis with collision
+        // integrate axis-by-axis with collision. sneaking = never step off a ledge.
         let nx = p.x + v.x * dt;
-        if (phase || !collides(nx, p.y, p.z)) p.x = nx; else v.x = 0;
+        if (phase || (!collides(nx, p.y, p.z) && !(sneaking && !groundUnder(nx, p.z)))) p.x = nx; else v.x = 0;
 
         let nz = p.z + v.z * dt;
-        if (phase || !collides(p.x, p.y, nz)) p.z = nz; else v.z = 0;
+        if (phase || (!collides(p.x, p.y, nz) && !(sneaking && !groundUnder(p.x, nz)))) p.z = nz; else v.z = 0;
 
         player.onGround = false;
         let ny = p.y + v.y * dt;
@@ -1130,13 +1420,43 @@
           v.y = 0;
         }
 
-        // don't fall out of the world
-        if (p.y < -20) { p.set = null; p.y = 60; v.set(0, 0, 0); }
+        // fall-damage bookkeeping: measure the drop from the fall's highest point
+        if (player.fly || player.inWater || god.on) {
+          player.airY = p.y;
+        } else if (!player.onGround) {
+          if (p.y > player.airY) player.airY = p.y;
+        } else {
+          if (wasAir) {
+            const fall = player.airY - p.y;
+            const dmg = Math.floor(fall - 3.5);
+            if (dmg > 0) damagePlayer(dmg);
+          }
+          player.airY = p.y;
+        }
 
-        camera.position.set(p.x, p.y + player.eye, p.z);
+        // don't fall out of the world
+        if (p.y < -20) { p.y = 60; v.set(0, 0, 0); player.airY = 60; }
+
+        // interactions always originate from the eye, even in third person
+        const eyeH = sneaking ? player.eye - 0.28 : player.eye;
+        eyePos.set(p.x, p.y + eyeH, p.z);
         camera.rotation.y = player.yaw;
         camera.rotation.x = player.pitch;
+
+        if (viewMode === 0) {
+          camera.position.copy(eyePos);
+        } else {
+          // third person: pull the camera back along the view ray, stopping at walls
+          camera.getWorldDirection(_camDir);
+          let dist = 4.4;
+          for (let s = 0.4; s <= dist; s += 0.4) {
+            const cx = eyePos.x - _camDir.x * s, cy = eyePos.y - _camDir.y * s, cz = eyePos.z - _camDir.z * s;
+            if (isSolid(getBlock(Math.floor(cx), Math.floor(cy), Math.floor(cz)))) { dist = Math.max(0.6, s - 0.5); break; }
+          }
+          camera.position.set(eyePos.x - _camDir.x * dist, eyePos.y - _camDir.y * dist, eyePos.z - _camDir.z * dist);
+        }
       }
+      const _camDir = new THREE.Vector3();
 
       // ===================================================================
       //  Input
@@ -1166,7 +1486,7 @@
       document.addEventListener('pointerlockchange', () => {
         running = document.pointerLockElement === renderer.domElement;
         overlay.style.display = running ? 'none' : (started ? 'none' : 'flex');
-        pauseHint.style.display = (started && !running) ? 'block' : 'none';
+        pauseHint.style.display = (started && !running && !invOpen) ? 'block' : 'none';
         if (!running) { pauseHint.textContent = 'Paused — click to resume'; held.left = held.right = false; mining.key = null; crackOverlay.visible = false; }
       });
 
@@ -1260,6 +1580,11 @@
 
       addEventListener('keydown', (e) => {
         keys[e.code] = true;
+        // E toggles the creative inventory (works whether or not the pointer is locked)
+        if (e.code === 'KeyE' && started) { e.preventDefault(); if (invOpen) { toggleInventory(false); requestLock(); } else toggleInventory(true); return; }
+        if (e.code === 'Escape' && invOpen) { toggleInventory(false); return; }
+        if (invOpen) return;                     // swallow game keys while browsing inventory
+        if (e.code === 'F5') { e.preventDefault(); viewMode = (viewMode + 1) % 2; updateHud(); }
         if (e.code === 'KeyF') { player.fly = !player.fly; player.vel.y = 0; updateHud(); }
         if (e.code.startsWith('Digit')) {
           const n = parseInt(e.code.slice(5), 10);
@@ -1357,7 +1682,7 @@
       // per voxel crossed instead of ~120 fine samples). reachOverride caps distance.
       const _o = new THREE.Vector3(), _d = new THREE.Vector3();
       function raycast(reachOverride) {
-        _o.copy(camera.position);
+        _o.copy(eyePos);
         camera.getWorldDirection(_d);
         const reach = reachOverride != null ? reachOverride : (god.on ? 40 : REACH);
         const dx = _d.x, dy = _d.y, dz = _d.z;
@@ -1382,29 +1707,61 @@
       }
 
       // ===================================================================
-      //  Hotbar UI
+      //  Hotbar UI + creative inventory (E)
       // ===================================================================
       let selected = 0;
       const hotbarEl = document.getElementById('hotbar');
       const atlasURL = atlasCanvas.toDataURL();       // reuse the same textures as the world
+      // set an element's background to a block's icon (its top-face tile)
+      function paintIcon(el, id) {
+        const t = tileFor(id, 2);
+        el.style.backgroundImage = `url(${atlasURL})`;
+        el.style.backgroundRepeat = 'no-repeat';
+        el.style.backgroundSize = `${TILE_COUNT * 100}% 100%`;
+        el.style.backgroundPosition = `${(t / (TILE_COUNT - 1)) * 100}% 0`;
+        el.style.imageRendering = 'pixelated';
+      }
+      // build 9 fixed slots; contents come from the mutable HOTBAR array
       HOTBAR.forEach((id, i) => {
-        const t = tileFor(id, 2);                      // show the block's top texture
         const div = document.createElement('div');
         div.className = 'slot';
-        div.style.backgroundImage = `url(${atlasURL})`;
-        div.style.backgroundRepeat = 'no-repeat';
-        div.style.backgroundSize = `${TILE_COUNT * 100}% 100%`;
-        div.style.backgroundPosition = `${(t / (TILE_COUNT - 1)) * 100}% 0`;
-        div.style.imageRendering = 'pixelated';
-        div.innerHTML = `<span class="num">${i+1}</span><span class="label">${NAMES[id]}</span>`;
+        div.innerHTML = `<span class="num">${i+1}</span><span class="label"></span>`;
         div.addEventListener('click', () => selectSlot(i));
         hotbarEl.appendChild(div);
+        paintSlot(i);
       });
+      function paintSlot(i) {
+        const el = hotbarEl.children[i];
+        paintIcon(el, HOTBAR[i]);
+        el.querySelector('.label').textContent = NAMES[HOTBAR[i]] || '';
+      }
       function selectSlot(i) {
         selected = i;
         [...hotbarEl.children].forEach((el, k) => el.classList.toggle('active', k === i));
+        const s = document.getElementById('invslot'); if (s) s.textContent = i + 1;
       }
       selectSlot(0);
+
+      // ---- Creative inventory: click a block to load it into the current slot ----
+      const invEl = document.getElementById('inventory');
+      const invGrid = document.getElementById('invgrid');
+      let invOpen = false;
+      PALETTE.forEach((id) => {
+        const cell = document.createElement('div');
+        cell.className = 'invcell';
+        cell.title = NAMES[id] || '';
+        paintIcon(cell, id);
+        cell.innerHTML = `<span class="ilabel">${NAMES[id] || ''}</span>`;
+        cell.addEventListener('click', () => {
+          HOTBAR[selected] = id; paintSlot(selected); sfx.place();
+        });
+        invGrid.appendChild(cell);
+      });
+      function toggleInventory(force) {
+        invOpen = force !== undefined ? force : !invOpen;
+        invEl.style.display = invOpen ? 'flex' : 'none';
+        if (invOpen) { if (document.pointerLockElement) document.exitPointerLock(); }
+      }
 
       // ===================================================================
       //  Chunk streaming
@@ -1487,6 +1844,8 @@
         let sy = WORLD_HEIGHT - 1;
         while (sy > 0 && !isSolid(getBlock(sx, sy, sz))) sy--;
         player.pos.set(sx + 0.5, sy + 1, sz + 0.5);
+        player.airY = sy + 1;
+        spawnPoint.set(sx + 0.5, sy + 1, sz + 0.5);
         camera.position.set(sx + 0.5, sy + 1 + player.eye, sz + 0.5);
       }
 
@@ -1499,7 +1858,8 @@
       const modeEl = document.getElementById('mode');
       const biomeEl = document.getElementById('biome');
       function updateHud() {
-        modeEl.textContent = god.on ? '⚡ God' : (player.fly ? 'Fly / Creative' : 'Survival');
+        const base = god.on ? '⚡ God' : (player.fly ? 'Fly / Creative' : 'Survival');
+        modeEl.textContent = base + (viewMode === 1 ? ' · 3rd' : '');
       }
       updateHud();
 
@@ -1775,7 +2135,7 @@
       // Is the player looking at a mob within reach? (used for left-click attacks)
       const _mo = new THREE.Vector3(), _md = new THREE.Vector3();
       function mobUnderCrosshair() {
-        _mo.copy(camera.position);
+        _mo.copy(eyePos);
         camera.getWorldDirection(_md);
         let best = null, bestT = 1e9;
         for (const m of mobs) {
@@ -1883,11 +2243,134 @@
       }
 
       // ===================================================================
+      //  Health / hunger (peaceful survival)
+      // ===================================================================
+      const stat = { hp: 20, food: 20, air: 10, dmgFlash: 0, hurtCd: 0, regenT: 0, drownT: 0 };
+      const healthRow = document.getElementById('health');
+      const hungerRow = document.getElementById('hunger');
+      const bubblesEl = document.getElementById('bubbles');
+      const damageEl = document.getElementById('damage');
+      // build 10 icons per bar; each represents 2 points (supports halves via a width-clipped front)
+      function buildIconRow(el, glyph, color) {
+        for (let i = 0; i < 10; i++) {
+          const w = document.createElement('div'); w.className = 'icon';
+          w.innerHTML = `<span class="back">${glyph}</span><span class="front" style="color:${color}">${glyph}</span>`;
+          el.appendChild(w);
+        }
+      }
+      buildIconRow(healthRow, '♥', '#ff4d4d');   // hearts
+      buildIconRow(hungerRow, '\u{1F357}', '#e0a24a'); // drumsticks
+      for (let i = 0; i < 10; i++) { const b = document.createElement('div'); b.className = 'icon'; b.innerHTML = '<span class="front" style="color:#cfe8ff">●</span>'; bubblesEl.appendChild(b); }
+      function paintBar(el, value) {           // value in 0..20
+        for (let i = 0; i < 10; i++) {
+          const frac = Math.max(0, Math.min(1, (value - i * 2) / 2));
+          el.children[i].querySelector('.front').style.width = (frac * 100) + '%';
+        }
+      }
+      function updateStats() { paintBar(healthRow, stat.hp); paintBar(hungerRow, stat.food); }
+      function damagePlayer(n) {
+        if (god.on || player.fly || !started || stat.hp <= 0) return;
+        stat.hp = Math.max(0, stat.hp - n);
+        stat.dmgFlash = 0.6; stat.hurtCd = 1.6; sfx.hit(); updateStats();
+        if (stat.hp <= 0) respawn();
+      }
+      function respawn() {
+        stat.hp = 20; stat.food = 20; stat.air = 10;
+        player.pos.copy(spawnPoint); player.vel.set(0, 0, 0); player.airY = spawnPoint.y;
+        stat.dmgFlash = 0.9; toast('💀 You died — respawned'); updateStats();
+      }
+      updateStats();
+
+      // ===================================================================
+      //  Weather (clear / rain / snow) — precip type follows the biome you're in
+      // ===================================================================
+      const weatherEl = document.getElementById('weather');
+      const weatherTintEl = document.getElementById('weathertint');
+      const weather = { type: 'clear', timer: 18, patter: 0 };
+      const PRECIP_N = 320;
+      const precipGeo = new THREE.BufferGeometry();
+      {
+        const arr = new Float32Array(PRECIP_N * 3);
+        for (let i = 0; i < PRECIP_N; i++) {
+          arr[i * 3] = (Math.random() - 0.5) * 30;
+          arr[i * 3 + 1] = Math.random() * 26;
+          arr[i * 3 + 2] = (Math.random() - 0.5) * 30;
+        }
+        precipGeo.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+      }
+      const precipMat = new THREE.PointsMaterial({ color: 0xaac4e6, size: 1.6, sizeAttenuation: false, transparent: true, opacity: 0.5, depthWrite: false, fog: false });
+      const precip = new THREE.Points(precipGeo, precipMat);
+      precip.visible = false;
+      scene.add(precip);
+      // is the player currently somewhere cold enough for snow instead of rain?
+      function coldHere() {
+        const b = biomeAt(Math.floor(player.pos.x), Math.floor(player.pos.z));
+        return b === B_SNOWY || (b === B_MOUNTAIN && player.pos.y > SEA_LEVEL + 24);
+      }
+      function setWeather(type) {
+        weather.type = type;
+        const raining = type !== 'clear';
+        precip.visible = raining;
+        weatherTintEl.style.opacity = type === 'rain' ? '0.30' : (type === 'snow' ? '0.16' : '0');
+        weatherEl.textContent = type === 'clear' ? 'Clear' : (type === 'snow' ? 'Snow ❄' : 'Rain 🌧');
+      }
+      function updateWeather(dt) {
+        weather.timer -= dt;
+        if (weather.timer <= 0) {
+          if (weather.type === 'clear') { setWeather(coldHere() ? 'snow' : 'rain'); weather.timer = 22 + Math.random() * 26; }
+          else { setWeather('clear'); weather.timer = 30 + Math.random() * 50; }
+        }
+        if (weather.type === 'clear') return;
+        // keep precip type matched to where the player currently is
+        const wantSnow = coldHere();
+        if (wantSnow && weather.type === 'rain') setWeather('snow');
+        else if (!wantSnow && weather.type === 'snow') setWeather('rain');
+        const snow = weather.type === 'snow';
+        precipMat.size = snow ? 3.0 : 1.6;
+        precipMat.color.setHex(snow ? 0xffffff : 0xaac4e6);
+        precip.position.set(player.pos.x, player.pos.y, player.pos.z);
+        const pos = precipGeo.attributes.position.array;
+        const fall = snow ? 6 : 26;
+        precipPhase += dt;
+        for (let i = 0; i < PRECIP_N; i++) {
+          let y = pos[i * 3 + 1] - fall * dt;
+          if (snow) pos[i * 3] += Math.sin(precipPhase * 1.5 + i) * 0.6 * dt; // gentle flutter
+          if (y < -6) { y += 30; pos[i * 3] = (Math.random() - 0.5) * 30; pos[i * 3 + 2] = (Math.random() - 0.5) * 30; }
+          pos[i * 3 + 1] = y;
+        }
+        precipGeo.attributes.position.needsUpdate = true;
+        // soft rain patter
+        if (!snow && running) { weather.patter -= dt; if (weather.patter <= 0) { weather.patter = 0.22; noise(0.08, 0.03, 260); } }
+      }
+
+      // ===================================================================
+      //  Player avatar (shown only in third-person view)
+      // ===================================================================
+      const avatar = (() => {
+        const g = new THREE.Group();
+        const parts = [
+          coloredBoxGeo(0.5, 0.5, 0.5, 0xd9a066, 0, 1.6, 0),   // head
+          coloredBoxGeo(0.5, 0.7, 0.28, 0x3a6ea5, 0, 1.05, 0), // torso
+        ];
+        g.add(new THREE.Mesh(mergeGeos(parts), mobMat));
+        const limbs = [];
+        const mk = (w, h, d, x, y, col) => { const m = new THREE.Mesh(coloredBoxGeo(w, h, d, col, 0, -h / 2, 0), mobMat); m.position.set(x, y, 0); g.add(m); limbs.push(m); return m; };
+        mk(0.22, 0.7, 0.24, 0.36, 1.4, 0x2f5a86);  // arms (shirt)
+        mk(0.22, 0.7, 0.24, -0.36, 1.4, 0x2f5a86);
+        mk(0.24, 0.7, 0.26, 0.14, 0.7, 0x2a3a5a);  // legs (pants)
+        mk(0.24, 0.7, 0.26, -0.14, 0.7, 0x2a3a5a);
+        g.visible = false;
+        scene.add(g);
+        return { group: g, limbs };
+      })();
+
+      // ===================================================================
       //  Main loop
       // ===================================================================
       const clock = new THREE.Clock();
       let fpsAccum = 0, fpsFrames = 0, fpsTimer = 0, waterTimer = 0, stepTimer = 0, bobT = 0, waveT = 0, outlineTick = 0;
       let renderScale = 1, resHold = 0; // adaptive resolution (1 = full, lowers when GPU-bound)
+      let precipPhase = 0;
 
       function frame() {
         requestAnimationFrame(frame);
@@ -1909,15 +2392,18 @@
           let wx = -sin * fwd + cos * strafe;
           let wz = -cos * fwd - sin * strafe;
           const len = Math.hypot(wx, wz);
-          const sprint = keys['ShiftLeft'] || keys['ShiftRight'];
-          let speed = god.on ? (sprint ? 30 : 14) : (sprint ? 8.5 : 5);
+          // Minecraft controls: Ctrl = sprint, Shift = sneak (slow + edge-safe)
+          const shift = keys['ShiftLeft'] || keys['ShiftRight'];
+          const sprint = (keys['ControlLeft'] || keys['ControlRight']) && !shift;
+          player.crouch = shift && player.onGround && !player.fly;
+          let speed = god.on ? (sprint ? 30 : 14) : (player.crouch ? 2.2 : (sprint ? 8.5 : 5));
           if (player.inWater && !god.on) speed *= 0.6; // slower in water
           if (len > 0) { wx = wx / len * speed; wz = wz / len * speed; }
           player.vel.x = wx;
           player.vel.z = wz;
 
           if (player.fly) {
-            const up = (keys['Space'] ? 1 : 0) - ((keys['ShiftLeft'] || keys['ControlLeft']) ? 1 : 0);
+            const up = (keys['Space'] ? 1 : 0) - (shift ? 1 : 0);
             player.vel.y = up * speed;
           } else if (player.inWater) {
             if (keys['Space']) player.vel.y = 4.2;               // swim up
@@ -1928,6 +2414,33 @@
           movePlayer(dt);
           updateChunks();
           updateMobs(dt);
+
+          // third-person avatar: follow the player, swing limbs while walking
+          avatar.group.visible = viewMode === 1;
+          if (viewMode === 1) {
+            avatar.group.position.set(player.pos.x, player.pos.y, player.pos.z);
+            avatar.group.rotation.y = player.yaw + Math.PI;   // face the way we look
+            const sw = (len > 0 && player.onGround) ? Math.sin(bobT) * 0.6 : 0;
+            avatar.limbs[0].rotation.x = sw;  avatar.limbs[1].rotation.x = -sw; // arms
+            avatar.limbs[2].rotation.x = -sw; avatar.limbs[3].rotation.x = sw;  // legs
+          }
+
+          // survival: drowning + slow regen (peaceful — no starving)
+          if (!god.on && !player.fly) {
+            if (player.headUnderwater) {
+              stat.air -= dt;
+              if (stat.air <= 0) { stat.drownT -= dt; if (stat.drownT <= 0) { stat.drownT = 1; damagePlayer(1); } }
+            } else { stat.air = Math.min(10, stat.air + dt * 4); stat.drownT = 0; }
+            if (stat.hurtCd > 0) stat.hurtCd -= dt;
+            if (stat.hp > 0 && stat.hp < 20 && stat.hurtCd <= 0) {
+              stat.regenT += dt;
+              if (stat.regenT >= 1.4) { stat.regenT = 0; stat.hp = Math.min(20, stat.hp + 1); updateStats(); }
+            }
+          }
+          // air bubbles show only while the head is under and running low
+          const showBubbles = player.headUnderwater && !god.on && !player.fly;
+          bubblesEl.style.display = showBubbles ? 'flex' : 'none';
+          if (showBubbles) paintBar(bubblesEl, stat.air * 2);
 
           // footsteps + subtle view-bob while walking on the ground
           const walking = len > 0 && player.onGround && !player.fly;
@@ -1964,6 +2477,10 @@
 
         updateDayNight(dt);
         updateParticles(dt);
+        updateWeather(dt);
+
+        // red damage vignette fades out after a hit
+        if (stat.dmgFlash > 0) { stat.dmgFlash -= dt; damageEl.style.opacity = Math.max(0, stat.dmgFlash).toFixed(2); }
 
         // clouds drift and follow the player; stars fade in at night
         clouds.position.x = player.pos.x; clouds.position.z = player.pos.z;
