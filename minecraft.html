@@ -293,7 +293,7 @@
       <div id="controls">
         <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move &nbsp;·&nbsp; <kbd>Space</kbd> Jump &nbsp;·&nbsp; <kbd>Ctrl</kbd> Sprint &nbsp;·&nbsp; <kbd>Shift</kbd> Sneak</div>
         <div><kbd>Mouse</kbd> Look &nbsp;·&nbsp; <kbd>L-Click</kbd> Mine &nbsp;·&nbsp; <kbd>R-Click</kbd> Place</div>
-        <div><kbd>1</kbd>–<kbd>9</kbd> / <kbd>Scroll</kbd> Hotbar &nbsp;·&nbsp; <kbd>E</kbd> Inventory &nbsp;·&nbsp; <kbd>F5</kbd> View</div>
+        <div><kbd>1</kbd>–<kbd>9</kbd> / <kbd>Scroll</kbd> Hotbar &nbsp;·&nbsp; <kbd>E</kbd> Inventory &nbsp;·&nbsp; <kbd>Q</kbd> 3rd-person View</div>
         <div><kbd>F</kbd> Fly &nbsp;·&nbsp; <kbd>M</kbd> Mute &nbsp;·&nbsp; ⛏️ Dig ore, ❤️ survive falls, 🌧 weather</div>
         <div><kbd>G</kbd> ⚡ <b>God Mode</b> — giant brush, nuke chunks, noclip &amp; more</div>
         <div><kbd>Esc</kbd> Release mouse</div>
@@ -1584,7 +1584,7 @@
         if (e.code === 'KeyE' && started) { e.preventDefault(); if (invOpen) { toggleInventory(false); requestLock(); } else toggleInventory(true); return; }
         if (e.code === 'Escape' && invOpen) { toggleInventory(false); return; }
         if (invOpen) return;                     // swallow game keys while browsing inventory
-        if (e.code === 'F5') { e.preventDefault(); viewMode = (viewMode + 1) % 2; updateHud(); }
+        if (e.code === 'KeyQ') { viewMode = (viewMode + 1) % 2; updateHud(); }
         if (e.code === 'KeyF') { player.fly = !player.fly; player.vel.y = 0; updateHud(); }
         if (e.code.startsWith('Digit')) {
           const n = parseInt(e.code.slice(5), 10);
