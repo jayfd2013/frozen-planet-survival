@@ -216,6 +216,11 @@
         position: fixed; inset: 0; z-index: 4; pointer-events: none;
         background: #2a2e36; opacity: 0; transition: opacity 1.2s linear;
       }
+      #boomflash {
+        position: fixed; inset: 0; z-index: 9; pointer-events: none;
+        background: radial-gradient(circle at 50% 55%, rgba(255,240,190,0.95), rgba(255,150,40,0.5) 45%, rgba(255,120,20,0) 75%);
+        opacity: 0;
+      }
 
       /* ---------- Creative inventory (E) ---------- */
       #inventory {
@@ -253,6 +258,7 @@
     <div id="nighttint"></div>
     <div id="underwater"></div>
     <div id="damage"></div>
+    <div id="boomflash"></div>
     <div id="crosshair"></div>
     <div id="hud">
       <div>FPS <b id="fps">–</b> &nbsp; Chunks <b id="chunks">–</b></div>
@@ -294,7 +300,7 @@
         <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move &nbsp;·&nbsp; <kbd>Space</kbd> Jump &nbsp;·&nbsp; <kbd>Ctrl</kbd> Sprint &nbsp;·&nbsp; <kbd>Shift</kbd> Sneak</div>
         <div><kbd>Mouse</kbd> Look &nbsp;·&nbsp; <kbd>L-Click</kbd> Mine &nbsp;·&nbsp; <kbd>R-Click</kbd> Place</div>
         <div><kbd>1</kbd>–<kbd>9</kbd> / <kbd>Scroll</kbd> Hotbar &nbsp;·&nbsp; <kbd>E</kbd> Inventory &nbsp;·&nbsp; <kbd>Q</kbd> 3rd-person View</div>
-        <div><kbd>F</kbd> Fly &nbsp;·&nbsp; <kbd>M</kbd> Mute &nbsp;·&nbsp; ⛏️ Dig ore, ❤️ survive falls, 🌧 weather</div>
+        <div><kbd>F</kbd> Fly &nbsp;·&nbsp; <kbd>M</kbd> Mute &nbsp;·&nbsp; 💣 <b>L-Click TNT to ignite</b> &nbsp;·&nbsp; ⛏️ ore, 🌧 weather</div>
         <div><kbd>G</kbd> ⚡ <b>God Mode</b> — giant brush, nuke chunks, noclip &amp; more</div>
         <div><kbd>Esc</kbd> Release mouse</div>
       </div>
@@ -1635,6 +1641,7 @@
         if (!hit) { if (mining.key) { mining.key = null; crackOverlay.visible = false; } return; }
         const bx = hit.block[0], by = hit.block[1], bz = hit.block[2];
         const id = getBlock(bx, by, bz);
+        if (id === TNT) { primeTNT(bx, by, bz); mining.key = null; crackOverlay.visible = false; return; }
         const key = bx + ',' + by + ',' + bz;
         if (key !== mining.key) { mining.key = key; mining.progress = 0; }
         const hard = HARDNESS[id] || 1;
@@ -1668,6 +1675,8 @@
         if (e.button === 0) {
           const mob = mobUnderCrosshair();     // left-click: attack a mob if aimed at one
           if (mob) { removeMob(mob); sfx.hit(); toast('🐾 ' + mob.def.name + '!'); return; }
+          const hit = raycast(REACH);          // left-click on TNT ignites it instead of mining
+          if (hit && getBlock(hit.block[0], hit.block[1], hit.block[2]) === TNT) { primeTNT(hit.block[0], hit.block[1], hit.block[2]); return; }
           held.left = true;
           if (god.on) { tryMine(); leftTimer = 0.2; } // god mode = instant
           else { mining.key = null; }                 // survival = hold to break (frame loop)
@@ -2214,6 +2223,8 @@
         jump:  () => tone(300, 0.12, 'sine', 0.12, 520),
         step:  () => noise(0.05, 0.06, 320),
         hit:   () => tone(520, 0.10, 'sawtooth', 0.14, 130),
+        fuse:  () => tone(1300, 0.05, 'square', 0.05, 1500),
+        boom:  () => { noise(0.55, 0.5, 200); tone(90, 0.5, 'sawtooth', 0.28, 38); },
       };
 
       // ===================================================================
@@ -2240,6 +2251,70 @@
           p.mesh.scale.setScalar(Math.max(0.05, Math.min(1, p.life * 2)));
           if (p.life <= 0) { scene.remove(p.mesh); p.mesh.material.dispose(); particles.splice(i, 1); }
         }
+      }
+
+      // ===================================================================
+      //  TNT — prime with a fuse, then explode (craters, damage, chain reaction)
+      // ===================================================================
+      const boomFlashEl = document.getElementById('boomflash');
+      const primed = [];                 // { x,y,z, fuse, blink, mesh }
+      const tntBlinkGeo = new THREE.BoxGeometry(1.03, 1.03, 1.03);
+      let shake = 0, boomFlash = 0;
+      function primeTNT(x, y, z) {
+        if (getBlock(x, y, z) !== TNT) return;
+        if (primed.some((p) => p.x === x && p.y === y && p.z === z)) return;
+        const mesh = new THREE.Mesh(tntBlinkGeo, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false }));
+        mesh.position.set(x + 0.5, y + 0.5, z + 0.5);
+        scene.add(mesh);
+        primed.push({ x, y, z, fuse: 2.2 + Math.random() * 0.6, blink: 0, mesh });
+        sfx.fuse(); toast('💥 TNT primed!');
+      }
+      function updatePrimed(dt) {
+        for (let i = primed.length - 1; i >= 0; i--) {
+          const p = primed[i];
+          p.fuse -= dt; p.blink += dt;
+          const rate = p.fuse < 0.6 ? 20 : 8;
+          p.mesh.material.opacity = (Math.sin(p.blink * rate) * 0.5 + 0.5) * 0.65;
+          p.mesh.scale.setScalar(1 + Math.sin(p.blink * rate) * 0.05);
+          if (p.fuse <= 0) {
+            scene.remove(p.mesh); p.mesh.material.dispose(); primed.splice(i, 1);
+            explode(p.x, p.y, p.z);
+          }
+        }
+      }
+      function explode(cx, cy, cz) {
+        const R = 3.6, R2 = R * R, Ri = Math.ceil(R);
+        setBlock(cx, cy, cz, AIR);
+        let fx = 0;
+        for (let dx = -Ri; dx <= Ri; dx++)
+          for (let dy = -Ri; dy <= Ri; dy++)
+            for (let dz = -Ri; dz <= Ri; dz++) {
+              const d2 = dx * dx + dy * dy + dz * dz;
+              if (d2 > R2) continue;
+              const x = cx + dx, y = cy + dy, z = cz + dz;
+              if (y < 1) continue;                       // keep a bedrock floor
+              const b = getBlock(x, y, z);
+              if (b === AIR || b === WATER || b === OBSIDIAN) continue;   // obsidian resists blasts
+              if (b === TNT) { primeTNT(x, y, z); continue; }            // chain reaction
+              setBlock(x, y, z, AIR);
+              if (fx < 24 && Math.random() < 0.35) { spawnBreakParticles(x, y, z, b); fx++; }
+            }
+        // fireball burst
+        const bx = cx + 0.5, by = cy + 0.5, bz = cz + 0.5;
+        for (let i = 0; i < 24 && particles.length < PART_MAX; i++) {
+          const col = Math.random() < 0.55 ? [1, 0.62, 0.16] : [0.28, 0.28, 0.3];
+          const m = new THREE.Mesh(partGeo, new THREE.MeshBasicMaterial({ color: new THREE.Color(col[0], col[1], col[2]) }));
+          m.position.set(bx + (Math.random() - 0.5), by + (Math.random() - 0.5), bz + (Math.random() - 0.5));
+          scene.add(m);
+          const sp = 4 + Math.random() * 6, a = Math.random() * Math.PI * 2, u = Math.random() * 2 - 1, r = Math.sqrt(1 - u * u);
+          particles.push({ mesh: m, vx: Math.cos(a) * r * sp, vy: Math.abs(u) * sp + 2, vz: Math.sin(a) * r * sp, life: 0.55 + Math.random() * 0.45 });
+        }
+        sfx.boom();
+        // proximity: screen flash, shake and blast damage
+        const dist = Math.hypot(player.pos.x - bx, player.pos.y + 0.9 - by, player.pos.z - bz);
+        boomFlash = Math.max(boomFlash, Math.max(0, 1 - dist / 14) * 0.9);
+        shake = Math.max(shake, Math.max(0, 1 - dist / 16) * 0.6);
+        if (dist < R + 2.5) { const dmg = Math.round((1 - dist / (R + 2.5)) * 16); if (dmg > 0) damagePlayer(dmg); }
       }
 
       // ===================================================================
@@ -2478,9 +2553,12 @@
         updateDayNight(dt);
         updateParticles(dt);
         updateWeather(dt);
+        updatePrimed(dt);
 
         // red damage vignette fades out after a hit
         if (stat.dmgFlash > 0) { stat.dmgFlash -= dt; damageEl.style.opacity = Math.max(0, stat.dmgFlash).toFixed(2); }
+        // explosion flash fades out
+        if (boomFlash > 0) { boomFlash -= dt * 2.2; boomFlashEl.style.opacity = Math.max(0, boomFlash).toFixed(2); }
 
         // clouds drift and follow the player; stars fade in at night
         clouds.position.x = player.pos.x; clouds.position.z = player.pos.z;
@@ -2505,6 +2583,15 @@
         // tick water flow a few times a second (independent of framerate)
         waterTimer += dt;
         if (waterTimer >= 0.09) { waterTimer = 0; simulateWater(); }
+
+        // explosion camera shake
+        if (shake > 0) {
+          shake -= dt * 1.6;
+          const s = Math.max(0, shake) * 0.45;
+          camera.position.x += (Math.random() - 0.5) * s;
+          camera.position.y += (Math.random() - 0.5) * s;
+          camera.position.z += (Math.random() - 0.5) * s;
+        }
 
         renderer.render(scene, camera);
 
