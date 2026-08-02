@@ -1171,6 +1171,23 @@
         { n: [ 0, 0,-1], c: [[0,0,0],[1,0,0],[1,1,0],[0,1,0]], s: 0.86 }, // -Z
       ];
 
+      // Minecraft-style foliage colouring: grass & leaves are tinted per biome
+      // (lush plains, deep forest, dry desert, pale-cool snowy). Multiplies the texture.
+      const GRASS_TINT = {
+        [B_PLAINS]:   [0.95, 1.00, 0.80],
+        [B_FOREST]:   [0.80, 1.00, 0.62],
+        [B_DESERT]:   [1.05, 0.96, 0.55],
+        [B_SNOWY]:    [0.80, 0.95, 0.92],
+        [B_MOUNTAIN]: [0.88, 1.00, 0.72],
+      };
+      const LEAF_TINT = {
+        [B_PLAINS]:   [0.85, 1.00, 0.62],
+        [B_FOREST]:   [0.72, 0.95, 0.50],
+        [B_DESERT]:   [0.90, 0.92, 0.50],
+        [B_SNOWY]:    [0.66, 0.86, 0.62],
+        [B_MOUNTAIN]: [0.76, 0.96, 0.55],
+      };
+
       function buildChunkMesh(c) {
         const sp = [], sc = [], su = [];   // solid positions / colors / uvs
         const wp = [], wc = [], wu = [];   // water positions / colors / uvs
@@ -1200,6 +1217,12 @@
               const glass = id === GLASS;
               // surface water sits a bit below a full block (nicer waterline); submerged water is full
               const waterTop = water ? (nbAt(x, y + 1, z, wx, wz) === AIR ? 0.88 : 1) : 1;
+              // biome tint for grass/leaves (Minecraft foliage colouring)
+              let tr = 1, tg = 1, tb = 1;
+              if (id === GRASS || id === LEAVES) {
+                const tt = (id === GRASS ? GRASS_TINT : LEAF_TINT)[biomeAt(wx, wz)] || GRASS_TINT[B_PLAINS];
+                tr = tt[0]; tg = tt[1]; tb = tt[2];
+              }
 
               for (let f = 0; f < 6; f++) {
                 const n = FACES[f].n;
@@ -1252,7 +1275,7 @@
                   const b = sh * aoc;
                   const vy = wy + (water && cc[1] === 1 ? waterTop : cc[1]);
                   P.push(wx + cc[0], vy, wz + cc[2]);
-                  C.push(b, b, b);
+                  C.push(b * tr, b * tg, b * tb);
                   tileUV(U, t, ti);
                 }
               }
