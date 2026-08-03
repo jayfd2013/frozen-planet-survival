@@ -1715,8 +1715,12 @@
         c.maxY = 0;        // the whole chunk is air now
         c.digFloor = 0;    // fully cleared — mesh the whole column
         markDirty(cx, cz);
-        markDirty(cx - 1, cz); markDirty(cx + 1, cz);
-        markDirty(cx, cz - 1); markDirty(cx, cz + 1);
+        // neighbours now face an open void down to bedrock: mesh their full-height walls
+        for (const [ax, az] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+          const nc = getChunk(cx + ax, cz + az);
+          if (nc) nc.digFloor = 0;
+          markDirty(cx + ax, cz + az);
+        }
         // wake any water touching the pit's edges so it pours in and falls
         const ox = cx * CHUNK, oz = cz * CHUNK;
         for (let y = 0; y < WORLD_HEIGHT; y++) {
