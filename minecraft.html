@@ -475,12 +475,14 @@
         // deterministic PRNG so textures are stable every load (like real Minecraft art)
         let _seed = 0x1a2b3c4d;
         const R = () => { _seed = (_seed + 0x6D2B79F5) | 0; let t = Math.imul(_seed ^ (_seed >>> 15), 1 | _seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
-        // fill a whole tile with a base colour + subtle per-texel noise
-        const fill = (t, r, g, b, amp) => {
-          const ox = t * TS;
+        // fill a tile with a base colour + per-texel noise. Each channel gets an
+        // independent jitter on top of a shared brightness shift, so pixels vary in
+        // HUE as well as tone (like real Minecraft textures), not just brightness.
+        const fill = (t, r, g, b, amp, hue) => {
+          const ox = t * TS, h = hue == null ? amp * 0.7 : hue;
           for (let y = 0; y < TS; y++) for (let x = 0; x < TS; x++) {
-            const n = (R() * 2 - 1) * amp;
-            put(ox, x, y, r + n, g + n, b + n);
+            const l = (R() * 2 - 1) * amp;   // shared luminance shift
+            put(ox, x, y, r + l + (R() * 2 - 1) * h, g + l + (R() * 2 - 1) * h, b + l + (R() * 2 - 1) * h);
           }
         };
         const specks = (t, n, dr, dg, db, spread) => {
@@ -490,28 +492,37 @@
             put(ox, x, y, dr + s, dg + s, db + s);
           }
         };
-        // scatter little 1-2px pebble clusters of a colour across a tile
+        // scatter 1-2px pebble clusters, each pixel jittered per-channel for hue variety
         const pebbles = (t, n, r, g, b, amp, big) => {
-          const ox = t * TS;
+          const ox = t * TS, h = amp * 0.7;
           for (let i = 0; i < n; i++) {
             const x = (R() * TS) | 0, y = (R() * TS) | 0, w = big && R() < 0.4 ? 2 : 1;
             for (let dy = 0; dy < w; dy++) for (let dx = 0; dx < w; dx++) {
-              const nn = (R() * 2 - 1) * amp;
-              put(ox, (x + dx) % TS, (y + dy) % TS, r + nn, g + nn, b + nn);
+              const l = (R() * 2 - 1) * amp;
+              put(ox, (x + dx) % TS, (y + dy) % TS, r + l + (R() * 2 - 1) * h, g + l + (R() * 2 - 1) * h, b + l + (R() * 2 - 1) * h);
             }
+          }
+        };
+        // scatter individual pixels drawn from a small PALETTE of hued variants (max variety)
+        const tones = (t, n, cols) => {
+          const ox = t * TS;
+          for (let i = 0; i < n; i++) {
+            const x = (R() * TS) | 0, y = (R() * TS) | 0, c = cols[(R() * cols.length) | 0];
+            const j = (R() * 2 - 1) * 5;
+            put(ox, x, y, c[0] + j, c[1] + j, c[2] + j);
           }
         };
 
         // ---- Dirt: soft warm brown, small pebbles + a few pale grains (JAPPA) ----
-        fill(TILE.DIRT, 139, 101, 71, 6);
-        pebbles(TILE.DIRT, 26, 116, 82, 56, 8, true);
-        pebbles(TILE.DIRT, 12, 96, 68, 46, 7, false);
-        pebbles(TILE.DIRT, 12, 166, 126, 90, 6, false);
+        fill(TILE.DIRT, 139, 101, 71, 7);
+        pebbles(TILE.DIRT, 24, 116, 82, 56, 9, true);
+        pebbles(TILE.DIRT, 12, 96, 68, 46, 8, false);
+        tones(TILE.DIRT, 30, [[156,118,84],[128,92,64],[150,98,66],[112,86,62],[168,130,94],[104,74,50]]);
 
-        // ---- Grass top: soft green with gentle clumps (modern tint base) ----
-        fill(TILE.GRASS_TOP, 121, 174, 78, 5);
-        pebbles(TILE.GRASS_TOP, 26, 104, 158, 66, 9, true);
-        pebbles(TILE.GRASS_TOP, 18, 142, 192, 100, 7, false);
+        // ---- Grass top: soft green with gentle clumps + hue variety ----
+        fill(TILE.GRASS_TOP, 121, 174, 78, 6);
+        pebbles(TILE.GRASS_TOP, 22, 104, 158, 66, 9, true);
+        tones(TILE.GRASS_TOP, 34, [[150,190,86],[104,160,70],[132,182,82],[96,150,60],[160,196,96],[112,172,74]]);
 
         // ---- Grass side: dirt with a soft jagged green overhang ----
         fill(TILE.GRASS_SIDE, 139, 101, 71, 6);
@@ -526,11 +537,11 @@
           }
         }
 
-        // ---- Stone: light, cloudy grey (modern ~#8b8b8b), no hard lines ----
-        fill(TILE.STONE, 139, 139, 139, 4);
-        pebbles(TILE.STONE, 26, 122, 122, 124, 6, true);
-        pebbles(TILE.STONE, 16, 156, 156, 158, 5, true);
-        specks(TILE.STONE, 8, 108, 108, 110, 6);
+        // ---- Stone: light cloudy grey with subtle warm/cool pixels ----
+        fill(TILE.STONE, 139, 139, 140, 6);
+        pebbles(TILE.STONE, 22, 122, 122, 124, 7, true);
+        pebbles(TILE.STONE, 14, 158, 158, 160, 6, true);
+        tones(TILE.STONE, 34, [[146,142,136],[130,134,142],[150,150,150],[124,124,126],[138,134,130],[132,138,140]]);
 
         // ---- Cobblestone: rounded stones, soft mortar, per-stone colour drift ----
         fill(TILE.COBBLE, 78, 76, 78, 3);
@@ -538,16 +549,17 @@
           // [x, y, w, h] stone bodies; drawn with a lit top edge + shaded bottom
           const stones = [[1,1,6,4],[8,1,6,3],[1,6,4,4],[6,6,4,4],[11,5,4,5],[1,11,5,4],[7,11,7,4],[8,5,3,3]];
           for (const [sx, sy, sw, sh2] of stones) {
-            const tint = (R() * 2 - 1) * 6;            // some cobbles slightly warmer/cooler
+            const tint = (R() * 2 - 1) * 10;           // some cobbles clearly warmer/cooler
             for (let y = 0; y < sh2; y++) for (let x = 0; x < sw; x++) {
               const gx = (sx + x) % TS, gy = (sy + y) % TS;
-              let base = 140 + (R() * 2 - 1) * 7;
+              let base = 140 + (R() * 2 - 1) * 9;
               if (y === 0) base += 18;                 // lit top
               else if (y === sh2 - 1) base -= 24;      // shaded bottom
               if (x === 0) base += 5; if (x === sw - 1) base -= 6;
-              put(TILE.COBBLE * TS, gx, gy, base + tint, base + tint * 0.5, base - tint * 0.5);
+              put(TILE.COBBLE * TS, gx, gy, base + tint, base + tint * 0.4, base - tint * 0.6);
             }
           }
+          tones(TILE.COBBLE, 16, [[150,146,138],[128,132,142],[146,146,146],[122,120,120]]);
         }
 
         // ---- Oak log side: warm bark with soft vertical grain + knots ----
@@ -575,17 +587,16 @@
           put(ox, 7, 7, 120, 92, 56); put(ox, 8, 8, 120, 92, 56);    // heart
         }
 
-        // ---- Oak leaves: lighter, richer green with holes (biome-tinted) ----
-        fill(TILE.LEAVES, 66, 124, 50, 8);
-        pebbles(TILE.LEAVES, 34, 48, 92, 38, 10, true);
-        pebbles(TILE.LEAVES, 26, 96, 152, 72, 9, false);
+        // ---- Oak leaves: lighter, richer green with holes + hue variety ----
+        fill(TILE.LEAVES, 66, 124, 50, 9);
+        pebbles(TILE.LEAVES, 30, 48, 92, 38, 11, true);
+        tones(TILE.LEAVES, 40, [[96,152,72],[52,104,42],[120,166,66],[70,132,54],[42,86,34],[104,150,58]]);
         specks(TILE.LEAVES, 8, 40, 80, 34, 6);   // little gaps
 
-        // ---- Sand: pale warm with soft grain banding ----
-        fill(TILE.SAND, 223, 213, 166, 4);
+        // ---- Sand: pale warm with soft grain banding + hue variety ----
+        fill(TILE.SAND, 223, 213, 166, 5);
         { const ox = TILE.SAND * TS; for (let y = 2; y < TS; y += 4) for (let x = 0; x < TS; x++) if (R() < 0.5) put(ox, x, y, 210, 198, 150); }
-        pebbles(TILE.SAND, 12, 236, 226, 184, 4, false);
-        pebbles(TILE.SAND, 8, 200, 188, 142, 5, false);
+        tones(TILE.SAND, 26, [[232,222,178],[214,202,156],[226,212,160],[236,224,188],[218,206,168]]);
 
         // ---- Oak planks: warm boards, soft seams, visible grain ----
         fill(TILE.PLANKS, 182, 147, 91, 3);
@@ -597,7 +608,8 @@
           for (let y = 0; y < TS; y += 4) for (let x = 0; x < TS; x++) put(ox, x, y, 140, 110, 66); // soft board seams
           for (let b2 = 0; b2 < 4; b2++) { const vx = (b2 % 2 ? 6 : 11); for (let y = b2 * 4 + 1; y < b2 * 4 + 4; y++) put(ox, vx, y, 150, 118, 70); }
           for (const [kx, ky] of [[3, 2], [12, 10]]) { put(ox, kx, ky, 150, 116, 68); put(ox, kx, ky + 1, 150, 116, 68); } // knots
-          for (let i = 0; i < 30; i++) { const x = (R() * TS) | 0, y = (R() * TS) | 0; if (y % 4 !== 0) put(ox, x, y, 200, 164, 104); } // grain flecks
+          // varied grain flecks (warm, pale and darker), avoiding the seam rows
+          for (let i = 0; i < 40; i++) { const x = (R() * TS) | 0, y = (R() * TS) | 0; if (y % 4 === 0) continue; const c = [[204,168,108],[168,132,78],[190,148,88],[196,160,100]][(R()*4)|0]; put(ox, x, y, c[0], c[1], c[2]); }
         }
 
         // ---- Glass: clear pane with a bright frame + corner glint ----
@@ -694,10 +706,11 @@
         stoneBase(TILE.REDSTONE);
         scatter(TILE.REDSTONE * TS, [[3,3],[4,3],[9,2],[6,8],[7,8],[12,6],[3,11],[11,11],[8,12],[10,9]], 216, 48, 48, 118, 24, 24);
 
-        // ---- Gravel: speckled grey with a hint of tan ----
-        fill(TILE.GRAVEL, 128, 124, 120, 4);
-        pebbles(TILE.GRAVEL, 40, 92, 88, 84, 12, true);
-        pebbles(TILE.GRAVEL, 22, 172, 168, 160, 10, false);
+        // ---- Gravel: strongly mixed grey/tan pebbles (high variety) ----
+        fill(TILE.GRAVEL, 128, 124, 120, 8);
+        pebbles(TILE.GRAVEL, 34, 92, 88, 84, 12, true);
+        pebbles(TILE.GRAVEL, 20, 174, 170, 162, 10, true);
+        tones(TILE.GRAVEL, 40, [[150,140,124],[108,110,116],[160,156,150],[120,112,102],[96,94,92],[142,138,132]]);
 
         // ---- Glowstone: lumpy yellow with bright spots + dark veins ----
         fill(TILE.GLOWSTONE, 214, 172, 84, 8);
