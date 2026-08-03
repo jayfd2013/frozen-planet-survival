@@ -946,6 +946,12 @@
         return c.blocks[idx(lx, wy, lz)];
       }
 
+      // remember the lowest edited level so meshing includes freshly-exposed deep faces
+      function lowerDigFloor(cx, cz, wy) {
+        const c = getChunk(cx, cz);
+        if (c && wy - 1 < c.digFloor) c.digFloor = Math.max(0, wy - 1);
+      }
+
       function setBlock(wx, wy, wz, id) {
         if (wy < 0 || wy >= WORLD_HEIGHT) return;
         const cx = Math.floor(wx / CHUNK), cz = Math.floor(wz / CHUNK);
@@ -955,12 +961,14 @@
         c.blocks[li] = id;
         c.water[li] = (id === WATER) ? 8 : 0; // placed water = source; anything else clears water
         if (id !== AIR && wy > (c.maxY || 0)) c.maxY = wy; // keep meshing bound current
+        // an edit can expose deep faces — never skip meshing at/below it (self + neighbours)
+        lowerDigFloor(cx, cz, wy);
         markDirty(cx, cz);
         // rebuild neighbour chunk if we touched a border block
-        if (lx === 0) markDirty(cx - 1, cz);
-        if (lx === CHUNK - 1) markDirty(cx + 1, cz);
-        if (lz === 0) markDirty(cx, cz - 1);
-        if (lz === CHUNK - 1) markDirty(cx, cz + 1);
+        if (lx === 0) { markDirty(cx - 1, cz); lowerDigFloor(cx - 1, cz, wy); }
+        if (lx === CHUNK - 1) { markDirty(cx + 1, cz); lowerDigFloor(cx + 1, cz, wy); }
+        if (lz === 0) { markDirty(cx, cz - 1); lowerDigFloor(cx, cz - 1, wy); }
+        if (lz === CHUNK - 1) { markDirty(cx, cz + 1); lowerDigFloor(cx, cz + 1, wy); }
         activateWater(wx, wy, wz); // wake the flow simulation around this edit
       }
 
@@ -1001,11 +1009,12 @@
         c.water[li] = level;
         c.blocks[li] = level > 0 ? WATER : (b === WATER ? AIR : b);
         if (level > 0 && y > (c.maxY || 0)) c.maxY = y;
+        lowerDigFloor(cx, cz, y);
         markDirty(cx, cz);
-        if (lx === 0) markDirty(cx - 1, cz);
-        if (lx === CHUNK - 1) markDirty(cx + 1, cz);
-        if (lz === 0) markDirty(cx, cz - 1);
-        if (lz === CHUNK - 1) markDirty(cx, cz + 1);
+        if (lx === 0) { markDirty(cx - 1, cz); lowerDigFloor(cx - 1, cz, y); }
+        if (lx === CHUNK - 1) { markDirty(cx + 1, cz); lowerDigFloor(cx + 1, cz, y); }
+        if (lz === 0) { markDirty(cx, cz - 1); lowerDigFloor(cx, cz - 1, y); }
+        if (lz === CHUNK - 1) { markDirty(cx, cz + 1); lowerDigFloor(cx, cz + 1, y); }
       }
 
       const WATER_DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
@@ -1072,6 +1081,8 @@
           solidMesh: null,
           waterMesh: null,
           glassMesh: null,
+          minH: 0,                 // lowest terrain surface in this chunk (mesh floor)
+          digFloor: WORLD_HEIGHT,  // lowest edited y — meshing never skips below this
         };
         chunks.set(keyOf(cx, cz), c);
         genChunkData(c);
@@ -1080,11 +1091,13 @@
 
       function genChunkData(c) {
         const b = c.blocks;
+        let minH = WORLD_HEIGHT, maxTop = 0;
         for (let lx = 0; lx < CHUNK; lx++) {
           for (let lz = 0; lz < CHUNK; lz++) {
             const wx = c.cx * CHUNK + lx, wz = c.cz * CHUNK + lz;
             const biome = biomeAt(wx, wz);
             const h = Math.min(terrainHeight(wx, wz) + biomeHeightBoost(wx, wz, biome), WORLD_HEIGHT - 8);
+            if (h < minH) minH = h;
             const underwater = h < SEA_LEVEL + 1;
 
             // choose surface + subsurface block by biome
@@ -1098,6 +1111,7 @@
             } else { topId = GRASS; subId = DIRT; }
 
             const top = Math.max(h, SEA_LEVEL);
+            if (top > maxTop) maxTop = top;
             for (let y = 0; y <= top; y++) {
               let id = AIR;
               if (y > h)          id = (y <= SEA_LEVEL) ? WATER : AIR;
@@ -1115,10 +1129,12 @@
           }
         }
         c.generated = true;
+        c.minH = minH;
         genFeatures(c);
-        // highest non-air block, so meshing can stop before empty sky
+        // highest non-air block (scan only the shallow band that can hold trees/structures)
         let my = 0;
-        for (let i = c.blocks.length - 1; i >= 0; i--) {
+        const scanTop = Math.min(WORLD_HEIGHT - 1, maxTop + 14);
+        for (let i = (scanTop + 1) * CHUNK * CHUNK - 1; i >= 0; i--) {
           if (c.blocks[i] !== AIR) { my = (i / (CHUNK * CHUNK)) | 0; break; }
         }
         c.maxY = my;
@@ -1247,6 +1263,15 @@
         const ox = c.cx * CHUNK, oz = c.cz * CHUNK;
         const B = c.blocks;
         const yMax = Math.min((c.maxY || WORLD_HEIGHT - 1) + 1, WORLD_HEIGHT - 1);
+        // Deep interior stone is fully buried and never rendered — skip meshing it.
+        // The safe floor is the lowest terrain surface in this chunk AND its 4 neighbours
+        // (so cliff/ocean border faces still draw), never above anything the player dug.
+        let yMin = c.minH;
+        for (const [ax, az] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+          const nc = getChunk(c.cx + ax, c.cz + az);
+          if (nc && nc.generated && nc.minH < yMin) yMin = nc.minH;
+        }
+        yMin = Math.max(0, Math.min(yMin - 2, c.digFloor));
         // fast neighbour read: local array for same-chunk cells, getBlock only at borders
         const nbAt = (lx, ny, lz, wx2, wz2) => {
           if (lx >= 0 && lx < CHUNK && lz >= 0 && lz < CHUNK)
@@ -1259,7 +1284,7 @@
           return (bb !== AIR && bb !== WATER && bb !== GLASS) ? 1 : 0;
         };
 
-        for (let y = 0; y <= yMax; y++) {
+        for (let y = yMin; y <= yMax; y++) {
           for (let z = 0; z < CHUNK; z++) {
             for (let x = 0; x < CHUNK; x++) {
               const id = B[idx(x, y, z)];
@@ -1688,6 +1713,7 @@
         c.blocks.fill(AIR);
         c.water.fill(0);   // clear stale water levels so the pit is truly empty
         c.maxY = 0;        // the whole chunk is air now
+        c.digFloor = 0;    // fully cleared — mesh the whole column
         markDirty(cx, cz);
         markDirty(cx - 1, cz); markDirty(cx + 1, cz);
         markDirty(cx, cz - 1); markDirty(cx, cz + 1);
