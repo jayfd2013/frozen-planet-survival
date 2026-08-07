@@ -299,14 +299,14 @@
 
     <div id="inventory">
       <div id="invpanel">
-        <h2>🎒 Creative Inventory</h2>
+        <h2>Creative Inventory</h2>
         <div class="hint">Click a block to load it into hotbar slot <b id="invslot">1</b> · press <kbd>E</kbd> or <kbd>Esc</kbd> to close</div>
         <div id="invgrid"></div>
       </div>
     </div>
 
     <div id="godpanel">
-      <div class="gtitle">⚡ GOD MODE</div>
+      <div class="gtitle">GOD MODE</div>
       <div>Brush <b id="gbrush">3</b> <span class="dim"><span class="k">[</span><span class="k">]</span> size · <span class="k">L</span>dig <span class="k">R</span>fill</span></div>
       <div>Noclip <b id="gnoclip">off</b> <span class="dim"><span class="k">V</span></span></div>
       <div><span class="k">N</span> nuke chunk · <span class="k">C</span> clear area · <span class="k">T</span> tower</div>
@@ -324,8 +324,8 @@
         <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move &nbsp;·&nbsp; <kbd>Space</kbd> Jump &nbsp;·&nbsp; <kbd>Ctrl</kbd> Sprint &nbsp;·&nbsp; <kbd>Shift</kbd> Sneak</div>
         <div><kbd>Mouse</kbd> Look &nbsp;·&nbsp; <kbd>L-Click</kbd> Mine &nbsp;·&nbsp; <kbd>R-Click</kbd> Place</div>
         <div><kbd>1</kbd>–<kbd>9</kbd> / <kbd>Scroll</kbd> Hotbar &nbsp;·&nbsp; <kbd>E</kbd> Inventory &nbsp;·&nbsp; <kbd>Q</kbd> 3rd-person View</div>
-        <div><kbd>F</kbd> Fly &nbsp;·&nbsp; <kbd>M</kbd> Mute &nbsp;·&nbsp; 💣 <b>L-Click TNT to ignite</b> &nbsp;·&nbsp; ⛏️ ore, 🌧 weather</div>
-        <div><kbd>G</kbd> ⚡ <b>God Mode</b> — giant brush, nuke chunks, noclip &amp; more</div>
+        <div><kbd>F</kbd> Fly &nbsp;·&nbsp; <kbd>M</kbd> Mute &nbsp;·&nbsp; <b>L-Click TNT to ignite</b> &nbsp;·&nbsp; dig ore, weather</div>
+        <div><kbd>G</kbd> <b>God Mode</b> — giant brush, nuke chunks, noclip &amp; more</div>
         <div><kbd>Esc</kbd> Release mouse</div>
       </div>
       <div id="seedinfo"></div>
@@ -1718,7 +1718,7 @@
       }
       function toggleGod() {
         god.on = !god.on;
-        if (god.on) { player.fly = true; player.vel.set(0, 0, 0); toast('⚡ GOD MODE'); }
+        if (god.on) { player.fly = true; player.vel.set(0, 0, 0); toast('GOD MODE'); }
         else { god.noclip = false; toast('mortal again'); }
         updateGodPanel(); updateHud();
       }
@@ -1759,7 +1759,7 @@
             if (getBlock(ox + CHUNK, y, oz + i) === WATER)     activateWater(ox + CHUNK, y, oz + i);
           }
         }
-        toast('💥 chunk erased');
+        toast('chunk erased');
       }
 
       // Clear a big cube of air around the player (handy for carving rooms).
@@ -1769,7 +1769,7 @@
           for (let dz = -rad; dz <= rad; dz++)
             for (let dy = 0; dy <= rady; dy++)
               setBlock(px + dx, py + dy, pz + dz, AIR);
-        toast('🌀 area cleared');
+        toast('area cleared');
       }
 
       // Raise a tower under the player and stand on top.
@@ -1779,7 +1779,7 @@
         for (let i = 0; i < 12; i++) setBlock(px, base + i, pz, HOTBAR[selected]);
         player.pos.set(px + 0.5, base + 12, pz + 0.5);
         player.vel.set(0, 0, 0);
-        toast('🏗️ tower!');
+        toast('tower!');
       }
 
       addEventListener('keydown', (e) => {
@@ -1795,7 +1795,7 @@
           if (n >= 1 && n <= HOTBAR.length) selectSlot(n - 1);
         }
         if (!running) return;
-        if (e.code === 'KeyM') { muted = !muted; toast(muted ? '🔇 muted' : '🔊 sound on'); }
+        if (e.code === 'KeyM') { muted = !muted; toast(muted ? 'muted' : 'sound on'); }
         if (e.code === 'KeyG') toggleGod();
         if (god.on) {
           if (e.code === 'KeyV') { god.noclip = !god.noclip; updateGodPanel(); toast(god.noclip ? 'noclip on' : 'noclip off'); }
@@ -1872,7 +1872,7 @@
         if (!running) return;
         if (e.button === 0) {
           const mob = mobUnderCrosshair();     // left-click: attack a mob if aimed at one
-          if (mob) { removeMob(mob); sfx.hit(); toast('🐾 ' + mob.def.name + '!'); return; }
+          if (mob) { removeMob(mob); sfx.hit(); toast(mob.def.name + '!'); return; }
           const hit = raycast(REACH);          // left-click on TNT ignites it instead of mining
           if (hit && getBlock(hit.block[0], hit.block[1], hit.block[2]) === TNT) { primeTNT(hit.block[0], hit.block[1], hit.block[2]); return; }
           held.left = true;
@@ -2078,7 +2078,7 @@
       const modeEl = document.getElementById('mode');
       const biomeEl = document.getElementById('biome');
       function updateHud() {
-        const base = god.on ? '⚡ God' : (player.fly ? 'Fly / Creative' : 'Survival');
+        const base = god.on ? 'God' : (player.fly ? 'Fly / Creative' : 'Survival');
         modeEl.textContent = base + (viewMode === 1 ? ' · 3rd' : '');
       }
       updateHud();
@@ -2478,7 +2478,7 @@
         mesh.position.set(x + 0.5, y + 0.5, z + 0.5);
         scene.add(mesh);
         primed.push({ x, y, z, fuse: 2.2 + Math.random() * 0.6, blink: 0, mesh });
-        sfx.fuse(); toast('💥 TNT primed!');
+        sfx.fuse(); toast('TNT primed!');
       }
       function updatePrimed(dt) {
         for (let i = primed.length - 1; i >= 0; i--) {
@@ -2563,7 +2563,7 @@
       function respawn() {
         stat.hp = 20; stat.food = 20; stat.air = 10;
         player.pos.copy(spawnPoint); player.vel.set(0, 0, 0); player.airY = spawnPoint.y;
-        stat.dmgFlash = 0.9; toast('💀 You died — respawned'); updateStats();
+        stat.dmgFlash = 0.9; toast('You died — respawned'); updateStats();
       }
       updateStats();
 
@@ -2598,7 +2598,7 @@
         const raining = type !== 'clear';
         precip.visible = raining;
         weatherTintEl.style.opacity = type === 'rain' ? '0.30' : (type === 'snow' ? '0.16' : '0');
-        weatherEl.textContent = type === 'clear' ? 'Clear' : (type === 'snow' ? 'Snow ❄' : 'Rain 🌧');
+        weatherEl.textContent = type === 'clear' ? 'Clear' : (type === 'snow' ? 'Snow' : 'Rain');
       }
       function updateWeather(dt) {
         weather.timer -= dt;
@@ -2846,7 +2846,7 @@
 
       // show the world seed on the start screen (shareable via ?seed=)
       document.getElementById('seedinfo').innerHTML =
-        `🌱 World seed <b>${WORLD_SEED}</b> &nbsp;·&nbsp; new map every load` +
+        `World seed <b>${WORLD_SEED}</b> &nbsp;·&nbsp; new map every load` +
         (_seedParam ? ' (pinned by URL)' : '');
 
       boot();
