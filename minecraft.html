@@ -360,7 +360,12 @@
             // building / decoration
             GRAVEL = 19, GLOWSTONE = 20, BOOKSHELF = 21, CRAFTING = 22, FURNACE = 23,
             PUMPKIN = 24, TNT = 25, WOOL_W = 26, WOOL_R = 27, WOOL_B = 28, WOOL_Y = 29,
-            OBSIDIAN = 30, MOSSY = 31, BEDROCK = 32;
+            OBSIDIAN = 30, MOSSY = 31, BEDROCK = 32,
+            // new wood types + cross-sprite plants
+            BIRCH_LOG = 33, SPRUCE_LOG = 34, ACACIA_LOG = 35,
+            POPPY = 36, DANDELION = 37, TALLGRASS = 38, SUGARCANE = 39;
+      // cross-sprite plants (rendered as an X, walked through, don't occlude)
+      function isPlant(id){ return id === POPPY || id === DANDELION || id === TALLGRASS || id === SUGARCANE; }
 
       // Base colors (0..1 rgb) — used for break particles
       const COLORS = {
@@ -396,6 +401,13 @@
         [OBSIDIAN]:[0.16, 0.13, 0.22],
         [MOSSY]:  [0.40, 0.48, 0.40],
         [BEDROCK]:[0.24, 0.24, 0.26],
+        [BIRCH_LOG]:[0.86, 0.84, 0.78],
+        [SPRUCE_LOG]:[0.32, 0.24, 0.14],
+        [ACACIA_LOG]:[0.50, 0.44, 0.40],
+        [POPPY]:  [0.78, 0.16, 0.14],
+        [DANDELION]:[0.95, 0.86, 0.24],
+        [TALLGRASS]:[0.36, 0.62, 0.28],
+        [SUGARCANE]:[0.56, 0.78, 0.44],
       };
       // seconds to break each block by hand (Minecraft-style mining time)
       const HARDNESS = {
@@ -404,6 +416,8 @@
         [COAL]:3.0,[IRON]:3.3,[GOLD]:3.3,[DIAMOND]:3.6,[REDSTONE]:3.3,
         [GLOWSTONE]:0.4,[BOOKSHELF]:1.5,[CRAFTING]:1.3,[FURNACE]:2.3,[PUMPKIN]:0.6,[TNT]:0.5,
         [WOOL_W]:0.5,[WOOL_R]:0.5,[WOOL_B]:0.5,[WOOL_Y]:0.5,[OBSIDIAN]:9.0,[BEDROCK]:999,
+        [BIRCH_LOG]:1.3,[SPRUCE_LOG]:1.3,[ACACIA_LOG]:1.3,
+        [POPPY]:0.1,[DANDELION]:0.1,[TALLGRASS]:0.1,[SUGARCANE]:0.1,
       };
       const GRASS_TOP = [0.40, 0.66, 0.30];
       const LOG_TOP   = [0.55, 0.42, 0.25];
@@ -419,22 +433,25 @@
         [FURNACE]:'Furnace',[PUMPKIN]:'Pumpkin',[TNT]:'TNT',
         [WOOL_W]:'White Wool',[WOOL_R]:'Red Wool',[WOOL_B]:'Blue Wool',[WOOL_Y]:'Yellow Wool',
         [OBSIDIAN]:'Obsidian',[MOSSY]:'Mossy',[BEDROCK]:'Bedrock',
+        [BIRCH_LOG]:'Birch Log',[SPRUCE_LOG]:'Spruce Log',[ACACIA_LOG]:'Acacia Log',
+        [POPPY]:'Poppy',[DANDELION]:'Dandelion',[TALLGRASS]:'Tall Grass',[SUGARCANE]:'Sugar Cane',
       };
 
       // Hotbar = 9 assignable quick-slots (reassign from the E inventory)
       let HOTBAR = [GRASS, DIRT, STONE, COBBLE, PLANKS, GLASS, LOG, SAND, WATER];
       // Everything you can pull into a slot from the creative inventory (E)
       const PALETTE = [
-        GRASS, DIRT, STONE, COBBLE, MOSSY, GRAVEL, SAND, LOG, PLANKS, LEAVES,
+        GRASS, DIRT, STONE, COBBLE, MOSSY, GRAVEL, SAND, LOG, BIRCH_LOG, SPRUCE_LOG, ACACIA_LOG, PLANKS, LEAVES,
         BOOKSHELF, CRAFTING, FURNACE, BRICK, GLASS, GLOWSTONE, PUMPKIN, TNT,
-        CACTUS, SNOW, WOOL_W, WOOL_R, WOOL_B, WOOL_Y,
+        CACTUS, SNOW, POPPY, DANDELION, TALLGRASS, SUGARCANE,
+        WOOL_W, WOOL_R, WOOL_B, WOOL_Y,
         COAL, IRON, GOLD, DIAMOND, REDSTONE, OBSIDIAN, BEDROCK, WATER,
       ];
 
-      // A block is "solid" for physics if it's not air and not water.
-      function isSolid(id){ return id !== AIR && id !== WATER; }
+      // A block is "solid" for physics if it's not air, water, or a walk-through plant.
+      function isSolid(id){ return id !== AIR && id !== WATER && !isPlant(id); }
       // Transparent for face culling (a solid block still draws a face against these)
-      function isSeeThrough(id){ return id === AIR || id === WATER || id === GLASS; }
+      function isSeeThrough(id){ return id === AIR || id === WATER || id === GLASS || isPlant(id); }
 
       // ===================================================================
       //  Procedural texture atlas (drawn once to a canvas, no external files)
@@ -448,8 +465,10 @@
         BOOKSHELF:23, CRAFT_TOP:24, CRAFT_SIDE:25, FURNACE_FRONT:26, FURNACE_SIDE:27,
         PUMPKIN_TOP:28, PUMPKIN_SIDE:29, TNT_TOP:30, TNT_SIDE:31,
         WOOL_W:32, WOOL_R:33, WOOL_B:34, WOOL_Y:35, OBSIDIAN:36, MOSSY:37, BEDROCK:38,
+        BIRCH_SIDE:39, BIRCH_TOP:40, SPRUCE_SIDE:41, SPRUCE_TOP:42, ACACIA_SIDE:43, ACACIA_TOP:44,
+        POPPY:45, DANDELION:46, TALLGRASS:47, SUGARCANE:48,
       };
-      const TILE_COUNT = 39;
+      const TILE_COUNT = 49;
       const TS = 16; // texels per tile
 
       // pick the atlas tile for a block id + face (2=+Y top, 3=-Y bottom, else side)
@@ -461,6 +480,9 @@
           case STONE:  return TILE.STONE;
           case COBBLE: return TILE.COBBLE;
           case LOG:    return (top || bottom) ? TILE.LOG_TOP : TILE.LOG_SIDE;
+          case BIRCH_LOG:  return (top || bottom) ? TILE.BIRCH_TOP : TILE.BIRCH_SIDE;
+          case SPRUCE_LOG: return (top || bottom) ? TILE.SPRUCE_TOP : TILE.SPRUCE_SIDE;
+          case ACACIA_LOG: return (top || bottom) ? TILE.ACACIA_TOP : TILE.ACACIA_SIDE;
           case LEAVES: return TILE.LEAVES;
           case SAND:   return TILE.SAND;
           case PLANKS: return TILE.PLANKS;
@@ -489,6 +511,15 @@
           case WOOL_B:   return TILE.WOOL_B;
           case WOOL_Y:   return TILE.WOOL_Y;
           default:     return TILE.STONE;
+        }
+      }
+      // atlas tile for a cross-sprite plant
+      function plantTile(id) {
+        switch (id) {
+          case POPPY:     return TILE.POPPY;
+          case DANDELION: return TILE.DANDELION;
+          case SUGARCANE: return TILE.SUGARCANE;
+          default:        return TILE.TALLGRASS;
         }
       }
 
@@ -850,6 +881,57 @@
         wool(TILE.WOOL_B, 60, 68, 170);
         wool(TILE.WOOL_Y, 254, 216, 61);
 
+        // ---- Birch log: pale bark with dark flecks, light rings ----
+        fill(TILE.BIRCH_SIDE, 222, 220, 210, 4);
+        { const ox = TILE.BIRCH_SIDE * TS;
+          for (let x = 0; x < TS; x++) { put(ox, x, 0, 200, 198, 188); put(ox, x, 15, 200, 198, 188); }
+          for (const [bx, by, bw] of [[2,3,3],[9,6,3],[4,10,2],[12,12,2],[1,8,2],[7,1,2]]) for (let i = 0; i < bw; i++) put(ox, (bx + i) % TS, by, 46, 44, 42); // dark dashes
+        }
+        fill(TILE.BIRCH_TOP, 214, 202, 168, 4);
+        { const ox = TILE.BIRCH_TOP * TS, cx2 = 7.5, cy2 = 7.5;
+          for (let y = 0; y < TS; y++) for (let x = 0; x < TS; x++) { const d = Math.sqrt((x-cx2)**2+(y-cy2)**2); if (d > 7.1) put(ox, x, y, 224, 222, 212); else if ((Math.round(d)%2)===0) put(ox, x, y, 190, 178, 146); } }
+
+        // ---- Spruce log: dark reddish-brown bark ----
+        fill(TILE.SPRUCE_SIDE, 74, 56, 34, 4);
+        { const ox = TILE.SPRUCE_SIDE * TS;
+          for (let x = 0; x < TS; x++) { const streak = ((x%4)===1)?-10:((x%4)===3?8:0); for (let y = 0; y < TS; y++) { const n=(R()*2-1)*3; put(ox, x, y, 74+streak+n, 56+streak*0.7+n, 34+streak*0.5+n); } }
+          for (let x = 0; x < TS; x++) { put(ox, x, 0, 58, 42, 26); put(ox, x, 15, 58, 42, 26); } }
+        fill(TILE.SPRUCE_TOP, 116, 92, 58, 3);
+        { const ox = TILE.SPRUCE_TOP * TS, cx2 = 7.5, cy2 = 7.5;
+          for (let y = 0; y < TS; y++) for (let x = 0; x < TS; x++) { const d = Math.sqrt((x-cx2)**2+(y-cy2)**2); if (d > 7.1) put(ox, x, y, 70, 52, 32); else if ((Math.round(d)%2)===0) put(ox, x, y, 96, 74, 46); } }
+
+        // ---- Acacia log: grey-brown bark with orange tint ----
+        fill(TILE.ACACIA_SIDE, 108, 96, 88, 4);
+        { const ox = TILE.ACACIA_SIDE * TS;
+          for (let x = 0; x < TS; x++) { const streak = ((x%3)===1)?-12:6; for (let y = 0; y < TS; y++) { const n=(R()*2-1)*4; put(ox, x, y, 108+streak+n, 96+streak*0.7+n, 88+streak*0.6+n); } }
+          for (let x = 0; x < TS; x++) { put(ox, x, 0, 88, 76, 68); put(ox, x, 15, 88, 76, 68); } }
+        fill(TILE.ACACIA_TOP, 168, 96, 56, 4);
+        { const ox = TILE.ACACIA_TOP * TS, cx2 = 7.5, cy2 = 7.5;
+          for (let y = 0; y < TS; y++) for (let x = 0; x < TS; x++) { const d = Math.sqrt((x-cx2)**2+(y-cy2)**2); if (d > 7.1) put(ox, x, y, 120, 104, 92); else if ((Math.round(d)%2)===0) put(ox, x, y, 146, 82, 48); } }
+
+        // ---- Plants: transparent tiles (only the plant pixels are drawn) ----
+        // stem helper: a vertical green stalk
+        const stalk = (ox, x, top, r, g, b) => { for (let y = top; y < TS; y++) { const n = (R()*2-1)*8; put(ox, x, y, r+n, g+n, b+n); } };
+        // Tall grass: a tuft of green blades
+        { const ox = TILE.TALLGRASS * TS;
+          const blades = [[4,7],[6,4],[8,6],[10,3],[7,8],[5,9],[11,7],[3,10]];
+          for (const [x, top] of blades) { for (let y = top; y < 15; y++) { const n=(R()*2-1)*10; put(ox, x, y, 82+n, 138+n, 58+n); } put(ox, x, top, 96, 158, 66); }
+          for (let x = 3; x < 12; x++) if (R() < 0.5) put(ox, x, 14, 70, 120, 48); }
+        // Poppy: green stem + red bloom
+        { const ox = TILE.POPPY * TS; stalk(ox, 7, 8, 74, 122, 52); stalk(ox, 8, 9, 74, 122, 52);
+          const bloom = [[6,4],[7,3],[8,3],[9,4],[6,5],[7,5],[8,5],[9,5],[7,6],[8,6]];
+          for (const [x, y] of bloom) put(ox, x, y, 196, 40, 36);
+          put(ox, 7, 4, 40, 30, 20); put(ox, 8, 4, 40, 30, 20); } // dark centre
+        // Dandelion: green stem + yellow bloom
+        { const ox = TILE.DANDELION * TS; stalk(ox, 7, 8, 74, 122, 52); stalk(ox, 8, 9, 74, 122, 52);
+          const bloom = [[6,4],[7,4],[8,4],[9,4],[6,5],[7,3],[8,3],[9,5],[7,5],[8,5],[7,6],[8,6]];
+          for (const [x, y] of bloom) put(ox, x, y, 248, 216, 60); }
+        // Sugar cane: tall green segmented stalk
+        { const ox = TILE.SUGARCANE * TS;
+          for (let y = 0; y < TS; y++) for (const x of [6,7,8,9]) { const n=(R()*2-1)*8; put(ox, x, y, 120+n, 176+n*0.9, 96+n*0.7); }
+          for (const y of [3, 9, 14]) for (const x of [6,7,8,9]) put(ox, x, y, 96, 142, 74); // node bands
+          for (let y = 0; y < TS; y++) { put(ox, 6, y, 150, 200, 120); put(ox, 9, y, 96, 148, 78); } }
+
         return cvs;
       }
 
@@ -930,17 +1012,24 @@
       }
 
       // ---- Biomes ----
-      const B_PLAINS = 0, B_FOREST = 1, B_DESERT = 2, B_SNOWY = 3, B_MOUNTAIN = 4;
-      const BIOME_NAMES = ['Plains', 'Forest', 'Desert', 'Snowy', 'Mountains'];
+      const B_PLAINS = 0, B_FOREST = 1, B_DESERT = 2, B_SNOWY = 3, B_MOUNTAIN = 4,
+            B_SAVANNA = 5, B_TAIGA = 6, B_BIRCH = 7, B_JUNGLE = 8, B_SWAMP = 9;
+      const BIOME_NAMES = ['Plains', 'Forest', 'Desert', 'Snowy', 'Mountains',
+                           'Savanna', 'Taiga', 'Birch Forest', 'Jungle', 'Swamp'];
       // low-frequency temperature/moisture/ridge fields decide the biome per column
       function biomeAt(wx, wz) {
         const mt = perlin2((wx + 5100) / 170, (wz - 5100) / 170);   // mountain ridges
-        if (mt > 0.48) return B_MOUNTAIN;
+        if (mt > 0.50) return B_MOUNTAIN;
         const t = perlin2((wx + 1700) / 240, (wz + 9200) / 240);    // temperature
         const m = perlin2((wx - 8300) / 200, (wz - 400) / 200);     // moisture
-        if (t < -0.32) return B_SNOWY;
-        if (t > 0.30 && m < 0.05) return B_DESERT;
-        if (m > 0.18) return B_FOREST;
+        if (t < -0.28) return m > 0.05 ? B_TAIGA : B_SNOWY;         // cold: wet=taiga, dry=snowy
+        if (t > 0.28) {                                             // hot
+          if (m < -0.05) return B_DESERT;
+          if (m < 0.20)  return B_SAVANNA;
+          return B_JUNGLE;
+        }
+        if (m > 0.32) return B_SWAMP;                              // temperate + very wet = swamp
+        if (m > 0.10) return t < 0 ? B_BIRCH : B_FOREST;
         return B_PLAINS;
       }
       // extra height added on top of base terrain for a given biome/column
@@ -1105,6 +1194,7 @@
           solidMesh: null,
           waterMesh: null,
           glassMesh: null,
+          plantMesh: null,
           minH: 0,                 // lowest terrain surface in this chunk (mesh floor)
           digFloor: WORLD_HEIGHT,  // lowest edited y — meshing never skips below this
         };
@@ -1164,10 +1254,15 @@
         c.maxY = my;
       }
 
-      // trees / cacti / huts / boulders, chosen by biome
+      // trees / cacti / plants / structures, chosen by biome
       function genFeatures(c) {
         const b = c.blocks;
-        const set = (lx, y, lz, id) => { if (y >= 0 && y < WORLD_HEIGHT) b[idx(lx, y, lz)] = id; };
+        const set = (lx, y, lz, id) => { if (y >= 0 && y < WORLD_HEIGHT && lx >= 0 && lx < CHUNK && lz >= 0 && lz < CHUNK) b[idx(lx, y, lz)] = id; };
+        const at = (lx, y, lz) => (y >= 0 && y < WORLD_HEIGHT && lx >= 0 && lx < CHUNK && lz >= 0 && lz < CHUNK) ? b[idx(lx, y, lz)] : AIR;
+        const nearWater = (lx, sy, lz) => {
+          for (const [dx, dz] of [[1,0],[-1,0],[0,1],[0,-1]]) if (at(lx+dx, sy, lz+dz) === WATER || at(lx+dx, sy-1, lz+dz) === WATER) return true;
+          return false;
+        };
         const trees = [];  // placed trunk columns, for spacing
         const farFromTrees = (lx, lz) => {
           for (const t of trees) if (Math.abs(t[0] - lx) < 4 && Math.abs(t[1] - lz) < 4) return false;
@@ -1176,51 +1271,131 @@
         for (let lx = 2; lx < CHUNK - 2; lx++) {
           for (let lz = 2; lz < CHUNK - 2; lz++) {
             const wx = c.cx * CHUNK + lx, wz = c.cz * CHUNK + lz;
-            // find the surface block in this column
+            // find the surface block in this column (dry land above sea level)
             let sy = -1, surf = AIR;
-            for (let y = WORLD_HEIGHT - 10; y > SEA_LEVEL; y--) {
+            for (let y = WORLD_HEIGHT - 12; y > SEA_LEVEL - 2; y--) {
               const bl = b[idx(lx, y, lz)];
               if (bl !== AIR && bl !== WATER) { sy = y; surf = bl; break; }
             }
-            if (sy < 0) continue;
-            // column already has vegetation/structure on top — never build on it
-            if (surf === LEAVES || surf === LOG || surf === CACTUS) continue;
+            if (sy < 0 || at(lx, sy + 1, lz) !== AIR) continue;  // needs open air above
+            if (surf === LEAVES || surf === LOG || surf === CACTUS || isPlant(surf)) continue;
             const biome = biomeAt(wx, wz);
-            const r = hash2(wx * 7, wz * 13);
+            const r = hash2(wx * 7, wz * 13), r2 = hash2(wx * 31, wz * 17);
+
+            // sugar cane on shore blocks beside water (any biome)
+            if ((surf === SAND || surf === GRASS) && sy <= SEA_LEVEL + 1 && r < 0.07 && nearWater(lx, sy, lz)) {
+              const hgt = 1 + Math.floor(hash2(wx, wz) * 3);
+              for (let i = 1; i <= hgt; i++) set(lx, sy + i, lz, SUGARCANE);
+              continue;
+            }
 
             if (biome === B_DESERT) {
-              if (surf === SAND && r < 0.020) {
-                const hgt = 1 + Math.floor(hash2(wx, wz) * 3);
-                for (let i = 1; i <= hgt; i++) set(lx, sy + i, lz, CACTUS);
-              }
+              if (surf === SAND && r < 0.018) { const hgt = 1 + Math.floor(hash2(wx, wz) * 3); for (let i = 1; i <= hgt; i++) set(lx, sy + i, lz, CACTUS); }
+              else if (surf === SAND && lx >= 4 && lx < CHUNK - 4 && lz >= 4 && lz < CHUNK - 4 && r2 < 0.0007) placePyramid(set, lx, sy, lz);
             } else if (biome === B_MOUNTAIN) {
               if (surf === STONE && r < 0.010) placeBoulder(set, lx, sy, lz, wx, wz);
-              else if (surf === GRASS && r < 0.012 && farFromTrees(lx, lz)) { placeTree(set, lx, sy, lz); trees.push([lx, lz]); }
-            } else { // plains, forest, snowy
-              const treeChance = biome === B_FOREST ? 0.060 : (biome === B_SNOWY ? 0.022 : 0.012);
-              if ((surf === GRASS || surf === SNOW) && r < treeChance && farFromTrees(lx, lz)) {
-                placeTree(set, lx, sy, lz); trees.push([lx, lz]);
-              } else if (biome !== B_SNOWY && surf === GRASS && lx < CHUNK - 6 && lz < CHUNK - 6
-                         && hash2(wx * 31, wz * 17) < 0.0011) {
+              else if (surf === GRASS && r < 0.012 && farFromTrees(lx, lz)) { placeSpruce(set, lx, sy, lz); trees.push([lx, lz]); }
+            } else if (surf === GRASS || surf === SNOW) {
+              const treeChance = biome === B_JUNGLE ? 0.085 : biome === B_FOREST ? 0.060 :
+                                 biome === B_BIRCH ? 0.055 : biome === B_TAIGA ? 0.055 :
+                                 biome === B_SWAMP ? 0.020 : biome === B_SAVANNA ? 0.014 :
+                                 biome === B_SNOWY ? 0.022 : 0.012;
+              if (r < treeChance && farFromTrees(lx, lz)) {
+                if (biome === B_BIRCH) placeBirch(set, lx, sy, lz);
+                else if (biome === B_TAIGA) placeSpruce(set, lx, sy, lz);
+                else if (biome === B_SAVANNA) placeAcacia(set, lx, sy, lz);
+                else if (biome === B_JUNGLE) placeJungle(set, lx, sy, lz);
+                else placeTree(set, lx, sy, lz);
+                trees.push([lx, lz]);
+              } else if (surf === GRASS && biome !== B_SNOWY && biome !== B_SWAMP && lx < CHUNK - 6 && lz < CHUNK - 6 && r2 < 0.0010) {
                 placeHut(set, lx, sy, lz);
+              } else if (surf === GRASS) {
+                // ground cover: flowers, tall grass, pumpkin patches
+                const g = hash2(wx * 5 + 1, wz * 11 + 3);
+                if (biome === B_PLAINS || biome === B_SAVANNA) {
+                  if (g < 0.16) set(lx, sy + 1, lz, TALLGRASS);
+                  else if (g < 0.195) set(lx, sy + 1, lz, hash2(wx, wz) < 0.5 ? POPPY : DANDELION);
+                  else if (g < 0.197 && lx < CHUNK - 3 && lz < CHUNK - 3) placePumpkins(set, lx, sy, lz);
+                } else if (biome === B_FOREST || biome === B_JUNGLE || biome === B_SWAMP || biome === B_BIRCH) {
+                  if (g < 0.20) set(lx, sy + 1, lz, TALLGRASS);
+                  else if (g < 0.215) set(lx, sy + 1, lz, hash2(wx, wz) < 0.6 ? POPPY : DANDELION);
+                } else if (g < 0.08) set(lx, sy + 1, lz, TALLGRASS);
               }
             }
           }
         }
       }
 
-      function placeTree(set, lx, sy, lz) {
-        const th = 4 + Math.floor(hash2(lx * 13 + sy, lz * 7) * 3);
-        for (let dy = th - 2; dy <= th + 1; dy++) {
-          const rad = dy >= th ? 1 : 2;
+      // ---- Trees (one shape per wood type) ----
+      function leafBlob(set, lx, sy, lz, top, radTop, radBody) {
+        for (let dy = top - 2; dy <= top + 1; dy++) {
+          const rad = dy >= top ? radTop : radBody;
           for (let ox = -rad; ox <= rad; ox++)
             for (let oz = -rad; oz <= rad; oz++) {
-              if (ox === 0 && oz === 0 && dy < th) continue;
-              if (Math.abs(ox) === rad && Math.abs(oz) === rad && rad === 2) continue;
+              if (ox === 0 && oz === 0 && dy < top) continue;
+              if (Math.abs(ox) === rad && Math.abs(oz) === rad && rad >= 2) continue;
               set(lx + ox, sy + dy, lz + oz, LEAVES);
             }
         }
+      }
+      function placeTree(set, lx, sy, lz) {   // oak
+        const th = 4 + Math.floor(hash2(lx * 13 + sy, lz * 7) * 3);
+        leafBlob(set, lx, sy, lz, th, 1, 2);
         for (let dy = 1; dy <= th; dy++) set(lx, sy + dy, lz, LOG);
+      }
+      function placeBirch(set, lx, sy, lz) {
+        const th = 5 + Math.floor(hash2(lx * 7 + sy, lz * 3) * 3);
+        leafBlob(set, lx, sy, lz, th, 1, 2);
+        for (let dy = 1; dy <= th; dy++) set(lx, sy + dy, lz, BIRCH_LOG);
+      }
+      function placeSpruce(set, lx, sy, lz) {  // conical
+        const th = 6 + Math.floor(hash2(lx * 3 + sy, lz * 11) * 4);
+        for (let dy = 1; dy <= th; dy++) set(lx, sy + dy, lz, SPRUCE_LOG);
+        for (let dy = 2; dy <= th; dy++) {
+          const r = (dy < th - 1) ? (((th - dy) % 2 === 0) ? 2 : 1) : 1;
+          for (let ox = -r; ox <= r; ox++) for (let oz = -r; oz <= r; oz++) {
+            if (ox === 0 && oz === 0) continue;
+            if (Math.abs(ox) === r && Math.abs(oz) === r && r >= 2) continue;
+            set(lx + ox, sy + dy, lz + oz, LEAVES);
+          }
+        }
+        set(lx, sy + th + 1, lz, LEAVES);       // pointed tip
+      }
+      function placeAcacia(set, lx, sy, lz) {   // flat wide canopy
+        const th = 4 + Math.floor(hash2(lx * 5 + sy, lz * 7) * 2);
+        for (let dy = 1; dy <= th; dy++) set(lx, sy + dy, lz, ACACIA_LOG);
+        for (const [dy, r] of [[th, 3], [th + 1, 2]]) {
+          for (let ox = -r; ox <= r; ox++) for (let oz = -r; oz <= r; oz++) {
+            if (Math.abs(ox) === r && Math.abs(oz) === r) continue;
+            set(lx + ox, sy + dy, lz + oz, LEAVES);
+          }
+        }
+      }
+      function placeJungle(set, lx, sy, lz) {   // tall, big canopy
+        const th = 8 + Math.floor(hash2(lx * 9 + sy, lz * 13) * 5);
+        for (let dy = 1; dy <= th; dy++) set(lx, sy + dy, lz, LOG);
+        for (let dy = th - 3; dy <= th + 1; dy++) {
+          const r = dy >= th ? 1 : (dy === th - 1 ? 2 : 3);
+          for (let ox = -r; ox <= r; ox++) for (let oz = -r; oz <= r; oz++) {
+            if (ox === 0 && oz === 0 && dy < th) continue;
+            if (Math.abs(ox) === r && Math.abs(oz) === r && r >= 3) continue;
+            set(lx + ox, sy + dy, lz + oz, LEAVES);
+          }
+        }
+      }
+      function placePumpkins(set, lx, sy, lz) {
+        set(lx, sy + 1, lz, PUMPKIN);
+        if (hash2(lx * 3, lz) < 0.5) set(lx + 1, sy + 1, lz, PUMPKIN);
+        if (hash2(lx, lz * 3) < 0.4) set(lx, sy + 1, lz + 1, PUMPKIN);
+      }
+      // stepped desert pyramid (sandstone-less: built from sand)
+      function placePyramid(set, lx, sy, lz) {
+        for (let layer = 0; layer <= 3; layer++) {
+          const half = 3 - layer;
+          for (let ox = -half; ox <= half; ox++) for (let oz = -half; oz <= half; oz++)
+            set(lx + ox, sy + layer, lz + oz, SAND);
+        }
+        set(lx, sy + 4, lz, SAND);   // capstone
       }
 
       function placeBoulder(set, lx, sy, lz, wx, wz) {
@@ -1262,6 +1437,11 @@
         { n: [ 0, 0, 1], c: [[1,0,1],[0,0,1],[0,1,1],[1,1,1]], s: 0.86 }, // +Z
         { n: [ 0, 0,-1], c: [[0,0,0],[1,0,0],[1,1,0],[0,1,0]], s: 0.86 }, // -Z
       ];
+      // two diagonal planes (an X) for cross-sprite plants, inset from block edges
+      const PLANT_PLANES = [
+        [[0.1,0,0.1],[0.9,0,0.9],[0.9,1,0.9],[0.1,1,0.1]],
+        [[0.1,0,0.9],[0.9,0,0.1],[0.9,1,0.1],[0.1,1,0.9]],
+      ];
 
       // Minecraft-style foliage colouring: grass & leaves are tinted per biome
       // (lush plains, deep forest, dry desert, pale-cool snowy). Multiplies the texture.
@@ -1271,6 +1451,11 @@
         [B_DESERT]:   [1.05, 0.96, 0.55],
         [B_SNOWY]:    [0.80, 0.95, 0.92],
         [B_MOUNTAIN]: [0.88, 1.00, 0.72],
+        [B_SAVANNA]:  [1.02, 0.90, 0.48],
+        [B_TAIGA]:    [0.72, 0.92, 0.70],
+        [B_BIRCH]:    [0.86, 1.00, 0.68],
+        [B_JUNGLE]:   [0.62, 1.00, 0.42],
+        [B_SWAMP]:    [0.60, 0.76, 0.50],
       };
       const LEAF_TINT = {
         [B_PLAINS]:   [0.85, 1.00, 0.62],
@@ -1278,12 +1463,18 @@
         [B_DESERT]:   [0.90, 0.92, 0.50],
         [B_SNOWY]:    [0.66, 0.86, 0.62],
         [B_MOUNTAIN]: [0.76, 0.96, 0.55],
+        [B_SAVANNA]:  [0.92, 0.88, 0.44],
+        [B_TAIGA]:    [0.56, 0.78, 0.52],
+        [B_BIRCH]:    [0.80, 1.00, 0.58],
+        [B_JUNGLE]:   [0.50, 0.94, 0.36],
+        [B_SWAMP]:    [0.52, 0.70, 0.42],
       };
 
       function buildChunkMesh(c) {
         const sp = [], sc = [], su = [];   // solid positions / colors / uvs
         const wp = [], wc = [], wu = [];   // water positions / colors / uvs
         const gp = [], gc = [], gu = [];   // glass positions / colors / uvs
+        const pp = [], pc = [], pu = [];   // plant (cross-sprite) positions / colors / uvs
         const ox = c.cx * CHUNK, oz = c.cz * CHUNK;
         const B = c.blocks;
         const yMax = Math.min((c.maxY || WORLD_HEIGHT - 1) + 1, WORLD_HEIGHT - 1);
@@ -1305,7 +1496,7 @@
         // 1 if the neighbour block occludes for AO (defined once — no per-face allocation)
         const solidAO = (lx, ny, lz, wx2, wz2) => {
           const bb = nbAt(lx, ny, lz, wx2, wz2);
-          return (bb !== AIR && bb !== WATER && bb !== GLASS) ? 1 : 0;
+          return (bb !== AIR && bb !== WATER && bb !== GLASS && !isPlant(bb)) ? 1 : 0;
         };
 
         for (let y = yMin; y <= yMax; y++) {
@@ -1314,6 +1505,19 @@
               const id = B[idx(x, y, z)];
               if (id === AIR) continue;
               const wx = ox + x, wy = y, wz = oz + z;
+              // cross-sprite plant: emit an X of two quads, then skip the cube meshing
+              if (isPlant(id)) {
+                const ptile = plantTile(id);
+                let ptr = 1, ptg = 1, ptb = 1;
+                if (id === TALLGRASS) { const tt = GRASS_TINT[biomeAt(wx, wz)] || GRASS_TINT[B_PLAINS]; ptr = tt[0]; ptg = tt[1]; ptb = tt[2]; }
+                for (const q of PLANT_PLANES) for (const ti of [0, 1, 2, 0, 2, 3]) {
+                  const cc = q[ti];
+                  pp.push(wx + cc[0], wy + cc[1], wz + cc[2]);
+                  pc.push(0.94 * ptr, 0.94 * ptg, 0.94 * ptb);
+                  tileUV(pu, ptile, ti);
+                }
+                continue;
+              }
               const water = id === WATER;
               const glass = id === GLASS;
               // surface water sits a bit below a full block (nicer waterline); submerged water is full
@@ -1415,12 +1619,22 @@
           g.computeBoundingSphere();
           scene.add(c.glassMesh);
         }
+        if (pp.length) {
+          const g = new THREE.BufferGeometry();
+          g.setAttribute('position', new THREE.Float32BufferAttribute(pp, 3));
+          g.setAttribute('color', new THREE.Float32BufferAttribute(pc, 3));
+          g.setAttribute('uv', new THREE.Float32BufferAttribute(pu, 2));
+          c.plantMesh = new THREE.Mesh(g, plantMat);
+          g.computeBoundingSphere();
+          scene.add(c.plantMesh);
+        }
       }
 
       function disposeChunkMeshes(c) {
         if (c.solidMesh) { scene.remove(c.solidMesh); c.solidMesh.geometry.dispose(); c.solidMesh = null; }
         if (c.waterMesh) { scene.remove(c.waterMesh); c.waterMesh.geometry.dispose(); c.waterMesh = null; }
         if (c.glassMesh) { scene.remove(c.glassMesh); c.glassMesh.geometry.dispose(); c.glassMesh = null; }
+        if (c.plantMesh) { scene.remove(c.plantMesh); c.plantMesh.geometry.dispose(); c.plantMesh = null; }
       }
 
       // ===================================================================
@@ -1472,6 +1686,11 @@
       const glassMat = new THREE.MeshBasicMaterial({
         map: atlas, vertexColors: true, transparent: true, opacity: 0.34,
         depthWrite: false, side: THREE.BackSide,
+      });
+      // cross-sprite plants: alpha-tested cutout, double-sided, writes depth (occludes normally)
+      const plantMat = new THREE.MeshBasicMaterial({
+        map: atlas, vertexColors: true, transparent: true, alphaTest: 0.5,
+        side: THREE.DoubleSide, depthWrite: true,
       });
 
       addEventListener('resize', () => {
@@ -1934,7 +2153,7 @@
       })();
       // set an element's background to a block's icon (its top-face tile)
       function paintIcon(el, id) {
-        const t = tileFor(id, 2);
+        const t = isPlant(id) ? plantTile(id) : tileFor(id, 2);
         el.style.backgroundImage = `url(${atlasURL})`;
         el.style.backgroundRepeat = 'no-repeat';
         el.style.backgroundSize = `${TILE_COUNT * 100}% 100%`;
