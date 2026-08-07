@@ -14,133 +14,147 @@
       html, body { width: 100%; height: 100%; overflow: hidden; }
       body {
         background: #0a0a14;
-        font-family: 'Segoe UI', Arial, sans-serif;
+        /* retro pixel-leaning UI font; hard 2px drop-shadow mimics Minecraft's text render */
+        font-family: ui-monospace, 'Cascadia Mono', 'Consolas', 'Courier New', monospace;
         color: #fff;
+        text-shadow: 2px 2px 0 rgba(0,0,0,0.5);
         user-select: none;
         -webkit-user-select: none;
       }
       canvas { display: block; }
 
-      /* ---------- Crosshair ---------- */
+      /* Minecraft-style beveled panel (dark) and stone button, reused below */
+      .mc-panel {
+        background: rgba(0,0,0,0.72);
+        border: 2px solid #000;
+        box-shadow: inset 2px 2px 0 rgba(255,255,255,0.14), inset -2px -2px 0 rgba(0,0,0,0.55);
+        border-radius: 0;
+      }
+
+      /* ---------- Crosshair (classic inverting white cross) ---------- */
       #crosshair {
         position: fixed;
         top: 50%; left: 50%;
-        width: 22px; height: 22px;
+        width: 20px; height: 20px;
         transform: translate(-50%, -50%);
         pointer-events: none;
         z-index: 20;
-        opacity: 0.85;
+        mix-blend-mode: difference;
       }
       #crosshair::before, #crosshair::after {
         content: '';
         position: absolute;
-        background: rgba(255,255,255,0.9);
-        box-shadow: 0 0 2px rgba(0,0,0,0.7);
+        background: #fff;
       }
       #crosshair::before { top: 50%; left: 0; width: 100%; height: 2px; transform: translateY(-50%); }
       #crosshair::after  { left: 50%; top: 0; height: 100%; width: 2px; transform: translateX(-50%); }
 
       /* ---------- HUD ---------- */
       #hud {
-        position: fixed; top: 12px; left: 12px;
+        position: fixed; top: 10px; left: 10px;
         z-index: 20; pointer-events: none;
-        font-size: 13px; line-height: 1.5;
-        text-shadow: 0 1px 3px rgba(0,0,0,0.6);
-        background: rgba(0,0,0,0.25);
-        padding: 8px 12px; border-radius: 10px;
-        backdrop-filter: blur(6px);
-        -webkit-backdrop-filter: blur(6px);
+        font-size: 13px; line-height: 1.6;
+        background: rgba(0,0,0,0.55);
+        border: 2px solid #000;
+        box-shadow: inset 2px 2px 0 rgba(255,255,255,0.12), inset -2px -2px 0 rgba(0,0,0,0.5);
+        padding: 8px 12px;
       }
-      #hud b { color: #ffe08a; font-weight: 600; }
+      #hud b { color: #ffe051; font-weight: 400; }
 
-      /* ---------- Hotbar ---------- */
+      /* ---------- Hotbar (dark strip, square slots, classic selector) ---------- */
       #hotbar {
-        position: fixed; bottom: 16px; left: 50%;
+        position: fixed; bottom: 14px; left: 50%;
         transform: translateX(-50%);
-        display: flex; gap: 6px;
+        display: flex; gap: 0;
         z-index: 20;
-        padding: 6px;
-        background: rgba(0,0,0,0.3);
-        border-radius: 12px;
-        backdrop-filter: blur(6px);
-        -webkit-backdrop-filter: blur(6px);
+        padding: 3px;
+        background: rgba(0,0,0,0.55);
+        border: 2px solid #000;
+        box-shadow: inset 2px 2px 0 rgba(255,255,255,0.16), inset -2px -2px 0 rgba(0,0,0,0.5);
       }
       .slot {
-        width: 52px; height: 52px;
-        border-radius: 9px;
-        border: 2px solid rgba(255,255,255,0.25);
+        width: 50px; height: 50px;
+        border: 2px solid #373737;
+        box-shadow: inset 1px 1px 0 rgba(0,0,0,0.5), inset -1px -1px 0 rgba(255,255,255,0.15);
+        background: rgba(139,139,139,0.28);
+        background-repeat: no-repeat;
         position: relative;
         display: flex; align-items: center; justify-content: center;
         cursor: pointer;
-        transition: transform .12s ease, border-color .12s ease;
       }
-      .slot:hover { transform: translateY(-3px); }
+      /* the iconic ~2px light selection frame that overhangs the selected slot */
       .slot.active {
-        border-color: #ffffff;
-        box-shadow: 0 0 0 2px rgba(255,255,255,0.35), 0 6px 16px rgba(0,0,0,0.4);
-        transform: translateY(-3px);
+        outline: 3px solid #e0e0e0;
+        outline-offset: 0px;
+        box-shadow: 0 0 0 2px #000, inset 1px 1px 0 rgba(0,0,0,0.4);
+        z-index: 1;
       }
       .slot .num {
-        position: absolute; top: 2px; left: 5px;
-        font-size: 11px; color: rgba(255,255,255,0.85);
-        text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+        position: absolute; top: -1px; left: 2px;
+        font-size: 11px; color: #fff;
+        text-shadow: 1px 1px 0 rgba(0,0,0,0.85);
       }
       .slot .label {
-        position: absolute; bottom: 2px; right: 4px;
-        font-size: 9px; color: rgba(255,255,255,0.9);
-        text-shadow: 0 1px 2px rgba(0,0,0,0.9);
+        position: absolute; bottom: 0px; right: 2px;
+        font-size: 8px; color: #fff;
+        text-shadow: 1px 1px 0 rgba(0,0,0,0.95);
       }
 
-      /* ---------- Start overlay ---------- */
+      /* ---------- Start overlay (dirt-tiled menu background, set in JS) ---------- */
       #overlay {
         position: fixed; inset: 0; z-index: 50;
         display: flex; flex-direction: column;
         align-items: center; justify-content: center;
         text-align: center;
-        background: radial-gradient(1200px 600px at 50% 30%, #6fb7e8 0%, #4a90c8 45%, #2d5f8a 100%);
+        background: #3a2c1c;   /* dark dirt fallback until the tiled texture loads */
+        image-rendering: pixelated;
       }
       #overlay h1 {
-        font-size: clamp(40px, 8vw, 88px);
-        letter-spacing: 2px;
-        margin-bottom: 6px;
-        text-shadow: 0 4px 0 rgba(0,0,0,0.25), 0 10px 30px rgba(0,0,0,0.4);
+        font-size: clamp(34px, 7vw, 74px);
+        letter-spacing: 1px; font-weight: 400;
+        margin-bottom: 4px;
+        text-shadow: 4px 4px 0 rgba(0,0,0,0.55);
       }
-      #overlay h1 .a { color: #8bd17a; }
+      #overlay h1 .a { color: #7ec850; }
       #overlay h1 .b { color: #f4d06f; }
-      #overlay .sub { font-size: 16px; opacity: 0.9; margin-bottom: 28px; }
+      #overlay .sub { font-size: 14px; opacity: 0.92; margin-bottom: 26px; color: #e8e8e8; }
+      /* Minecraft stone button */
       #play {
-        font-size: 20px; font-weight: 700;
-        padding: 14px 44px;
-        border: none; border-radius: 14px;
-        background: linear-gradient(180deg, #7bc96f, #4f9e46);
-        color: white; cursor: pointer;
-        box-shadow: 0 8px 0 #3a7a33, 0 14px 30px rgba(0,0,0,0.35);
-        transition: transform .08s ease, box-shadow .08s ease;
+        font-size: 18px; letter-spacing: 1px;
+        padding: 12px 52px;
+        border: 2px solid #000; border-radius: 0;
+        background: #6f6f6f;
+        box-shadow: inset 2px 2px 0 #9a9a9a, inset -2px -2px 0 #4a4a4a;
+        color: #fff; cursor: pointer;
+        text-shadow: 2px 2px 0 rgba(0,0,0,0.55);
       }
-      #play:active { transform: translateY(6px); box-shadow: 0 2px 0 #3a7a33, 0 6px 16px rgba(0,0,0,0.35); }
+      #play:hover { background: #79798a; box-shadow: inset 2px 2px 0 #a6a6b4, inset -2px -2px 0 #4a4a52, 0 0 0 2px #fff; color: #b4ffb4; }
+      #play:active { box-shadow: inset -2px -2px 0 #9a9a9a, inset 2px 2px 0 #4a4a4a; }
       #controls {
-        margin-top: 30px; font-size: 14px; line-height: 1.9;
-        background: rgba(0,0,0,0.22); padding: 16px 26px; border-radius: 14px;
-        backdrop-filter: blur(4px);
+        margin-top: 28px; font-size: 13px; line-height: 2;
+        background: rgba(0,0,0,0.55); padding: 14px 24px;
+        border: 2px solid #000;
+        box-shadow: inset 2px 2px 0 rgba(255,255,255,0.12), inset -2px -2px 0 rgba(0,0,0,0.5);
       }
       #controls kbd {
-        display: inline-block; min-width: 20px; text-align: center;
-        padding: 2px 8px; margin: 0 2px;
-        background: rgba(255,255,255,0.15);
-        border: 1px solid rgba(255,255,255,0.35);
-        border-bottom-width: 3px; border-radius: 6px;
-        font-family: inherit; font-size: 12px;
+        display: inline-block; min-width: 18px; text-align: center;
+        padding: 1px 7px; margin: 0 2px;
+        background: #6f6f6f; color: #fff;
+        border: 2px solid #000;
+        box-shadow: inset 1px 1px 0 #9a9a9a, inset -1px -1px 0 #4a4a4a;
+        font-family: inherit; font-size: 11px;
       }
       #credit {
-        position: fixed; bottom: 10px; right: 12px; z-index: 20;
-        font-size: 11px; opacity: 0.6; pointer-events: none;
-        text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+        position: fixed; bottom: 8px; right: 10px; z-index: 20;
+        font-size: 11px; opacity: 0.7; pointer-events: none;
       }
       #seedinfo {
-        margin-top: 18px; font-size: 13px; opacity: 0.85;
-        background: rgba(0,0,0,0.22); padding: 8px 16px; border-radius: 10px;
+        margin-top: 16px; font-size: 12px; color: #d8d8d8;
+        background: rgba(0,0,0,0.5); padding: 8px 16px;
+        border: 2px solid #000;
+        box-shadow: inset 2px 2px 0 rgba(255,255,255,0.1), inset -2px -2px 0 rgba(0,0,0,0.5);
       }
-      #seedinfo b { color: #ffe08a; }
+      #seedinfo b { color: #ffe051; }
       #nighttint {
         position: fixed; inset: 0; z-index: 5; pointer-events: none;
         background: #0a1030; opacity: 0;
@@ -154,29 +168,30 @@
         position: fixed; top: 50%; left: 50%;
         transform: translate(-50%, calc(-50% - 60px));
         z-index: 40; display: none;
-        font-size: 15px; text-align: center;
-        background: rgba(0,0,0,0.55); padding: 14px 22px; border-radius: 12px;
+        font-size: 14px; text-align: center;
+        background: rgba(0,0,0,0.6); padding: 12px 20px;
+        border: 2px solid #000;
+        box-shadow: inset 2px 2px 0 rgba(255,255,255,0.12), inset -2px -2px 0 rgba(0,0,0,0.5);
       }
       #godpanel {
-        position: fixed; top: 12px; right: 12px; z-index: 20;
+        position: fixed; top: 10px; right: 10px; z-index: 20;
         display: none; pointer-events: none;
-        font-size: 12px; line-height: 1.6;
-        padding: 10px 14px; border-radius: 12px;
-        background: linear-gradient(160deg, rgba(120,40,180,0.42), rgba(40,10,70,0.42));
-        border: 1px solid rgba(210,160,255,0.45);
-        box-shadow: 0 6px 20px rgba(80,0,140,0.35);
-        backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px);
-        text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+        font-size: 12px; line-height: 1.7;
+        padding: 9px 13px;
+        background: rgba(24,8,34,0.72);
+        border: 2px solid #000;
+        box-shadow: inset 2px 2px 0 rgba(200,150,255,0.28), inset -2px -2px 0 rgba(0,0,0,0.55);
       }
       #godpanel .gtitle {
-        font-size: 14px; font-weight: 800; letter-spacing: 1px;
-        color: #f0c8ff; margin-bottom: 4px;
+        font-size: 13px; letter-spacing: 1px;
+        color: #e6b4ff; margin-bottom: 4px;
       }
-      #godpanel b { color: #ffe08a; }
+      #godpanel b { color: #ffe051; }
       #godpanel .k {
-        display: inline-block; min-width: 16px; text-align: center; padding: 1px 6px;
-        margin: 0 1px; border-radius: 5px; font-size: 11px;
-        background: rgba(255,255,255,0.16); border: 1px solid rgba(255,255,255,0.35);
+        display: inline-block; min-width: 14px; text-align: center; padding: 0 5px;
+        margin: 0 1px; font-size: 11px;
+        background: #6f6f6f; border: 2px solid #000;
+        box-shadow: inset 1px 1px 0 #9a9a9a, inset -1px -1px 0 #4a4a4a;
       }
       #godpanel .dim { opacity: 0.8; }
       #godToast {
@@ -222,35 +237,44 @@
         opacity: 0;
       }
 
-      /* ---------- Creative inventory (E) ---------- */
+      /* ---------- Creative inventory (E) — Minecraft GUI panel ---------- */
       #inventory {
         position: fixed; inset: 0; z-index: 45;
         display: none; flex-direction: column;
         align-items: center; justify-content: center;
-        background: rgba(0,0,0,0.55); backdrop-filter: blur(3px);
+        background: rgba(0,0,0,0.6);
       }
       #invpanel {
-        background: rgba(20,22,30,0.92);
-        border: 2px solid rgba(255,255,255,0.25);
-        border-radius: 14px; padding: 18px 20px;
-        box-shadow: 0 16px 50px rgba(0,0,0,0.5);
-        max-width: 560px;
+        background: #c6c6c6;          /* the classic light-grey GUI panel */
+        border: 2px solid #000;
+        box-shadow: inset 3px 3px 0 #ffffff, inset -3px -3px 0 #555555;
+        border-radius: 0; padding: 16px 18px;
+        max-width: 600px; color: #3f3f3f;
       }
-      #invpanel h2 { font-size: 18px; margin-bottom: 4px; }
-      #invpanel .hint { font-size: 12px; opacity: 0.7; margin-bottom: 14px; }
-      #invgrid { display: grid; grid-template-columns: repeat(8, 56px); gap: 8px; }
+      #invpanel h2 { font-size: 16px; margin-bottom: 4px; color: #3f3f3f; text-shadow: 1px 1px 0 rgba(255,255,255,0.4); }
+      #invpanel .hint { font-size: 11px; color: #555; margin-bottom: 12px; text-shadow: none; }
+      #invpanel .hint b { color: #2b2b2b; }
+      #invpanel kbd {
+        display: inline-block; padding: 0 5px; margin: 0 1px;
+        background: #6f6f6f; color: #fff; border: 2px solid #000;
+        box-shadow: inset 1px 1px 0 #9a9a9a, inset -1px -1px 0 #4a4a4a; font-size: 10px;
+      }
+      #invgrid { display: grid; grid-template-columns: repeat(8, 50px); gap: 3px; background: #8b8b8b; padding: 3px; border: 2px solid #373737; box-shadow: inset 2px 2px 0 #555, inset -2px -2px 0 #cfcfcf; }
       .invcell {
-        width: 56px; height: 56px; border-radius: 8px;
-        border: 2px solid rgba(255,255,255,0.2);
+        width: 50px; height: 50px; border-radius: 0;
+        border: 2px solid #373737;
+        box-shadow: inset 1px 1px 0 rgba(0,0,0,0.45), inset -1px -1px 0 rgba(255,255,255,0.25);
+        background-color: #8b8b8b;
         position: relative; cursor: pointer;
-        transition: transform .1s ease, border-color .1s ease;
       }
-      .invcell:hover { transform: translateY(-3px) scale(1.05); border-color: #fff; }
+      .invcell:hover { box-shadow: inset 0 0 0 2px #fff; }
       .invcell .ilabel {
-        position: absolute; bottom: 1px; left: 0; right: 0;
+        position: absolute; bottom: 0; left: 0; right: 0;
         font-size: 8px; text-align: center; color: #fff;
-        text-shadow: 0 1px 2px rgba(0,0,0,0.95);
+        text-shadow: 1px 1px 0 rgba(0,0,0,0.95);
+        opacity: 0; pointer-events: none;
       }
+      .invcell:hover .ilabel { opacity: 1; }
     </style>
   </head>
   <body>
@@ -1895,6 +1919,19 @@
       let selected = 0;
       const hotbarEl = document.getElementById('hotbar');
       const atlasURL = atlasCanvas.toDataURL();       // reuse the same textures as the world
+
+      // Minecraft-style tiled-dirt menu background (darkened), behind the start/pause screen
+      (function () {
+        const S = 48, cv = document.createElement('canvas'); cv.width = cv.height = S;
+        const g = cv.getContext('2d'); g.imageSmoothingEnabled = false;
+        g.drawImage(atlasCanvas, TILE.DIRT * TS, 0, TS, TS, 0, 0, S, S); // one dirt tile at 3× block scale
+        g.fillStyle = 'rgba(0,0,0,0.62)'; g.fillRect(0, 0, S, S);        // darken like MC's options background
+        const url = cv.toDataURL();
+        const ov = document.getElementById('overlay');
+        ov.style.backgroundImage = `url(${url})`;
+        ov.style.backgroundRepeat = 'repeat';
+        ov.style.backgroundSize = `${S}px ${S}px`;
+      })();
       // set an element's background to a block's icon (its top-face tile)
       function paintIcon(el, id) {
         const t = tileFor(id, 2);
