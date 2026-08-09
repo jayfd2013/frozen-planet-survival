@@ -1289,6 +1289,23 @@
               continue;
             }
 
+            // ---- rare structures (checked first; footprint must fit the chunk) ----
+            const r3 = hash2(wx * 53 + 7, wz * 97 + 3);
+            const fit = (w) => lx >= 1 && lz >= 1 && lx + w < CHUNK - 1 && lz + w < CHUNK - 1;
+            let built = true;
+            if (surf === GRASS && (biome === B_PLAINS || biome === B_SAVANNA || biome === B_FOREST || biome === B_BIRCH) && fit(4) && r3 < 0.0009) placeWell(set, lx, sy, lz);
+            else if (surf === GRASS && (biome === B_PLAINS || biome === B_FOREST || biome === B_BIRCH) && fit(3) && r3 < 0.0017) placeWatchtower(set, lx, sy, lz);
+            else if (surf === SNOW && (biome === B_SNOWY || biome === B_TAIGA) && fit(6) && r3 < 0.0016) placeIgloo(set, lx, sy, lz);
+            else if (surf === SNOW && biome === B_SNOWY && r3 >= 0.0016 && r3 < 0.006) placeIceSpike(set, lx, sy, lz, wx, wz);
+            else if (surf === GRASS && biome === B_SWAMP && fit(5) && r3 < 0.003) placeWitchHut(set, lx, sy, lz);
+            else if (surf === GRASS && biome === B_JUNGLE && fit(6) && r3 < 0.0016) placeJungleTemple(set, lx, sy, lz);
+            else if (surf === SAND && biome === B_DESERT && fit(3) && r3 >= 0.0007 && r3 < 0.0022) placeDesertWell(set, lx, sy, lz);
+            else if (surf === GRASS && (biome === B_PLAINS || biome === B_FOREST || biome === B_SWAMP || biome === B_JUNGLE) && fit(4) && r3 >= 0.004 && r3 < 0.0075) placePond(set, lx, sy, lz);
+            else if (surf === GRASS && (biome === B_FOREST || biome === B_TAIGA || biome === B_BIRCH) && fit(4) && r3 >= 0.0075 && r3 < 0.012) placeFallenLog(set, lx, sy, lz, wx, wz);
+            else if ((surf === GRASS || surf === SAND || surf === STONE) && fit(3) && r3 >= 0.012 && r3 < 0.0132) placeRuinedPortal(set, lx, sy, lz);
+            else built = false;
+            if (built) continue;
+
             if (biome === B_DESERT) {
               if (surf === SAND && r < 0.018) { const hgt = 1 + Math.floor(hash2(wx, wz) * 3); for (let i = 1; i <= hgt; i++) set(lx, sy + i, lz, CACTUS); }
               else if (surf === SAND && lx >= 4 && lx < CHUNK - 4 && lz >= 4 && lz < CHUNK - 4 && r2 < 0.0007) placePyramid(set, lx, sy, lz);
@@ -1396,6 +1413,105 @@
             set(lx + ox, sy + layer, lz + oz, SAND);
         }
         set(lx, sy + 4, lz, SAND);   // capstone
+      }
+
+      // ---- extra structures (all corner-anchored at lx,lz, built on surface sy) ----
+      function placeWell(set, lx, sy, lz) {                 // village well
+        const y = sy;
+        for (let x = 0; x < 5; x++) for (let z = 0; z < 5; z++) {
+          const edge = x === 0 || x === 4 || z === 0 || z === 4;
+          if (edge) { set(lx + x, y, lz + z, COBBLE); set(lx + x, y + 1, lz + z, COBBLE); }
+          else set(lx + x, y, lz + z, WATER);
+        }
+        for (const [cx, cz] of [[0,0],[4,0],[0,4],[4,4]]) for (let dy = 2; dy <= 4; dy++) set(lx + cx, y + dy, lz + cz, LOG);
+        for (let x = 0; x < 5; x++) for (let z = 0; z < 5; z++) set(lx + x, y + 5, lz + z, PLANKS);
+      }
+      function placeWatchtower(set, lx, sy, lz) {
+        const y = sy, H = 8;
+        for (const [cx, cz] of [[0,0],[3,0],[0,3],[3,3]]) for (let dy = 1; dy <= H; dy++) set(lx + cx, y + dy, lz + cz, LOG);
+        for (let dy = 1; dy <= H - 1; dy++) for (let x = 0; x < 4; x++) for (let z = 0; z < 4; z++) {
+          const edge = x === 0 || x === 3 || z === 0 || z === 3;
+          const corner = (x === 0 || x === 3) && (z === 0 || z === 3);
+          if (edge && !corner && dy % 3 !== 0) set(lx + x, y + dy, lz + z, PLANKS);
+        }
+        for (let x = 0; x < 4; x++) for (let z = 0; z < 4; z++) { set(lx + x, y + 1, lz + z, PLANKS); set(lx + x, y + H, lz + z, PLANKS); }
+        for (let x = 0; x < 4; x++) for (let z = 0; z < 4; z++) { const edge = x === 0 || x === 3 || z === 0 || z === 3; if (edge && (x + z) % 2 === 0) set(lx + x, y + H + 1, lz + z, COBBLE); }
+        set(lx + 1, y + H + 1, lz + 1, GLOWSTONE);
+      }
+      function placeIgloo(set, lx, sy, lz) {                // snow dome
+        const cx = lx + 3, cz = lz + 3, y = sy, R = 3;
+        for (let dy = 0; dy <= R; dy++) for (let ox = -R; ox <= R; ox++) for (let oz = -R; oz <= R; oz++) {
+          const d = Math.sqrt(ox * ox + dy * dy * 1.15 + oz * oz);
+          if (d <= R + 0.3 && d >= R - 0.75) set(cx + ox, y + dy, cz + oz, SNOW);
+        }
+        for (let ox = -R + 1; ox <= R - 1; ox++) for (let oz = -R + 1; oz <= R - 1; oz++) set(cx + ox, y, cz + oz, SNOW);
+        for (let dy = 1; dy < R; dy++) for (let ox = -R + 1; ox <= R - 1; ox++) for (let oz = -R + 1; oz <= R - 1; oz++) {
+          if (Math.sqrt(ox * ox + dy * dy * 1.15 + oz * oz) < R - 0.75) set(cx + ox, y + dy, cz + oz, AIR);
+        }
+        set(cx, y + 1, cz - R, AIR); set(cx, y + 2, cz - R, AIR);
+        set(cx, y + R, cz, GLASS);
+      }
+      function placeIceSpike(set, lx, sy, lz, wx, wz) {
+        const y = sy, H = 5 + Math.floor(hash2(wx, wz) * 6);
+        for (let dy = 1; dy <= H; dy++) {
+          const r = dy < H * 0.5 ? 1 : 0;
+          for (let ox = 0; ox <= r; ox++) for (let oz = 0; oz <= r; oz++) set(lx + ox, y + dy, lz + oz, SNOW);
+        }
+      }
+      function placeWitchHut(set, lx, sy, lz) {             // swamp hut on stilts
+        const y = sy, fy = y + 3;
+        for (const [cx, cz] of [[0,0],[5,0],[0,5],[5,5]]) for (let dy = 1; dy <= 3; dy++) set(lx + cx, y + dy, lz + cz, LOG);
+        for (let x = 0; x < 6; x++) for (let z = 0; z < 6; z++) set(lx + x, fy, lz + z, SPRUCE_LOG);
+        for (let dy = 1; dy <= 3; dy++) for (let x = 0; x < 6; x++) for (let z = 0; z < 6; z++) {
+          const edge = x === 0 || x === 5 || z === 0 || z === 5; if (edge) set(lx + x, fy + dy, lz + z, PLANKS);
+        }
+        for (let x = 0; x < 6; x++) for (let z = 0; z < 6; z++) set(lx + x, fy + 4, lz + z, SPRUCE_LOG);
+        set(lx + 2, fy + 1, lz, AIR); set(lx + 2, fy + 2, lz, AIR);
+        set(lx + 5, fy + 2, lz + 2, GLASS);
+      }
+      function placeJungleTemple(set, lx, sy, lz) {         // mossy stepped ruin
+        const y = sy;
+        for (let layer = 0; layer < 3; layer++) {
+          const a = layer, w = 6 - layer * 2;
+          for (let x = a; x <= a + w; x++) for (let z = a; z <= a + w; z++) {
+            const edge = x === a || x === a + w || z === a || z === a + w;
+            if (edge || layer === 0) set(lx + x, y + layer, lz + z, hash2(lx + x, lz + z) < 0.4 ? MOSSY : COBBLE);
+          }
+        }
+        for (let x = 2; x <= 4; x++) for (let z = 2; z <= 4; z++) set(lx + x, y + 1, lz + z, AIR);
+        set(lx + 3, y + 1, lz + 3, GLOWSTONE);
+        set(lx + 3, y + 1, lz, AIR); set(lx + 3, y + 2, lz, AIR);
+      }
+      function placeDesertWell(set, lx, sy, lz) {
+        const y = sy;
+        for (let x = 0; x < 4; x++) for (let z = 0; z < 4; z++) {
+          const edge = x === 0 || x === 3 || z === 0 || z === 3;
+          if (edge) { set(lx + x, y, lz + z, SAND); set(lx + x, y + 1, lz + z, SAND); }
+          else set(lx + x, y, lz + z, WATER);
+        }
+        for (const [cx, cz] of [[0,0],[3,0],[0,3],[3,3]]) { set(lx + cx, y + 2, lz + cz, SAND); set(lx + cx, y + 3, lz + cz, SAND); }
+        for (let x = 0; x < 4; x++) for (let z = 0; z < 4; z++) set(lx + x, y + 4, lz + z, SAND);
+      }
+      function placePond(set, lx, sy, lz) {
+        const y = sy;
+        for (let x = 0; x < 5; x++) for (let z = 0; z < 5; z++) {
+          const d = Math.hypot(x - 2, z - 2);
+          if (d < 2.3) { set(lx + x, y, lz + z, WATER); set(lx + x, y - 1, lz + z, WATER); set(lx + x, y + 1, lz + z, AIR); }
+          else if (d < 3) set(lx + x, y, lz + z, SAND);
+        }
+      }
+      function placeFallenLog(set, lx, sy, lz, wx, wz) {
+        const len = 3 + Math.floor(hash2(wx, wz) * 3), horiz = hash2(wz, wx) < 0.5;
+        for (let i = 0; i < len; i++) { const x = horiz ? lx + i : lx, z = horiz ? lz : lz + i; set(x, sy + 1, z, i === len - 1 ? MOSSY : LOG); }
+      }
+      function placeRuinedPortal(set, lx, sy, lz) {
+        const y = sy;
+        const frame = [];
+        for (let x = 0; x < 4; x++) { frame.push([x, 0]); frame.push([x, 4]); }
+        for (let dy = 0; dy < 5; dy++) { frame.push([0, dy]); frame.push([3, dy]); }
+        for (const [x, dy] of frame) if (hash2(lx + x * 3, lz + dy * 7) < 0.78) set(lx + x, y + 1 + dy, lz, OBSIDIAN);
+        for (let x = -1; x < 5; x++) for (let z = -1; z <= 1; z++) if (hash2(lx + x * 3, lz + z * 5) < 0.5) set(lx + x, y, lz + z, hash2(lx + x, lz + z) < 0.5 ? COBBLE : MOSSY);
+        if (hash2(lx, lz) < 0.5) set(lx + 1, y + 2, lz, GLOWSTONE);
       }
 
       function placeBoulder(set, lx, sy, lz, wx, wz) {
