@@ -324,7 +324,7 @@
         <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move &nbsp;·&nbsp; <kbd>Space</kbd> Jump &nbsp;·&nbsp; <kbd>Ctrl</kbd> Sprint &nbsp;·&nbsp; <kbd>Shift</kbd> Sneak</div>
         <div><kbd>Mouse</kbd> Look &nbsp;·&nbsp; <kbd>L-Click</kbd> Mine &nbsp;·&nbsp; <kbd>R-Click</kbd> Place</div>
         <div><kbd>1</kbd>–<kbd>9</kbd> / <kbd>Scroll</kbd> Hotbar &nbsp;·&nbsp; <kbd>E</kbd> Inventory &nbsp;·&nbsp; <kbd>Q</kbd> 3rd-person View</div>
-        <div><kbd>F</kbd> Fly &nbsp;·&nbsp; <kbd>M</kbd> Mute &nbsp;·&nbsp; <b>L-Click TNT to ignite</b> &nbsp;·&nbsp; dig ore, weather</div>
+        <div><kbd>F</kbd> Fly &nbsp;·&nbsp; <kbd>M</kbd> Mute &nbsp;·&nbsp; <kbd>P</kbd> <b>Nether portal</b> &nbsp;·&nbsp; <b>L-Click TNT to ignite</b></div>
         <div><kbd>G</kbd> <b>God Mode</b> — giant brush, nuke chunks, noclip &amp; more</div>
         <div><kbd>Esc</kbd> Release mouse</div>
       </div>
@@ -363,9 +363,12 @@
             OBSIDIAN = 30, MOSSY = 31, BEDROCK = 32,
             // new wood types + cross-sprite plants
             BIRCH_LOG = 33, SPRUCE_LOG = 34, ACACIA_LOG = 35,
-            POPPY = 36, DANDELION = 37, TALLGRASS = 38, SUGARCANE = 39;
+            POPPY = 36, DANDELION = 37, TALLGRASS = 38, SUGARCANE = 39,
+            // Nether
+            NETHERRACK = 40, LAVA = 41, SOUL_SAND = 42, QUARTZ_ORE = 43, NETHER_BRICK = 44, PORTAL = 45;
       // cross-sprite plants (rendered as an X, walked through, don't occlude)
       function isPlant(id){ return id === POPPY || id === DANDELION || id === TALLGRASS || id === SUGARCANE; }
+      function isLiquid(id){ return id === WATER || id === LAVA; }
 
       // Base colors (0..1 rgb) — used for break particles
       const COLORS = {
@@ -408,6 +411,12 @@
         [DANDELION]:[0.95, 0.86, 0.24],
         [TALLGRASS]:[0.36, 0.62, 0.28],
         [SUGARCANE]:[0.56, 0.78, 0.44],
+        [NETHERRACK]:[0.45, 0.16, 0.16],
+        [LAVA]:   [0.95, 0.45, 0.12],
+        [SOUL_SAND]:[0.36, 0.28, 0.22],
+        [QUARTZ_ORE]:[0.60, 0.40, 0.38],
+        [NETHER_BRICK]:[0.24, 0.12, 0.14],
+        [PORTAL]: [0.62, 0.28, 0.86],
       };
       // seconds to break each block by hand (Minecraft-style mining time)
       const HARDNESS = {
@@ -418,6 +427,7 @@
         [WOOL_W]:0.5,[WOOL_R]:0.5,[WOOL_B]:0.5,[WOOL_Y]:0.5,[OBSIDIAN]:9.0,[BEDROCK]:999,
         [BIRCH_LOG]:1.3,[SPRUCE_LOG]:1.3,[ACACIA_LOG]:1.3,
         [POPPY]:0.1,[DANDELION]:0.1,[TALLGRASS]:0.1,[SUGARCANE]:0.1,
+        [NETHERRACK]:0.6,[SOUL_SAND]:0.7,[QUARTZ_ORE]:1.2,[NETHER_BRICK]:2.2,
       };
       const GRASS_TOP = [0.40, 0.66, 0.30];
       const LOG_TOP   = [0.55, 0.42, 0.25];
@@ -435,6 +445,7 @@
         [OBSIDIAN]:'Obsidian',[MOSSY]:'Mossy',[BEDROCK]:'Bedrock',
         [BIRCH_LOG]:'Birch Log',[SPRUCE_LOG]:'Spruce Log',[ACACIA_LOG]:'Acacia Log',
         [POPPY]:'Poppy',[DANDELION]:'Dandelion',[TALLGRASS]:'Tall Grass',[SUGARCANE]:'Sugar Cane',
+        [NETHERRACK]:'Netherrack',[LAVA]:'Lava',[SOUL_SAND]:'Soul Sand',[QUARTZ_ORE]:'Quartz Ore',[NETHER_BRICK]:'Nether Brick',[PORTAL]:'Portal',
       };
 
       // Hotbar = 9 assignable quick-slots (reassign from the E inventory)
@@ -446,12 +457,14 @@
         CACTUS, SNOW, POPPY, DANDELION, TALLGRASS, SUGARCANE,
         WOOL_W, WOOL_R, WOOL_B, WOOL_Y,
         COAL, IRON, GOLD, DIAMOND, REDSTONE, OBSIDIAN, BEDROCK, WATER,
+        NETHERRACK, SOUL_SAND, QUARTZ_ORE, NETHER_BRICK, GLOWSTONE, LAVA,
       ];
 
-      // A block is "solid" for physics if it's not air, water, or a walk-through plant.
-      function isSolid(id){ return id !== AIR && id !== WATER && !isPlant(id); }
-      // Transparent for face culling (a solid block still draws a face against these)
-      function isSeeThrough(id){ return id === AIR || id === WATER || id === GLASS || isPlant(id); }
+      // A block is "solid" for physics if it's not air, a liquid, portal, or a walk-through plant.
+      function isSolid(id){ return id !== AIR && id !== WATER && id !== LAVA && id !== PORTAL && !isPlant(id); }
+      // Transparent for face culling (a solid block still draws a face against these).
+      // Lava is opaque here so buried faces cull; it's only non-solid for physics.
+      function isSeeThrough(id){ return id === AIR || id === WATER || id === GLASS || id === PORTAL || isPlant(id); }
 
       // ===================================================================
       //  Procedural texture atlas (drawn once to a canvas, no external files)
@@ -467,8 +480,9 @@
         WOOL_W:32, WOOL_R:33, WOOL_B:34, WOOL_Y:35, OBSIDIAN:36, MOSSY:37, BEDROCK:38,
         BIRCH_SIDE:39, BIRCH_TOP:40, SPRUCE_SIDE:41, SPRUCE_TOP:42, ACACIA_SIDE:43, ACACIA_TOP:44,
         POPPY:45, DANDELION:46, TALLGRASS:47, SUGARCANE:48,
+        NETHERRACK:49, LAVA:50, SOUL_SAND:51, QUARTZ_ORE:52, NETHER_BRICK:53, PORTAL:54,
       };
-      const TILE_COUNT = 49;
+      const TILE_COUNT = 55;
       const TS = 16; // texels per tile
 
       // pick the atlas tile for a block id + face (2=+Y top, 3=-Y bottom, else side)
@@ -510,6 +524,12 @@
           case WOOL_R:   return TILE.WOOL_R;
           case WOOL_B:   return TILE.WOOL_B;
           case WOOL_Y:   return TILE.WOOL_Y;
+          case NETHERRACK: return TILE.NETHERRACK;
+          case LAVA:       return TILE.LAVA;
+          case SOUL_SAND:  return TILE.SOUL_SAND;
+          case QUARTZ_ORE: return TILE.QUARTZ_ORE;
+          case NETHER_BRICK: return TILE.NETHER_BRICK;
+          case PORTAL:     return TILE.PORTAL;
           default:     return TILE.STONE;
         }
       }
@@ -932,6 +952,32 @@
           for (const y of [3, 9, 14]) for (const x of [6,7,8,9]) put(ox, x, y, 96, 142, 74); // node bands
           for (let y = 0; y < TS; y++) { put(ox, 6, y, 150, 200, 120); put(ox, 9, y, 96, 148, 78); } }
 
+        // ---- Netherrack: dark red rock with veins ----
+        fill(TILE.NETHERRACK, 106, 40, 40, 9);
+        tones(TILE.NETHERRACK, 44, [[128,48,46],[80,28,30],[142,58,52],[66,22,24],[112,44,40]]);
+        // ---- Lava: bright orange with hot yellow blotches + dark crust ----
+        fill(TILE.LAVA, 214, 92, 22, 10);
+        tones(TILE.LAVA, 40, [[252,196,60],[236,132,30],[180,54,16],[248,168,44],[150,40,14]]);
+        // ---- Soul sand: brown with sunken dark hollows ----
+        fill(TILE.SOUL_SAND, 90, 70, 56, 8);
+        tones(TILE.SOUL_SAND, 30, [[70,54,42],[104,82,64],[54,40,32]]);
+        { const ox = TILE.SOUL_SAND * TS; for (const [x,y] of [[4,5],[10,7],[6,11]]) for (let dy=0;dy<2;dy++) for (let dx=0;dx<2;dx++) put(ox, x+dx, y+dy, 40, 30, 24); }
+        // ---- Quartz ore: netherrack with white quartz specks ----
+        fill(TILE.QUARTZ_ORE, 106, 40, 40, 8);
+        tones(TILE.QUARTZ_ORE, 22, [[128,48,46],[80,28,30]]);
+        pebbles(TILE.QUARTZ_ORE, 18, 226, 220, 214, 8, true);
+        // ---- Nether brick: dark maroon bricks with black mortar ----
+        { const ox = TILE.NETHER_BRICK * TS;
+          for (let y = 0; y < TS; y++) for (let x = 0; x < TS; x++) {
+            const row = (y / 4) | 0, offset = row % 2 ? 4 : 0;
+            const mortar = (y % 4 === 0) || ((x + offset) % 8 === 0);
+            if (mortar) put(ox, x, y, 26, 14, 16);
+            else { const n = (R() * 2 - 1) * 8; put(ox, x, y, 58 + n, 28 + n * 0.6, 32 + n * 0.6); }
+          } }
+        // ---- Portal: swirling purple (rendered translucent) ----
+        fill(TILE.PORTAL, 120, 48, 168, 14);
+        tones(TILE.PORTAL, 60, [[168,86,220],[92,34,140],[196,120,238],[70,24,120],[146,64,196]]);
+
         return cvs;
       }
 
@@ -1044,7 +1090,13 @@
       // ===================================================================
       //  World / chunk storage
       // ===================================================================
-      const chunks = new Map();                 // "cx,cz" -> chunk
+      // Two dimensions: 0 = Overworld, 1 = Nether. Each keeps its own chunk map so
+      // builds survive travelling between them. `chunks` points at the active one.
+      const DIM_OVERWORLD = 0, DIM_NETHER = 1;
+      const NETHER_CEIL = 100, NETHER_LAVA = 32;
+      let dim = DIM_OVERWORLD;
+      const worldChunks = [new Map(), new Map()];
+      let chunks = worldChunks[dim];            // "cx,cz" -> chunk (active dimension)
       const keyOf = (cx, cz) => cx + ',' + cz;
       const idx = (x, y, z) => x + z * CHUNK + y * CHUNK * CHUNK;
 
@@ -1198,9 +1250,59 @@
           minH: 0,                 // lowest terrain surface in this chunk (mesh floor)
           digFloor: WORLD_HEIGHT,  // lowest edited y — meshing never skips below this
         };
+        c.dim = dim;
         chunks.set(keyOf(cx, cz), c);
-        genChunkData(c);
+        if (dim === DIM_NETHER) genNetherData(c); else genChunkData(c);
         return c;
+      }
+
+      // ---- Nether generation: netherrack landscape, lava seas, glowstone, soul sand ----
+      function netherTerrain(wx, wz) {
+        let amp = 1, freq = 1 / 48, sum = 0, h = 0;
+        for (let o = 0; o < 3; o++) { h += perlin2((wx + 700) * freq, (wz - 700) * freq) * amp; sum += amp; amp *= 0.5; freq *= 2; }
+        h /= sum; // -1..1
+        return Math.floor(34 + h * 18); // ~16..52 (valleys below the lava sea flood)
+      }
+      function genNetherData(c) {
+        const b = c.blocks;
+        let minH = WORLD_HEIGHT, maxTop = NETHER_CEIL;
+        for (let lx = 0; lx < CHUNK; lx++) {
+          for (let lz = 0; lz < CHUNK; lz++) {
+            const wx = c.cx * CHUNK + lx, wz = c.cz * CHUNK + lz;
+            const h = netherTerrain(wx, wz);
+            if (h < minH) minH = h;
+            for (let y = 0; y <= NETHER_CEIL; y++) {
+              let id = AIR;
+              if (y === 0 || y >= NETHER_CEIL) id = BEDROCK;                           // floor + ceiling
+              else if (y >= NETHER_CEIL - 4 && hash3(wx, y * 7, wz) < 0.6) id = NETHERRACK; // hanging roof
+              else if (y <= h) {
+                if (y === h && hash3(wx + 11, y, wz - 11) < 0.10) id = SOUL_SAND;
+                else if (hash3(wx, y, wz + 5) < 0.015) id = QUARTZ_ORE;
+                else if (y < h - 2 && hash3(wx - 7, y, wz) < 0.006) id = GLOWSTONE;
+                else id = NETHERRACK;
+              } else if (y <= NETHER_LAVA) id = LAVA;                                   // lava sea in valleys
+              if (id !== AIR) b[idx(lx, y, lz)] = id;
+            }
+          }
+        }
+        c.generated = true; c.minH = Math.max(1, minH);
+        genNetherFeatures(c);
+        let my = 0;
+        for (let i = (NETHER_CEIL + 1) * CHUNK * CHUNK - 1; i >= 0; i--) { if (b[i] !== AIR) { my = (i / (CHUNK * CHUNK)) | 0; break; } }
+        c.maxY = my;
+      }
+      // glowstone clusters hanging under the ceiling + a few netherrack pillars
+      function genNetherFeatures(c) {
+        const b = c.blocks;
+        const set = (lx, y, lz, id) => { if (y >= 0 && y < WORLD_HEIGHT && lx >= 0 && lx < CHUNK && lz >= 0 && lz < CHUNK) b[idx(lx, y, lz)] = id; };
+        for (let lx = 2; lx < CHUNK - 2; lx++) for (let lz = 2; lz < CHUNK - 2; lz++) {
+          const wx = c.cx * CHUNK + lx, wz = c.cz * CHUNK + lz;
+          if (hash2(wx * 17, wz * 9) < 0.010) {   // glowstone cluster under the roof
+            const cy = NETHER_CEIL - 5 - Math.floor(hash2(wx, wz) * 6);
+            for (const [ox, oy, oz] of [[0,0,0],[1,0,0],[0,0,1],[-1,0,0],[0,0,-1],[0,-1,0],[1,-1,0],[0,-1,1]])
+              if (hash2(wx + ox * 13, wz + oz * 7) < 0.7) set(lx + ox, cy + oy, lz + oz, GLOWSTONE);
+          }
+        }
       }
 
       function genChunkData(c) {
@@ -1635,7 +1737,7 @@
                 continue;
               }
               const water = id === WATER;
-              const glass = id === GLASS;
+              const glass = id === GLASS || id === PORTAL;   // portal rendered like translucent glass
               // surface water sits a bit below a full block (nicer waterline); submerged water is full
               const waterTop = water ? (nbAt(x, y + 1, z, wx, wz) === AIR ? 0.88 : 1) : 1;
               // biome tint for grass/leaves (Minecraft foliage colouring)
@@ -2124,6 +2226,7 @@
         if (e.code === 'Escape' && invOpen) { toggleInventory(false); return; }
         if (invOpen) return;                     // swallow game keys while browsing inventory
         if (e.code === 'KeyQ') { viewMode = (viewMode + 1) % 2; updateHud(); }
+        if (e.code === 'KeyP' && running) lightPortal();   // build a nether portal in front of you
         if (e.code === 'KeyF') { player.fly = !player.fly; player.vel.y = 0; updateHud(); }
         if (e.code.startsWith('Digit')) {
           const n = parseInt(e.code.slice(5), 10);
@@ -2864,9 +2967,63 @@
       }
 
       // ===================================================================
+      //  Nether portals + dimension travel
+      // ===================================================================
+      let portalTimer = 0, portalCooldown = 0;
+      // build an obsidian frame (fixed-z plane) with a 2x3 portal interior at (bx,by,bz)
+      function erectPortal(bx, by, bz) {
+        for (let x = bx - 1; x <= bx + 2; x++) { setBlock(x, by - 1, bz, OBSIDIAN); setBlock(x, by + 3, bz, OBSIDIAN); }
+        for (let y = by; y <= by + 2; y++) { setBlock(bx - 1, y, bz, OBSIDIAN); setBlock(bx + 2, y, bz, OBSIDIAN); }
+        for (let x = bx; x <= bx + 1; x++) for (let y = by; y <= by + 2; y++) setBlock(x, y, bz, PORTAL);
+      }
+      // find a safe floor at (px,pz), lay an obsidian platform + portal, return stand-y
+      function buildLandingPortal(px, pz) {
+        const topLimit = dim === DIM_NETHER ? NETHER_CEIL - 5 : WORLD_HEIGHT - 4;
+        let gy = null;
+        for (let y = topLimit; y > 2; y--) { const bl = getBlock(px, y, pz); if (isSolid(bl)) { gy = y; break; } }
+        if (gy === null) gy = dim === DIM_NETHER ? 44 : 64;
+        if (dim === DIM_NETHER) gy = Math.max(gy, NETHER_LAVA + 2);   // keep the platform above the lava sea
+        for (let dx = -1; dx <= 3; dx++) for (let dz = -1; dz <= 2; dz++) {
+          setBlock(px + dx, gy, pz + dz, OBSIDIAN);
+          for (let dy = 1; dy <= 5; dy++) setBlock(px + dx, gy + dy, pz + dz, AIR);
+        }
+        erectPortal(px, gy + 1, pz);
+        return gy + 1;
+      }
+      // travel between Overworld and Nether (swaps the active chunk map)
+      function travel() {
+        for (const c of chunks.values()) disposeChunkMeshes(c);
+        buildQueue.clear(); waterActive.clear();
+        dim = 1 - dim;
+        chunks = worldChunks[dim];
+        const px = Math.round(player.pos.x), pz = Math.round(player.pos.z);
+        const cx = Math.floor(px / CHUNK), cz = Math.floor(pz / CHUNK);
+        for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) if (!getChunk(cx + dx, cz + dz)) createChunk(cx + dx, cz + dz);
+        const ly = buildLandingPortal(px, pz);
+        player.pos.set(px + 0.5, ly, pz + 1.5); player.vel.set(0, 0, 0); player.airY = ly;  // stand beside the portal, not in it
+        for (const k of chunks.keys()) buildQueue.add(k);
+        // mesh the immediate landing area right away so the new world appears without a blank frame
+        for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) { const lc = getChunk(cx + dx, cz + dz); if (lc && lc.generated) { buildChunkMesh(lc); buildQueue.delete(keyOf(cx + dx, cz + dz)); } }
+        portalCooldown = 3; portalTimer = 0;
+        camera.position.set(player.pos.x, player.pos.y + player.eye, player.pos.z);
+        updateHud();
+        toast(dim === DIM_NETHER ? 'Entering the Nether' : 'Back to the Overworld');
+      }
+      // "flint & steel": build a lit nether portal a few blocks in front of the player
+      function lightPortal() {
+        const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw);
+        const bx = Math.round(player.pos.x + fx * 3), bz = Math.round(player.pos.z + fz * 3);
+        let gy = Math.floor(player.pos.y);
+        for (let y = Math.floor(player.pos.y) + 3; y > 2; y--) { if (isSolid(getBlock(bx, y, bz))) { gy = y; break; } }
+        for (let dx = -1; dx <= 2; dx++) setBlock(bx + dx, gy, bz, OBSIDIAN);
+        erectPortal(bx, gy + 1, bz);
+        sfx.place(); toast('portal lit — step in');
+      }
+
+      // ===================================================================
       //  Health / hunger (peaceful survival)
       // ===================================================================
-      const stat = { hp: 20, food: 20, air: 10, dmgFlash: 0, hurtCd: 0, regenT: 0, drownT: 0 };
+      const stat = { hp: 20, food: 20, air: 10, dmgFlash: 0, hurtCd: 0, regenT: 0, drownT: 0, lavaT: 0 };
       const healthRow = document.getElementById('health');
       const hungerRow = document.getElementById('hunger');
       const bubblesEl = document.getElementById('bubbles');
@@ -3001,9 +3158,16 @@
         if (running) {
           // water state: body in water => swimming; head in water => underwater view
           const fx0 = Math.floor(player.pos.x), fz0 = Math.floor(player.pos.z);
-          player.inWater = getBlock(fx0, Math.floor(player.pos.y + 0.9), fz0) === WATER
-                        || getBlock(fx0, Math.floor(player.pos.y + 0.2), fz0) === WATER;
+          const bMid = getBlock(fx0, Math.floor(player.pos.y + 0.9), fz0), bLow = getBlock(fx0, Math.floor(player.pos.y + 0.2), fz0);
+          player.inLava = bMid === LAVA || bLow === LAVA;
+          player.inWater = bMid === WATER || bLow === WATER || player.inLava; // lava is buoyant like water
           player.headUnderwater = getBlock(fx0, Math.floor(player.pos.y + player.eye), fz0) === WATER;
+          player.headInLava = getBlock(fx0, Math.floor(player.pos.y + player.eye), fz0) === LAVA;
+          // standing in a portal → travel to the other dimension after a short delay
+          const inPortal = bMid === PORTAL || bLow === PORTAL;
+          if (portalCooldown > 0) portalCooldown -= dt;
+          if (inPortal && portalCooldown <= 0) { portalTimer += dt; if (portalTimer > 1.1) { travel(); portalTimer = 0; } }
+          else if (!inPortal) portalTimer = Math.max(0, portalTimer - dt * 2);
 
           // desired horizontal movement from yaw
           const fwd = (keys['KeyW'] ? 1 : 0) - (keys['KeyS'] ? 1 : 0);
@@ -3048,6 +3212,7 @@
 
           // survival: drowning + slow regen (peaceful — no starving)
           if (!god.on && !player.fly) {
+            if (player.inLava) { stat.lavaT = (stat.lavaT || 0) - dt; if (stat.lavaT <= 0) { stat.lavaT = 0.5; damagePlayer(3); } } // lava burns
             if (player.headUnderwater) {
               stat.air -= dt;
               if (stat.air <= 0) { stat.drownT -= dt; if (stat.drownT <= 0) { stat.drownT = 1; damagePlayer(1); } }
@@ -3096,9 +3261,7 @@
           }
         }
 
-        updateDayNight(dt);
         updateParticles(dt);
-        updateWeather(dt);
         updatePrimed(dt);
 
         // red damage vignette fades out after a hit
@@ -3106,24 +3269,30 @@
         // explosion flash fades out
         if (boomFlash > 0) { boomFlash -= dt * 2.2; boomFlashEl.style.opacity = Math.max(0, boomFlash).toFixed(2); }
 
-        // clouds drift and follow the player; stars fade in at night
-        clouds.position.x = player.pos.x; clouds.position.z = player.pos.z;
-        cloudTex.offset.x = (cloudTex.offset.x + dt * 0.004) % 1;
-        stars.position.copy(camera.position);
-        starMat.opacity = Math.max(0, Math.min(0.9, (0.5 - skyLight) * 2.2));
-        stars.visible = starMat.opacity > 0.02;
-
-        // gentle sea swell: bob all water surfaces together (seam-free)
-        waveT += dt;
-        const waveY = Math.sin(waveT * 1.1) * 0.03;
-        for (const c of chunks.values()) if (c.waterMesh) c.waterMesh.position.y = waveY;
-
-        // underwater view: blue tint + murky fog when the head is submerged
-        underwaterEl.style.opacity = player.headUnderwater ? '1' : '0';
-        if (player.headUnderwater) {
-          scene.fog.color.setHex(0x14508c); scene.fog.near = 0.1; scene.fog.far = 22;
+        if (dim === DIM_OVERWORLD) {
+          updateDayNight(dt);
+          updateWeather(dt);
+          // clouds drift and follow the player; stars fade in at night
+          clouds.visible = true; clouds.position.x = player.pos.x; clouds.position.z = player.pos.z;
+          cloudTex.offset.x = (cloudTex.offset.x + dt * 0.004) % 1;
+          stars.position.copy(camera.position);
+          starMat.opacity = Math.max(0, Math.min(0.9, (0.5 - skyLight) * 2.2));
+          stars.visible = starMat.opacity > 0.02;
+          // gentle sea swell: bob all water surfaces together (seam-free)
+          waveT += dt;
+          const waveY = Math.sin(waveT * 1.1) * 0.03;
+          for (const c of chunks.values()) if (c.waterMesh) c.waterMesh.position.y = waveY;
+          // underwater view: blue tint + murky fog when the head is submerged
+          underwaterEl.style.opacity = player.headUnderwater ? '1' : '0';
+          if (player.headUnderwater) { scene.fog.color.setHex(0x14508c); scene.fog.near = 0.1; scene.fog.far = 22; }
+          else { scene.fog.near = FOG_NEAR; scene.fog.far = FOG_FAR; }
         } else {
-          scene.fog.near = FOG_NEAR; scene.fog.far = FOG_FAR;
+          // Nether: gloomy red haze, no sky/clouds/stars/weather
+          scene.background.setHex(0x2a0a0a);
+          clouds.visible = false; stars.visible = false;
+          underwaterEl.style.opacity = '0';
+          if (player.headInLava) { scene.fog.color.setHex(0xd83a10); scene.fog.near = 0.1; scene.fog.far = 3; }
+          else { scene.fog.color.setHex(0x531a12); scene.fog.near = 6; scene.fog.far = (RENDER_DIST + 1) * CHUNK; }
         }
 
         // tick water flow a few times a second (independent of framerate)
@@ -3166,7 +3335,7 @@
           }
           fpsEl.textContent = Math.round(fps);
           posEl.textContent = `${player.pos.x.toFixed(0)} ${player.pos.y.toFixed(0)} ${player.pos.z.toFixed(0)}`;
-          biomeEl.textContent = BIOME_NAMES[biomeAt(Math.floor(player.pos.x), Math.floor(player.pos.z))];
+          biomeEl.textContent = dim === DIM_NETHER ? 'The Nether' : BIOME_NAMES[biomeAt(Math.floor(player.pos.x), Math.floor(player.pos.z))];
           chunksEl.textContent = chunks.size;
           fpsTimer = 0; fpsFrames = 0;
         }
