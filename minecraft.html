@@ -2533,8 +2533,17 @@
         { name:'Cat', body:[0.34,0.34,0.70], head:0.36, color:0xf6f6f3, headColor:0xf6f6f3, legColor:0xf1f1ee, legLen:0.30, legW:0.11, hw:0.28, speed:1.7 },
         // biped: head sits on top, walks upright. Deliberately goofy-looking.
         { name:'Villager', body:[0.50,0.70,0.34], head:0.50, color:0x7a5c3e, headColor:0xc39a6b, legColor:0x45403a, legLen:0.42, legW:0.16, hw:0.32, speed:1.05, legCount:2, biped:true },
+        // rabbit is biome-agnostic like the farm animals; the rest are biome-specific
+        { name:'Rabbit',  body:[0.28,0.28,0.44], head:0.28, color:0xcaa472, headColor:0xcaa472, legColor:0xb89060, legLen:0.20, legW:0.10, hw:0.24, speed:2.4 },
+        { name:'Horse',   body:[0.60,0.72,1.15], head:0.46, color:0x5a3a22, headColor:0x5a3a22, legColor:0x3a2616, legLen:0.72, legW:0.16, hw:0.50, speed:2.4, biomes:[0,5] },
+        { name:'Wolf',    body:[0.42,0.44,0.78], head:0.40, color:0x8a8a8a, headColor:0x8a8a8a, legColor:0x7a7a7a, legLen:0.42, legW:0.13, hw:0.34, speed:2.2, biomes:[1,6] },
+        { name:'Fox',     body:[0.36,0.36,0.72], head:0.36, color:0xd6733a, headColor:0xd6733a, legColor:0x2a1a12, legLen:0.34, legW:0.11, hw:0.30, speed:2.5, biomes:[6,3] },
+        { name:'Goat',    body:[0.48,0.56,0.90], head:0.42, color:0xe6ddc8, headColor:0xd8cdb4, legColor:0x6a5c48, legLen:0.50, legW:0.15, hw:0.40, speed:1.8, biomes:[4] },
+        { name:'Panda',   body:[0.72,0.68,1.00], head:0.56, color:0xededed, headColor:0xededed, legColor:0x1a1a1a, legLen:0.40, legW:0.22, hw:0.50, speed:1.2, biomes:[8] },
+        // Nether: the lava-loving strider (2 tall legs, glowing eyes)
+        { name:'Strider', body:[0.58,0.60,0.66], head:0.34, color:0x9a4a5e, headColor:0x6a2a3e, legColor:0x8a3a52, legLen:0.60, legW:0.18, hw:0.40, speed:1.1, legCount:2, nether:true },
       ];
-      const MAX_MOBS = 8;
+      const MAX_MOBS = 10;
       const mobs = [];
       let mobSpawnTimer = 0;
       const mobMat = new THREE.MeshBasicMaterial({ vertexColors: true }); // one material for all mobs
@@ -2627,6 +2636,59 @@
             [bw+0.03,0.22,bL+0.03, 0, bodyY-0.03, 0, 0x5a7d4a],        // green sash
           ];
         }
+        if (def.name === 'Rabbit') return [
+          [0.05,0.16,0.05, 0.05, headY+hs*0.6, headZ-0.02, def.color], // tall ears
+          [0.05,0.16,0.05, -0.05, headY+hs*0.6, headZ-0.02, def.color],
+          [0.05,0.04,0.03, 0, headY-0.05, front, 0xffb6c1],            // pink nose
+          [0.10,0.10,0.10, 0, bodyY+bh*0.1, -bL/2-0.02, 0xffffff],     // fluffy tail
+        ];
+        if (def.name === 'Horse') return [
+          [0.22,0.16,0.14, 0, headY-0.08, front+0.06, def.color],      // long snout
+          [0.18,0.10,0.06, 0, headY-0.13, front+0.12, 0x2a1c10],       // muzzle
+          [0.06,0.13,0.06, 0.10, headY+hs*0.5, headZ-0.02, 0x3a2616],  // ears
+          [0.06,0.13,0.06, -0.10, headY+hs*0.5, headZ-0.02, 0x3a2616],
+          [0.05,0.22,0.26, 0, headY+hs*0.25, headZ-hs*0.45, 0x2a1c10], // mane
+          [0.07,0.42,0.07, 0, bodyY+bh*0.05, -bL/2-0.02, 0x2a1c10],    // long tail
+        ];
+        if (def.name === 'Wolf') return [
+          [0.16,0.14,0.16, 0, headY-0.05, front+0.03, 0x6f6f6f],       // snout
+          [0.05,0.04,0.03, 0, headY-0.06, front+0.11, 0x1a1a1a],       // nose
+          [0.09,0.12,0.05, 0.10, headY+hs*0.5, headZ, 0x5a5a5a],       // pointy ears
+          [0.09,0.12,0.05, -0.10, headY+hs*0.5, headZ, 0x5a5a5a],
+          [0.13,0.13,0.28, 0, bodyY+bh*0.25, -bL/2-0.06, 0x6f6f6f],    // bushy tail
+          [bw*0.85,0.08,bL*0.6, 0, legLen+0.01, bL*0.05, 0xdedede],    // pale belly
+        ];
+        if (def.name === 'Fox') return [
+          [0.14,0.12,0.16, 0, headY-0.05, front+0.03, def.color],      // snout
+          [0.05,0.04,0.03, 0, headY-0.07, front+0.11, 0x2a1a12],       // nose
+          [0.08,0.13,0.05, 0.10, headY+hs*0.5, headZ, 0x2a1a12],       // dark pointy ears
+          [0.08,0.13,0.05, -0.10, headY+hs*0.5, headZ, 0x2a1a12],
+          [0.17,0.17,0.30, 0, bodyY+bh*0.15, -bL/2-0.08, def.color],   // bushy tail
+          [0.13,0.11,0.12, 0, bodyY+bh*0.15, -bL/2-0.22, 0xffffff],    // white tail tip
+          [bw*0.85,0.08,bL*0.6, 0, legLen+0.01, bL*0.05, 0xf5eee6],    // white belly
+        ];
+        if (def.name === 'Goat') return [
+          [0.12,0.10,0.10, 0, headY-0.05, front+0.02, def.headColor],  // snout
+          [0.05,0.15,0.05, 0.07, headY+hs*0.45, headZ-0.07, 0xcfc3b0], // swept-back horns
+          [0.05,0.15,0.05, -0.07, headY+hs*0.45, headZ-0.07, 0xcfc3b0],
+          [0.05,0.09,0.04, 0, headY-0.12, front, 0xe8e0d0],            // beard
+          [0.06,0.14,0.06, 0, bodyY+bh*0.1, -bL/2-0.02, def.color],    // tail
+        ];
+        if (def.name === 'Panda') return [
+          [0.16,0.12,0.10, 0, headY-0.05, front+0.02, 0x1a1a1a],       // black muzzle
+          [0.11,0.11,0.07, 0.21, headY+hs*0.5, headZ, 0x1a1a1a],       // black ears
+          [0.11,0.11,0.07, -0.21, headY+hs*0.5, headZ, 0x1a1a1a],
+          [0.09,0.11,0.04, 0.14, headY+0.04, front, 0x1a1a1a],         // black eye patches
+          [0.09,0.11,0.04, -0.14, headY+0.04, front, 0x1a1a1a],
+          [0.16,0.30,0.12, 0.30, bodyY, bL*0.05, 0x1a1a1a],            // black shoulder patch
+          [0.16,0.30,0.12, -0.30, bodyY, bL*0.05, 0x1a1a1a],
+        ];
+        if (def.name === 'Strider') return [
+          [bw+0.06, bh*0.55, bL+0.06, 0, bodyY+bh*0.28, 0, 0x8a3a52],  // ridged upper body
+          [bw*0.5, 0.10, bL*0.5, 0, bodyY+bh*0.6, 0, 0xb05a70],        // warm crest
+          [0.05,0.05,0.03, 0.06, headY+0.02, front, 0x3cf0ff],         // glowing eyes
+          [0.05,0.05,0.03, -0.06, headY+0.02, front, 0x3cf0ff],
+        ];
         // Chicken
         return [
           [0.14,0.09,0.14, 0, headY-0.02, front+0.02, 0xe6a11a],       // beak
@@ -2690,13 +2752,24 @@
       }
 
       function spawnMob() {
-        for (let attempt = 0; attempt < 8; attempt++) {
+        for (let attempt = 0; attempt < 10; attempt++) {
           const ang = Math.random() * Math.PI * 2, dist = 12 + Math.random() * 16;
           const wx = Math.floor(player.pos.x + Math.cos(ang) * dist);
           const wz = Math.floor(player.pos.z + Math.sin(ang) * dist);
           const s = topSolidY(wx, wz);
-          if (!s || s.block === WATER || s.y <= SEA_LEVEL) continue;   // land only
-          const def = MOB_DEFS[(Math.random() * MOB_DEFS.length) | 0];
+          if (!s) continue;
+          let candidates;
+          if (dim === DIM_NETHER) {
+            // roam netherrack, keep off lava/bedrock ceiling
+            if (s.block !== NETHERRACK && s.block !== SOUL_SAND && s.block !== QUARTZ_ORE) continue;
+            candidates = MOB_DEFS.filter((d) => d.nether);
+          } else {
+            if (s.block === WATER || s.y <= SEA_LEVEL) continue;       // dry land only
+            const bm = biomeAt(wx, wz);
+            candidates = MOB_DEFS.filter((d) => !d.nether && (!d.biomes || d.biomes.includes(bm)));
+          }
+          if (!candidates.length) continue;
+          const def = candidates[(Math.random() * candidates.length) | 0];
           const { group, legs } = buildMobMesh(def);
           const mob = {
             def, group, legs,
@@ -2753,7 +2826,7 @@
             const ax = Math.floor(p.x + fx * 0.7), az = Math.floor(p.z + fz * 0.7);
             const aheadFoot = getBlock(ax, Math.floor(p.y), az);
             const aheadBelow = getBlock(ax, Math.floor(p.y) - 1, az);
-            if (aheadFoot === WATER || aheadBelow === WATER || aheadBelow === AIR) {
+            if (aheadFoot === WATER || aheadFoot === LAVA || aheadBelow === WATER || aheadBelow === LAVA || aheadBelow === AIR) {
               m.yaw += Math.PI * (0.6 + Math.random() * 0.8); // turn away
             }
           }
@@ -2993,6 +3066,7 @@
       // travel between Overworld and Nether (swaps the active chunk map)
       function travel() {
         for (const c of chunks.values()) disposeChunkMeshes(c);
+        for (let i = mobs.length - 1; i >= 0; i--) removeMob(mobs[i]);  // mobs don't follow between dimensions
         buildQueue.clear(); waterActive.clear();
         dim = 1 - dim;
         chunks = worldChunks[dim];
