@@ -340,7 +340,8 @@
       const CHUNK = 16;                // chunk width/depth in blocks
       const WORLD_HEIGHT = 128;        // vertical block limit (classic Minecraft depth)
       const SEA_LEVEL = 62;
-      const RENDER_DIST = 3;           // chunk radius around player (lower = less lag)
+      const RENDER_DIST = 3;           // max chunk radius around player
+      let renderDist = RENDER_DIST;    // current radius — shrinks automatically when FPS is low
       const BUILD_PER_FRAME = 2;       // chunk meshes built per frame
       const REACH = 6;                 // block interaction reach
       const WATER_FLOW = 4;            // how far water spreads from a source (Minecraft uses 7)
@@ -2431,10 +2432,10 @@
         // collect missing chunks in range, then generate only the nearest few per frame
         // (throttling generation removes the stutter when crossing into new terrain)
         const missing = [];
-        for (let dz = -RENDER_DIST; dz <= RENDER_DIST; dz++) {
-          for (let dx = -RENDER_DIST; dx <= RENDER_DIST; dx++) {
+        for (let dz = -renderDist; dz <= renderDist; dz++) {
+          for (let dx = -renderDist; dx <= renderDist; dx++) {
             const d2 = dx * dx + dz * dz;
-            if (d2 > RENDER_DIST * RENDER_DIST) continue;
+            if (d2 > renderDist * renderDist) continue;
             const cx = pcx + dx, cz = pcz + dz;
             if (!getChunk(cx, cz)) missing.push([d2, cx, cz]);
           }
@@ -2452,7 +2453,7 @@
 
         // unload distant chunks
         for (const [k, c] of chunks) {
-          if (Math.abs(c.cx - pcx) > RENDER_DIST + 2 || Math.abs(c.cz - pcz) > RENDER_DIST + 2) {
+          if (Math.abs(c.cx - pcx) > renderDist + 2 || Math.abs(c.cz - pcz) > renderDist + 2) {
             disposeChunkMeshes(c);
             chunks.delete(k);
             buildQueue.delete(k);
@@ -2887,7 +2888,9 @@
       // ===================================================================
       const nightTintEl = document.getElementById('nighttint');
       const underwaterEl = document.getElementById('underwater');
-      const FOG_NEAR = (RENDER_DIST - 1.5) * CHUNK, FOG_FAR = (RENDER_DIST + 0.5) * CHUNK;
+      let fogNear = (renderDist - 1.5) * CHUNK, fogFar = (renderDist + 0.5) * CHUNK;
+      // change the active render distance and re-derive the fog band so the horizon never pops
+      function setRenderDist(d) { renderDist = Math.max(2, Math.min(RENDER_DIST, d)); fogNear = (renderDist - 1.4) * CHUNK; fogFar = (renderDist + 0.5) * CHUNK; }
       let dayTime = 0.28, skyLight = 1;   // 0..1 (0=sunrise, .25=noon, .5=sunset, .75=midnight)
       const DAY_LEN = 240;                // seconds per full day
       const SKY_STOPS   = [[0,0x24344f],[0.05,0xef9d55],[0.14,0x87ceeb],[0.45,0x87ceeb],[0.5,0xef7a3c],[0.56,0x2b2450],[0.64,0x0a1030],[0.95,0x0a1030],[1,0x24344f]];
@@ -3359,14 +3362,14 @@
           // underwater view: blue tint + murky fog when the head is submerged
           underwaterEl.style.opacity = player.headUnderwater ? '1' : '0';
           if (player.headUnderwater) { scene.fog.color.setHex(0x14508c); scene.fog.near = 0.1; scene.fog.far = 22; }
-          else { scene.fog.near = FOG_NEAR; scene.fog.far = FOG_FAR; }
+          else { scene.fog.near = fogNear; scene.fog.far = fogFar; }
         } else {
           // Nether: gloomy red haze, no sky/clouds/stars/weather
           scene.background.setHex(0x2a0a0a);
           clouds.visible = false; stars.visible = false;
           underwaterEl.style.opacity = '0';
           if (player.headInLava) { scene.fog.color.setHex(0xd83a10); scene.fog.near = 0.1; scene.fog.far = 3; }
-          else { scene.fog.color.setHex(0x531a12); scene.fog.near = 6; scene.fog.far = (RENDER_DIST + 1) * CHUNK; }
+          else { scene.fog.color.setHex(0x531a12); scene.fog.near = 6; scene.fog.far = (renderDist + 1) * CHUNK; }
         }
 
         // tick water flow a few times a second (independent of framerate)
@@ -3395,16 +3398,25 @@
           // A cooldown + immediate repaint keep the canvas from flashing on resize.
           // Actively hold a high framerate: drop internal resolution when GPU-bound
           // (bigger drop the further below target), sharpen back up when there's headroom.
+          // Two-tier auto performance: (1) scale internal resolution to hold ~60 FPS,
+          // (2) if that bottoms out and it's still slow, shrink render distance — and
+          // restore both when there's headroom. Keeps FPS comfortably above 30 anywhere.
           if (resHold > 0) resHold--;
           else {
             let ns = renderScale;
-            if (fps < 55) ns = Math.max(0.5, renderScale - (fps < 30 ? 0.25 : fps < 45 ? 0.15 : 0.08));
+            if (fps < 55) ns = Math.max(0.42, renderScale - (fps < 30 ? 0.25 : fps < 45 ? 0.15 : 0.08));
             else if (fps > 59 && renderScale < 1) ns = Math.min(1, renderScale + 0.1);
             if (ns !== renderScale) {
               renderScale = ns;
               renderer.setPixelRatio(renderScale);
               renderer.render(scene, camera); // repaint at the new size so the buffer never shows blank
               resHold = 2;                     // ~1s before the next change (snappier, still no thrash)
+            } else if (fps < 34 && renderScale <= 0.45 && renderDist > 2) {
+              setRenderDist(renderDist - 1);   // resolution can't help more — pull the view in
+              resHold = 4;
+            } else if (fps > 58 && renderScale >= 0.98 && renderDist < RENDER_DIST) {
+              setRenderDist(renderDist + 1);   // plenty of headroom — push the view back out
+              resHold = 6;
             }
           }
           fpsEl.textContent = Math.round(fps);
