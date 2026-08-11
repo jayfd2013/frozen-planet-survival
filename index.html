@@ -392,7 +392,7 @@
   <body>
     <div id="loading-screen" style="position:fixed; top:0; left:0; width:100%; height:100%; background:linear-gradient(135deg, #060610, #0a0a2a, #0a1020); z-index:100; display:flex; justify-content:center; align-items:center; flex-direction:column; transition:opacity 0.8s;">
       <h1 style="font-size:40px; color:#88ccff; text-shadow:0 0 30px rgba(100,180,255,0.6), 0 0 60px rgba(100,180,255,0.2); letter-spacing:2px;">Frozen Planet Survival</h1>
-      <p style="margin-top:12px; font-size:12px; opacity:0.35; letter-spacing:3px; text-transform:uppercase;">Loading world</p>
+      <p style="margin-top:12px; font-size:12px; opacity:0.35; letter-spacing:3px; text-transform:uppercase;">Generating terrain...</p>
       <div style="margin-top:24px; width:240px; height:3px; background:rgba(255,255,255,0.06); border-radius:2px; overflow:hidden;">
         <div id="load-bar" style="width:0%; height:100%; background:linear-gradient(to right,#3366aa,#66bbee,#3366aa); background-size:200% 100%; border-radius:2px; transition:width 0.3s; animation:loadShimmer 1.5s ease-in-out infinite;"></div>
       </div>
@@ -405,10 +405,10 @@
     </style>
     <div id="title">
       <h1>Frozen Planet Survival</h1>
-      <p style="margin-top: 4px; font-size: 13px; opacity: 0.4; letter-spacing: 3px; text-transform: uppercase;">Survive the Frozen Wilderness</p>
+      <p style="margin-top: 4px; font-size: 12px; opacity: 0.35; letter-spacing: 2px;">The cold doesn't care how tough you are.</p>
       <div id="lobby" style="margin-top: 24px;">
         <div id="customize-panel">
-          <h3>CUSTOMIZE CHARACTER</h3>
+          <h3>Your Survivor</h3>
           <div style="margin-bottom:14px;">
             <input id="player-name" type="text" maxlength="16" placeholder="Your name..." value=""
               style="background:rgba(20,30,50,0.6); border:1px solid rgba(100,180,255,0.2); border-radius:10px; color:white; font-size:15px; padding:10px 16px; text-align:center; width:190px; outline:none; font-family:inherit; transition: border-color 0.3s, box-shadow 0.3s;"
@@ -542,22 +542,19 @@
     </div>
 
     <div id="death-screen" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:linear-gradient(180deg, rgba(10,5,15,0.9), rgba(5,0,10,0.95)); z-index:30; justify-content:center; align-items:center; flex-direction:column; text-align:center; backdrop-filter:blur(6px);">
-      <div style="font-size:11px; letter-spacing:4px; opacity:0.3; text-transform:uppercase; margin-bottom:16px;">Game Over</div>
-      <h1 style="font-size:48px; color:#7ab8e8; text-shadow:0 0 40px rgba(100,170,240,0.6), 0 0 80px rgba(100,170,240,0.2); margin-bottom:20px; letter-spacing:3px; font-weight:300;">YOU FROZE TO DEATH</h1>
-      <div style="width:60px; height:1px; background:linear-gradient(to right, transparent, rgba(100,180,255,0.4), transparent); margin:0 auto 20px;"></div>
-      <p style="font-size:18px; opacity:0.6; margin-bottom:6px;">Survived for <span id="death-score" style="color:#88ccff;">0</span> points</p>
-      <p style="font-size:13px; opacity:0.3; margin-top:30px; letter-spacing:1px;">Press any key to try again</p>
-      <p style="font-size:10px; opacity:0.15; margin-top:24px; letter-spacing:1px;">Made with AI</p>
+      <h1 style="font-size:44px; color:#7ab8e8; text-shadow:0 0 40px rgba(100,170,240,0.6), 0 0 80px rgba(100,170,240,0.2); margin-bottom:12px; letter-spacing:3px; font-weight:300;">The cold won.</h1>
+      <p style="font-size:14px; opacity:0.35; margin-bottom:24px; font-style:italic;" id="death-quote">Nobody heard the wind take you.</p>
+      <div style="width:40px; height:1px; background:rgba(100,180,255,0.3); margin:0 auto 20px;"></div>
+      <p style="font-size:16px; opacity:0.5;">You lasted <span id="death-score" style="color:#88ccff;">0</span> points</p>
+      <p style="font-size:12px; opacity:0.2; margin-top:30px;">Try again?</p>
     </div>
 
     <div id="win-screen" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:linear-gradient(180deg, rgba(5,15,10,0.9), rgba(0,10,5,0.95)); z-index:30; justify-content:center; align-items:center; flex-direction:column; text-align:center; backdrop-filter:blur(6px);">
-      <div style="font-size:11px; letter-spacing:4px; opacity:0.3; text-transform:uppercase; margin-bottom:16px;">Victory</div>
-      <h1 style="font-size:48px; color:#44ee88; text-shadow:0 0 40px rgba(68,238,136,0.6), 0 0 80px rgba(68,238,136,0.2); margin-bottom:20px; letter-spacing:3px; font-weight:300;">RESCUED!</h1>
-      <div style="width:60px; height:1px; background:linear-gradient(to right, transparent, rgba(68,255,136,0.4), transparent); margin:0 auto 20px;"></div>
-      <p style="font-size:18px; opacity:0.7; margin-bottom:6px;">You survived the frozen planet!</p>
+      <h1 style="font-size:44px; color:#44ee88; text-shadow:0 0 40px rgba(68,238,136,0.6), 0 0 80px rgba(68,238,136,0.2); margin-bottom:12px; letter-spacing:3px; font-weight:300;">You made it out.</h1>
+      <p style="font-size:14px; opacity:0.35; margin-bottom:24px; font-style:italic;">The helicopter breaks through the clouds. You're going home.</p>
+      <div style="width:40px; height:1px; background:rgba(68,255,136,0.3); margin:0 auto 20px;"></div>
       <p style="font-size:16px; opacity:0.5;">Final score: <span id="win-score" style="color:#44ff88;">0</span></p>
-      <p style="font-size:13px; opacity:0.3; margin-top:30px; letter-spacing:1px;">Press any key to play again</p>
-      <p style="font-size:10px; opacity:0.15; margin-top:24px; letter-spacing:1px;">Made with AI</p>
+      <p style="font-size:12px; opacity:0.2; margin-top:30px;">Play again?</p>
     </div>
 
     <div id="beacon-timer-hud" style="display:none; position:fixed; top:50%; right:50px; transform:translateY(-50%); z-index:10; text-align:center; pointer-events:none; background:rgba(20,10,25,0.5); backdrop-filter:blur(6px); border:1px solid rgba(255,68,255,0.15); border-radius:14px; padding:16px 24px;">
@@ -2123,13 +2120,13 @@
           showStatus(`Press F to place ${recipe.name}`, '#44ff88');
         } else if (recipe.id === 'torch') {
           state.heldItem = 'torch';
-          showStatus('Torch equipped!', '#ffcc44');
+          showStatus('Torch lit', '#ffcc44');
         } else if (recipe.id === 'ice_pick') {
           state.hasIcePick = true;
-          showStatus('Ice Pick crafted! Gather 2x faster', '#aaddff');
+          showStatus('Ice pick ready', '#aaddff');
         } else if (recipe.id === 'fishing_rod') {
           state.hasFishingRod = true;
-          showStatus('Fishing Rod crafted! Find ice holes to fish', '#88ccff');
+          showStatus('Fishing rod crafted', '#88ccff');
         } else if (recipe.id === 'beacon') {
           state.pendingPlace = 'beacon';
           state.craftMenuOpen = false;
@@ -3283,8 +3280,8 @@
             obj = createBeacon(px, pz);
             state.beaconActive = true;
             state.beaconTimer = 0;
-            showStatus('BEACON ACTIVE! Survive 2 minutes for rescue!', '#ff44ff');
-            addChatMessage('System', 'RESCUE BEACON ACTIVATED!', '#ff44ff');
+            showStatus('Beacon active. Hold out.', '#cc66aa');
+            addChatMessage('', 'The beacon hums to life. Now survive.', '#cc66aa');
           } else if (state.pendingPlace === 'signal_fire') {
             const ty = getTerrainHeight(px, pz);
             if (ty < 10) {
@@ -3386,7 +3383,7 @@
             wolves.splice(wolves.indexOf(closest), 1);
             state.score += 50;
             showStatus('Wolf killed! +50 pts', '#44ff88');
-            addChatMessage('System', `${state.playerName} killed a wolf!`, '#ff8844');
+            addChatMessage('', `${state.playerName} took down a wolf.`, '#997744');
           }
         }
         // Attack rabbits
@@ -3562,7 +3559,7 @@
         document.getElementById('player-name-hud').textContent = state.playerName;
         document.getElementById('sandbox-badge').style.display = state.sandboxMode ? 'block' : 'none';
         if (state.sandboxMode) {
-          addChatMessage('System', 'Sandbox mode! Unlimited resources, no damage. Build freely!', '#88dd44');
+          addChatMessage('', 'Creative mode. Build whatever you want.', '#88dd44');
         }
         startMusic();
         // Apply initial day/night lighting immediately (avoid slow lerp from dark)
@@ -3599,7 +3596,15 @@
           showStatus(`Game started! ${count} players`, '#44ff88');
         }
         document.getElementById('chat-container').style.display = 'block';
-        addChatMessage('System', 'Survive the frozen planet! Press T to chat.', '#888');
+        const tips = [
+          'The forest biome keeps you warmer than open tundra.',
+          'Wolves are afraid of campfires. Use that.',
+          'Caves hide rare metal and fuel. Worth the trip.',
+          'Cook meat at campfires. Raw meat does nothing.',
+          'Crouching near a fire? You lose heat slower.',
+          'The mountains are coldest. Bring fuel.',
+        ];
+        addChatMessage('', tips[Math.floor(Math.random() * tips.length)], '#667');
       }
 
       function restartGame() {
@@ -3926,7 +3931,7 @@
           if (t < 0.02 && state._lastTimeOfDay > 0.98) {
             state.dayCount++;
             state.skillPoints++;
-            if (typeof addChatMessage === 'function') addChatMessage('System', 'New day! +1 skill point (K to open skills)', '#bb88ff');
+            if (typeof addChatMessage === 'function') addChatMessage('', `Day ${state.dayCount}. You earned a skill point.`, '#9988aa');
           }
           state._lastTimeOfDay = t;
           timeEl.textContent = `Day ${state.dayCount} ${timeStr}`;
@@ -4622,43 +4627,35 @@
           const statusEl = DOM.statusMsg;
           if (state.bodyTemp < 26) {
             statusEl.style.display = 'block';
-            statusEl.textContent = 'SEVERE HYPOTHERMIA';
+            statusEl.textContent = 'Your body is shutting down';
             statusEl.style.color = '#ff4444';
           } else if (state.bodyTemp < 32) {
             statusEl.style.display = 'block';
-            statusEl.textContent = 'HYPOTHERMIA';
+            statusEl.textContent = 'You can barely feel your hands';
             statusEl.style.color = '#ffaa44';
           } else if (state.bodyTemp < 35) {
             statusEl.style.display = 'block';
-            statusEl.textContent = 'FREEZING';
+            statusEl.textContent = 'The cold is getting to you';
             statusEl.style.color = '#88ccff';
           } else if (state.nearCampfire && state.meat > 0) {
             statusEl.style.display = 'block';
-            statusEl.textContent = 'Q: Cook Meat | R: Eat';
+            statusEl.textContent = 'Q: Cook  R: Eat';
             statusEl.style.color = '#ff8844';
           } else if (state.nearCampfire) {
             statusEl.style.display = 'block';
-            statusEl.textContent = state.cookedMeat > 0 ? 'WARMING UP | R: Eat' : 'WARMING UP';
+            statusEl.textContent = state.cookedMeat > 0 ? 'The fire feels good  R: Eat' : 'The fire feels good';
             statusEl.style.color = '#ff8844';
           } else if (state.insideShelter) {
             statusEl.style.display = 'block';
-            statusEl.textContent = 'SHELTERED';
+            statusEl.textContent = 'Out of the wind';
             statusEl.style.color = '#88ddaa';
           } else if (state.pendingPlace) {
             statusEl.style.display = 'block';
-            statusEl.textContent = `Press F to place ${state.pendingPlace}`;
+            statusEl.textContent = `F: Place ${state.pendingPlace}`;
             statusEl.style.color = '#44ff88';
-          } else if (state.isSprinting) {
-            statusEl.style.display = 'block';
-            statusEl.textContent = 'SPRINTING';
-            statusEl.style.color = '#ffaa44';
-          } else if (state.isCrouching) {
-            statusEl.style.display = 'block';
-            statusEl.textContent = 'CROUCHING';
-            statusEl.style.color = '#44ccff';
           } else if (state.energy < 20) {
             statusEl.style.display = 'block';
-            statusEl.textContent = 'EXHAUSTED';
+            statusEl.textContent = 'Running on empty';
             statusEl.style.color = '#ff4444';
           } else {
             statusEl.style.display = 'none';
@@ -4897,6 +4894,17 @@
           if (state.health <= 0 && !state.dead) {
             state.dead = true;
             DOM.deathScore.textContent = state.score;
+            const deathQuotes = [
+              'Nobody heard the wind take you.',
+              'The snow covered your tracks within minutes.',
+              'You stopped shivering. That was the bad sign.',
+              'The wolves will find you before the rescue team does.',
+              'Another set of bones under the ice.',
+              'The planet keeps what it catches.',
+              'You were so close to the fire.',
+              'The blizzard didn\'t even notice you.',
+            ];
+            document.getElementById('death-quote').textContent = deathQuotes[Math.floor(Math.random() * deathQuotes.length)];
             const deathEl = DOM.deathScreen;
             deathEl.style.display = 'flex';
             deathEl.style.opacity = '0';
@@ -5249,20 +5257,20 @@
             setTimeout(() => popup.style.display = 'none', 6000);
             state.score += 100;
             showStatus(`Journal page found! (${collectedPages.length}/10) +100 pts`, '#eedd66');
-            if (typeof addChatMessage === 'function') addChatMessage('System', `Found journal page ${collectedPages.length}/10`, '#eedd66');
+            if (typeof addChatMessage === 'function') addChatMessage('', `Journal page ${collectedPages.length} of 10.`, '#bbaa55');
             // Win condition: all 10 pages
             if (collectedPages.length >= 10) {
               state.rescued = true;
               state.score += 1000;
-              DOM.winScreen.querySelector('h1').textContent = 'MYSTERY SOLVED!';
+              DOM.winScreen.querySelector('h1').textContent = 'Now you know.';
               DOM.winScreen.querySelector('h1').style.color = '#eedd44';
-              DOM.winScreen.querySelector('p').textContent = 'You found all the journal pages and uncovered the truth!';
+              DOM.winScreen.querySelector('p').textContent = 'Every page told a piece of the story. The rest is silence.';
               DOM.winScore.textContent = state.score;
               const winEl = DOM.winScreen;
               winEl.style.display = 'flex';
               winEl.style.opacity = '0';
               requestAnimationFrame(() => winEl.style.opacity = '1');
-              if (typeof addChatMessage === 'function') addChatMessage('System', 'ALL PAGES FOUND! Mystery solved!', '#eedd44');
+              if (typeof addChatMessage === 'function') addChatMessage('', 'The last page. Now you know the truth.', '#ddcc44');
             }
           }
           if (!page.userData.collected) {
@@ -5303,7 +5311,7 @@
           if (state.beaconTimer >= state.beaconRequired) {
             state.rescued = true;
             state.score += 500;
-            addChatMessage('System', 'RESCUE SHIP ARRIVED!', '#44ff88');
+            addChatMessage('', 'You hear rotors. They found you.', '#44dd77');
             DOM.winScore.textContent = state.score;
             const winEl = DOM.winScreen;
             winEl.style.display = 'flex';
