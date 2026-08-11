@@ -3223,7 +3223,7 @@
       //  Main loop
       // ===================================================================
       const clock = new THREE.Clock();
-      let fpsAccum = 0, fpsFrames = 0, fpsTimer = 0, waterTimer = 0, stepTimer = 0, bobT = 0, waveT = 0, outlineTick = 0;
+      let fpsAccum = 0, fpsFrames = 0, fpsTimer = 0, waterTimer = 0, stepTimer = 0, bobT = 0, bobAmp = 0, waveT = 0, outlineTick = 0;
       let renderScale = 1, resHold = 0; // adaptive resolution (1 = full, lowers when GPU-bound)
       let precipPhase = 0;
 
@@ -3261,8 +3261,12 @@
           let speed = god.on ? (sprint ? 30 : 14) : (player.crouch ? 2.2 : (sprint ? 8.5 : 5));
           if (player.inWater && !god.on) speed *= 0.6; // slower in water
           if (len > 0) { wx = wx / len * speed; wz = wz / len * speed; }
-          player.vel.x = wx;
-          player.vel.z = wz;
+          // ease velocity toward the target instead of snapping — smooth start/stop, momentum in the air
+          const accel = player.fly ? (1 - Math.pow(0.0012, dt))
+                      : player.onGround ? (1 - Math.pow(0.0006, dt))
+                      : (1 - Math.pow(0.14, dt));
+          player.vel.x += (wx - player.vel.x) * accel;
+          player.vel.z += (wz - player.vel.z) * accel;
 
           if (player.fly) {
             const up = (keys['Space'] ? 1 : 0) - (shift ? 1 : 0);
@@ -3305,14 +3309,15 @@
           bubblesEl.style.display = showBubbles ? 'flex' : 'none';
           if (showBubbles) paintBar(bubblesEl, stat.air * 2);
 
-          // footsteps + subtle view-bob while walking on the ground
+          // footsteps + subtle view-bob while walking on the ground (eased in/out for smoothness)
           const walking = len > 0 && player.onGround && !player.fly;
+          bobAmp += ((walking ? 1 : 0) - bobAmp) * Math.min(1, dt * 8);
           if (walking) {
             bobT += dt * (sprint ? 13 : 9.5);
-            camera.position.y += Math.sin(bobT) * 0.05;
             stepTimer -= dt;
             if (stepTimer <= 0) { sfx.step(); stepTimer = sprint ? 0.28 : 0.38; }
           } else { stepTimer = 0; }
+          if (viewMode === 0) camera.position.y += Math.sin(bobT) * 0.045 * bobAmp;
 
           // left: survival = timed mining w/ cracks, god = instant repeat
           if (held.left) {
