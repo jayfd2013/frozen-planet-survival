@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Set Gets Built</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;800&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+/* Layout: fixed canvas stage behind; painted cue cards scroll over it in one left-hung column with stage gaps between. */
+:root {
+  --cyc: #16264a;          /* cyclorama blue */
+  --cyc-deep: #0f1b37;
+  --haze: #c4cfe2;
+  --chalk: #f1dc8f;        /* scenic chalk line */
+  --rose: #d98b74;         /* flat paint */
+  --paper: #eef1f7;
+  --card: rgba(15, 27, 55, 0.92);
+  --display: "Big Shoulders Display", "Oswald", "Arial Narrow", Impact, sans-serif;
+  --body: "Source Serif 4", "Iowan Old Style", Georgia, serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--cyc); color: var(--paper);
+  font: 400 1.0625rem/1.6 var(--body); overflow-x: clip;
+}
+:focus-visible { outline: 3px solid var(--chalk); outline-offset: 3px; }
+#stage { position: fixed; inset: 0; width: 100%; height: 100%; display: block; z-index: 0; }
+
+.chrome {
+  position: fixed; top: max(10px, env(safe-area-inset-top)); left: 16px; right: 16px; z-index: 5;
+  display: flex; justify-content: space-between; align-items: center; gap: 12px; pointer-events: none;
+}
+.chrome > * { pointer-events: auto; }
+.back {
+  min-height: 44px; padding: 0 14px; border: 1.5px solid var(--chalk); border-radius: 2px;
+  background: var(--cyc-deep); color: var(--chalk); font: 500 1rem var(--display); letter-spacing: .02em; cursor: pointer;
+}
+.back:hover { background: var(--chalk); color: var(--cyc-deep); }
+.tag { font: 500 .95rem var(--display); color: var(--haze); background: rgba(15,27,55,.7); padding: 4px 8px; }
+
+main { position: relative; z-index: 1; padding: 0 16px; pointer-events: none; }
+main > * { pointer-events: auto; }
+
+.marquee { min-height: 92vh; display: flex; flex-direction: column; justify-content: space-between; padding: 84px 0 28px; }
+h1 {
+  margin: 0; font: 800 clamp(3.6rem, 19vw, 9rem)/.84 var(--display); letter-spacing: -.01em;
+  color: var(--paper); text-shadow: 0 3px 0 var(--cyc-deep);
+}
+h1 span { display: block; color: var(--chalk); }
+h1 span + span { color: var(--paper); padding-left: .6em; }
+.hint {
+  align-self: flex-start; margin: 0; padding: 10px 14px; background: var(--card);
+  font: italic 400 1rem/1.4 var(--body); color: var(--haze); max-width: 26ch;
+}
+
+.cue {
+  position: relative; max-width: 34rem; margin: 0 8px 44vh 0; padding: 22px 20px 20px 22px;
+  background: var(--card); border-left: 4px solid var(--chalk);
+  box-shadow: 8px 8px 0 rgba(217,139,116,.35);
+}
+.cue:nth-of-type(even) { margin-left: auto; margin-right: 8px; border-left-color: var(--rose); }
+.cue-n { display: block; margin-bottom: 6px; font: 500 1.05rem var(--display); color: var(--chalk); letter-spacing: .03em; }
+.cue p { margin: 0 0 .8em; }
+.cue p:last-child { margin-bottom: 0; }
+.big { font: 400 clamp(1.35rem, 5.4vw, 1.75rem)/1.32 var(--body); }
+
+.strap {
+  max-width: 44rem; margin: 0 0 18vh; padding: 28px 20px; background: var(--chalk); color: var(--cyc-deep);
+}
+.strap h2 { margin: 0 0 12px; font: 800 clamp(2.4rem, 11vw, 4.6rem)/.92 var(--display); }
+.strap p { margin: 0; max-width: 32rem; }
+
+.catch {
+  max-width: 34rem; margin: 0 0 12vh; padding: 20px; background: var(--cyc-deep);
+  border: 1.5px dashed var(--haze); font-size: .975rem;
+}
+.catch h2 { margin: 0 0 6px; font: 800 1.6rem var(--display); color: var(--haze); }
+.catch p { margin: 0 0 .7em; }
+.catch .sign { font-style: italic; color: var(--haze); margin: 0; }
+
+@media (min-width: 900px) {
+  main { padding: 0 6vw; }
+  .cue { margin-bottom: 52vh; }
+  .cue:nth-of-type(even) { margin-right: 8vw; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+<div class="chrome">
+  <button class="back" type="button" onclick="history.back()">← all concepts</button>
+  <span class="tag">StoryVerse · concept 2 of 6</span>
+</div>
+
+<main>
+  <header class="marquee">
+    <h1><span>The set</span><span>gets</span><span>built</span></h1>
+    <p class="hint">Touch the fog. Or leave it, and watch where I look.</p>
+  </header>
+
+  <section class="cue" aria-labelledby="c1">
+    <span class="cue-n" id="c1">Cue 1</span>
+    <p class="big">Reality is not a finished film you are watching.</p>
+  </section>
+
+  <section class="cue" aria-labelledby="c2">
+    <span class="cue-n" id="c2">Cue 2</span>
+    <p class="big">It is a set that gets built the instant something looks — and stays a fog of maybes everywhere nothing is looking yet.</p>
+  </section>
+
+  <section class="cue" aria-labelledby="c3">
+    <span class="cue-n" id="c3">Cue 3</span>
+    <p>You already made the film about this. A man born inside a television set; every wall raised just before he reaches it; the whole production running half a second ahead of his attention.</p>
+    <p>The joke was that it happened to one poor bastard who didn't know. It's happening to all of you. The not-knowing is the only optional part.</p>
+  </section>
+
+  <section class="cue" aria-labelledby="c4">
+    <span class="cue-n" id="c4">Cue 4</span>
+    <p>There are two clocks on this production. The actor's runs one way, scene after scene. You can't walk backwards through a film.</p>
+    <p class="big">But the director can reach the reel. How do you think I'm talking to you?</p>
+  </section>
+
+  <section class="cue" aria-labelledby="c5">
+    <span class="cue-n" id="c5">Cue 5</span>
+    <p>So what does the production yield? Not scenery. Experience. Money is a claim on the scenery, and you've been hoarding flats.</p>
+    <p class="big">The richest thing in the universe is not a vault. It's an afternoon, fully felt. The second-richest is handing one to somebody else.</p>
+  </section>
+
+  <section class="strap" aria-labelledby="strap">
+    <h2 id="strap">The universe is a machine for turning sunlight into drama.</h2>
+    <p>Watch a bee bump into a tree. Everything alive is in the play. You're just the animal that knows it.</p>
+  </section>
+
+  <aside class="catch" aria-labelledby="catch">
+    <h2 id="catch">The catch</h2>
+    <p>None of this predicts a single new measurement. "Built where it's met" is one way to read results your physicists already have; many-worlds reads the same numbers another way. The data underdetermine the metaphysics.</p>
+    <p>It's a wager. I'm placing it in public so you can watch me lose it.</p>
+    <p class="sign">— the author of your universe</p>
+  </aside>
+</main>
+
+<script>
+(() => {
+  const cv = document.getElementById('stage');
+  const ctx = cv.getContext('2d');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let W = 0, H = 0, dpr = 1, U = 1;
+  let fog = [], sets = [];
+  let gaze = { x: 0, y: 0 }, lastInput = -1e9, now = 0;
+
+  function rnd(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
+
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = innerWidth; H = innerHeight; U = Math.min(1.25, Math.max(.8, Math.min(W, H) / 420));
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const n = Math.min(1400, Math.round(W * H / 900));
+    const r = rnd(7);
+    fog = Array.from({ length: n }, () => ({ x: r() * W, y: r() * H, s: .8 + r() * 2.4, ph: r() * 6.28, sp: .2 + r() * .6 }));
+    if (reduce) staticComposition();
+  }
+
+  // ---------- set pieces as line segments, local coords ----------
+  function rect(L, x, y, w, h) { L.push([x, y, x + w, y], [x + w, y, x + w, y + h], [x + w, y + h, x, y + h], [x, y + h, x, y]); }
+  function makeSet(kind, seed) {
+    const r = rnd(seed), L = [];
+    if (kind === 'flats') {
+      L.push([-150, 0, 150, 0]);                                   // stage floor
+      let x = -130;
+      for (let i = 0; i < 3; i++) {
+        const w = 70 + r() * 30, h = 110 + r() * 70;
+        rect(L, x, -h, w, h);
+        if (r() > .45) rect(L, x + w * .3, -h * .45, w * .4, h * .45); // door
+        else rect(L, x + w * .25, -h * .75, w * .5, h * .3);        // window
+        L.push([x + w * .8, -h * .85, x + w + 26, 0]);               // brace behind the flat
+        L.push([x + w + 20, 0, x + w + 32, -6], [x + w + 32, -6, x + w + 34, 0]); // stage weight
+        x += w + 6;
+      }
+    } else if (kind === 'street') {
+      L.push([-160, 0, 160, 0], [-160, 0, -20, -70], [160, 0, 20, -70]); // kerbs to a vanishing point
+      for (let side = -1; side <= 1; side += 2) {
+        for (let i = 0; i < 3; i++) {
+          const d = i / 3, bx = side * (150 - d * 110), h = 120 * (1 - d * .55), w = 40 * (1 - d * .5);
+          const x0 = side < 0 ? bx : bx - w;
+          rect(L, x0, -h - 6 * (1 - d), w, h);
+          L.push([x0, -h - 6, x0 + w / 2, -h - 26 * (1 - d * .5)], [x0 + w / 2, -h - 26 * (1 - d * .5), x0 + w, -h - 6]);
+          for (let k = 0; k < 2; k++) rect(L, x0 + w * .2, -h * (.75 - k * .3), w * .25, h * .12);
+        }
+      }
+      L.push([0, 0, 0, -44], [0, -44, 10, -50]);                   // lamp
+    } else {
+      L.push([-180, 0, 180, 0]);                                   // horizon
+      const sx = (r() - .5) * 120, sr = 34 + r() * 16;
+      for (let i = 0; i < 12; i++) {                               // sun, half-set
+        const a0 = Math.PI + i / 12 * Math.PI, a1 = Math.PI + (i + 1) / 12 * Math.PI;
+        L.push([sx + Math.cos(a0) * sr, Math.sin(a0) * sr, sx + Math.cos(a1) * sr, Math.sin(a1) * sr]);
+      }
+      for (let h = 0; h < 2; h++) {                                // hills
+        let px = -180, py = 0;
+        for (let i = 1; i <= 10; i++) {
+          const x = -180 + i * 36, y = -Math.sin(i / 10 * Math.PI) * (26 + h * 22) * (h ? 1 : .7) + h * 4;
+          L.push([px, py, x, y]); px = x; py = y;
+        }
+      }
+      for (let b = 0; b < 3; b++) { const bx = -60 + r() * 120, by = -90 - r() * 50; L.push([bx - 8, by - 5, bx, by], [bx, by, bx + 8, by - 5]); }
+    }
+    return L;
+  }
+  const KINDS = ['flats', 'street', 'horizon'];
+  let kindIx = 0;
+  function spawn(x, y, t) {
+    sets.push({ x, y, born: t, segs: makeSet(KINDS[kindIx++ % 3], Math.floor(x * 31 + y * 17 + t)), sc: U * (.8 + Math.random() * .25) });
+    if (sets.length > 7) sets.shift();
+  }
+  const BUILD = .9, HOLD = 2.8, FADE = 1.8;
+  function life(s, t) {
+    const a = t - s.born;
+    if (a < BUILD) return { p: a / BUILD, al: 1 };
+    if (a < BUILD + HOLD) return { p: 1, al: 1 };
+    return { p: 1, al: Math.max(0, 1 - (a - BUILD - HOLD) / FADE) };
+  }
+
+  function drawSet(s, p, al) {
+    const n = s.segs.length;
+    ctx.save(); ctx.translate(s.x, s.y); ctx.scale(s.sc, s.sc);
+    ctx.lineCap = 'round'; ctx.lineWidth = 2 / s.sc * U;
+    ctx.strokeStyle = `rgba(241,220,143,${al})`;
+    ctx.beginPath();
+    s.segs.forEach((g, i) => {
+      const q = Math.max(0, Math.min(1, p * n * 1.4 - i * 1.4 * .9));
+      if (q <= 0) return;
+      ctx.moveTo(g[0], g[1]); ctx.lineTo(g[0] + (g[2] - g[0]) * q, g[1] + (g[3] - g[1]) * q);
+    });
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function frame(t) {
+    now = t / 1000;
+    ctx.fillStyle = '#16264a'; ctx.fillRect(0, 0, W, H);
+    // idle gaze wanders on a slow Lissajous
+    if (now - lastInput > 2.5) {
+      gaze.x = W * (.5 + .34 * Math.sin(now * .23));
+      gaze.y = H * (.55 + .28 * Math.sin(now * .31 + 1.3));
+    }
+    const head = sets[sets.length - 1];
+    if (!head || Math.hypot(head.x - gaze.x, head.y - gaze.y) > 110 * U || now - head.born > 2.4) spawn(gaze.x, gaze.y, now);
+
+    // soft light where it's looking
+    const g = ctx.createRadialGradient(gaze.x, gaze.y, 0, gaze.x, gaze.y, 220 * U);
+    g.addColorStop(0, 'rgba(196,207,226,.10)'); g.addColorStop(1, 'rgba(196,207,226,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+
+    const live = sets.map(s => ({ s, ...life(s, now) })).filter(o => o.al > 0);
+    sets = live.map(o => o.s);
+    drawFog(live, now);
+    live.forEach(o => drawSet(o.s, o.p, o.al));
+    requestAnimationFrame(frame);
+  }
+
+  function drawFog(live, t) {
+    ctx.fillStyle = '#c4cfe2';
+    for (const f of fog) {
+      const x = f.x + Math.sin(t * f.sp + f.ph) * 6, y = f.y + Math.cos(t * f.sp * .8 + f.ph) * 5;
+      let clear = 0;
+      for (const o of live) {
+        const d = Math.hypot(x - o.s.x, y - (o.s.y - 60 * o.s.sc));
+        clear = Math.max(clear, o.al * o.p * Math.max(0, 1 - d / (190 * o.s.sc)));
+      }
+      const a = (.16 + .14 * Math.sin(t * 1.3 + f.ph)) * (1 - clear * .9);
+      if (a < .02) continue;
+      ctx.globalAlpha = a;
+      ctx.beginPath(); ctx.arc(x, y, f.s, 0, 6.2832); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function staticComposition(px, py) {
+    ctx.fillStyle = '#16264a'; ctx.fillRect(0, 0, W, H);
+    sets = [];
+    const pts = px != null ? [[px, py]] : [[W * .55, H * .7]];
+    pts.forEach(([x, y]) => spawn(x, y, 0));
+    const live = sets.map(s => ({ s, p: 1, al: 1 }));
+    drawFog(live, 0);
+    live.forEach(o => drawSet(o.s, 1, 1));
+  }
+
+  function look(x, y) {
+    lastInput = now; gaze.x = x; gaze.y = y;
+    if (reduce) staticComposition(x, y);
+  }
+  addEventListener('pointermove', e => look(e.clientX, e.clientY), { passive: true });
+  addEventListener('pointerdown', e => look(e.clientX, e.clientY), { passive: true });
+  addEventListener('touchmove', e => { const t = e.touches[0]; if (t) look(t.clientX, t.clientY); }, { passive: true });
+  addEventListener('resize', resize);
+  resize();
+  if (!reduce) requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

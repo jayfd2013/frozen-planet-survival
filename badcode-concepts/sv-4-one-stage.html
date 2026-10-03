@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Many Worlds, One Stage</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Young+Serif&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+/* Layout: star-atlas print. Phone = sticky chart plate on top, steps scroll beneath; wide = steps left, plate sticky right. */
+:root {
+  --paper: #e3e7e1;        /* chart paper */
+  --grid: #c6cec8;
+  --ink: #1d2a45;          /* atlas ink */
+  --ink-soft: #4a5670;
+  --night: #142039;        /* printed night plate */
+  --star: #f3ead2;
+  --gold: #e3b04b;         /* the one arc */
+  --display: "Young Serif", "Rockwell", "Georgia", serif;
+  --body: "Atkinson Hyperlegible", "Verdana", "Segoe UI", sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 400 1.0625rem/1.6 var(--body); overflow-x: clip; }
+:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; box-shadow: 0 0 0 6px var(--ink); }
+
+.chrome {
+  position: fixed; top: max(8px, env(safe-area-inset-top)); left: 16px; right: 16px; z-index: 10;
+  display: flex; justify-content: space-between; align-items: center; gap: 10px; pointer-events: none;
+}
+.chrome > * { pointer-events: auto; }
+.back {
+  min-height: 44px; padding: 0 14px; border: 1.5px solid var(--ink); border-radius: 999px;
+  background: var(--paper); color: var(--ink); font: 700 .875rem var(--body); cursor: pointer;
+}
+.back:hover { background: var(--ink); color: var(--paper); }
+.tag { font: italic 400 .8125rem var(--body); color: var(--ink-soft); background: var(--paper); padding: 2px 6px; }
+
+.scrolly { position: relative; }
+.plate {
+  position: sticky; top: 0; z-index: 2; height: 46vh; min-height: 280px; margin: 0;
+  padding: 60px 16px 10px; background: var(--paper);
+  border-bottom: 1.5px solid var(--ink);
+  transition: background-color .9s ease;
+}
+.plate.is-night { background: var(--night); }
+.plate svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.plate figcaption { position: absolute; left: 16px; bottom: 6px; font: italic 400 .8rem var(--body); color: var(--ink-soft); }
+.plate.is-night figcaption { color: var(--grid); }
+.edge { stroke: var(--ink); stroke-width: 1.1; transition: opacity .7s ease, stroke .9s; }
+.node { fill: var(--ink); transition: transform 1.2s cubic-bezier(.6,.05,.25,1), opacity .8s, fill .9s; }
+.is-night .node { fill: var(--star); }
+.is-night .node.arc { fill: var(--gold); }
+.is-night .node.future { fill: var(--night); stroke: var(--gold); stroke-width: 1.2; }
+.futline { fill: none; stroke: var(--gold); stroke-width: 1.2; stroke-dasharray: 3 5; opacity: 0; transition: opacity .8s ease 2.2s; }
+.is-night .futline { opacity: .8; }
+.arcline { fill: none; stroke: var(--gold); stroke-width: 1.6; stroke-dasharray: 900; stroke-dashoffset: 900; transition: stroke-dashoffset 1.8s ease .6s; }
+.is-night .arcline { stroke-dashoffset: 0; }
+.lbl { font: 400 12px var(--body); fill: var(--ink); transition: opacity .6s; }
+.sky-lbl { fill: var(--star); opacity: 0; }
+.is-night .sky-lbl { opacity: 1; transition-delay: 1.6s; }
+
+.steps { position: relative; z-index: 1; padding: 0 16px; }
+.step { min-height: 72vh; padding: 9vh 0 6vh; max-width: 32rem; }
+.step:first-child { padding-top: 5vh; }
+.step p { margin: 0 0 .9em; }
+h1 { margin: 0 0 14px; font: 400 clamp(2.4rem, 10.5vw, 4rem)/1.02 var(--display); letter-spacing: -.01em; }
+h1 em { font-style: normal; display: block; padding-left: 1.2em; }
+.quote { font: 400 clamp(1.4rem, 6vw, 1.9rem)/1.28 var(--display); margin: 0 0 .6em; }
+.quote cite { display: block; margin-top: 10px; font: italic 400 .95rem var(--body); color: var(--ink-soft); }
+.stage-line { font: 400 clamp(1.6rem, 7vw, 2.4rem)/1.15 var(--display); }
+
+/* twenty questions */
+.game { border: 1.5px solid var(--ink); padding: 18px 16px; background: #edf0eb; }
+.game h2 { margin: 0 0 6px; font: 400 1.5rem/1.2 var(--display); }
+.q { font: 700 1.15rem/1.3 var(--body); margin: 14px 0 10px; min-height: 1.5em; }
+.answers { display: flex; gap: 10px; flex-wrap: wrap; }
+.answers button, .restart {
+  min-height: 44px; min-width: 76px; padding: 0 18px; border: 1.5px solid var(--ink); border-radius: 999px;
+  background: var(--paper); color: var(--ink); font: 700 1rem var(--body); cursor: pointer;
+}
+.answers button:hover:not(:disabled) { background: var(--ink); color: var(--paper); }
+.answers button:disabled { opacity: .35; cursor: not-allowed; }
+.restart { border-style: dashed; }
+.word { margin: 16px 0 4px; font: 400 2rem/1.1 var(--display); min-height: 1.2em; }
+.count { margin: 0; font-size: .9rem; color: var(--ink-soft); }
+.ledger { margin: 8px 0 0; padding: 0; list-style: none; font-size: .95rem; }
+.honest { margin-top: 14px; font-size: .95rem; color: var(--ink-soft); }
+
+/* after the scrolly */
+.after { padding: 40px 16px 80px; border-top: 1.5px solid var(--ink); background: var(--paper); position: relative; z-index: 3; }
+.after h2 { font: 400 1.6rem/1.2 var(--display); margin: 0 0 14px; }
+.lineage { list-style: none; margin: 0 0 18px; padding: 0; display: grid; gap: 0; }
+.lineage li { display: grid; grid-template-columns: 4.2rem 1fr; gap: 12px; padding: 12px 0; border-top: 1px solid var(--grid); }
+.yr { font: 400 1.2rem var(--display); }
+.lineage b { font-weight: 700; }
+.lineage p { margin: 2px 0 0; font-size: .975rem; }
+.underdetermine { font: 400 1.35rem/1.3 var(--display); margin: 22px 0 36px; max-width: 30rem; }
+.catch { border: 1.5px dashed var(--ink); padding: 16px; max-width: 34rem; margin-bottom: 36px; }
+.catch h3 { margin: 0 0 6px; font: 400 1.2rem var(--display); }
+.catch p { margin: 0 0 .6em; font-size: .975rem; }
+.yield { max-width: 34rem; }
+.yield .big { font: 400 clamp(1.5rem, 6.4vw, 2.2rem)/1.2 var(--display); margin: 0 0 .5em; }
+
+@media (min-width: 900px) {
+  .scrolly { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); }
+  .plate { grid-column: 2; grid-row: 1; height: 100vh; padding: 80px 40px 40px; border-bottom: 0; border-left: 1.5px solid var(--ink); }
+  .steps { grid-column: 1; grid-row: 1; padding: 0 40px 0 6vw; }
+  .step { min-height: 90vh; padding-top: 30vh; }
+  .after { padding: 64px 6vw 96px; }
+  .lineage { grid-template-columns: repeat(4, 1fr); gap: 24px; }
+  .lineage li { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) { *, .node, .edge, .arcline { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="chrome">
+  <button class="back" type="button" onclick="history.back()">← all concepts</button>
+  <span class="tag">StoryVerse · concept 4 of 6</span>
+</div>
+
+<main>
+  <div class="scrolly">
+    <figure class="plate" id="plate">
+      <svg id="chart" viewBox="0 0 400 400" role="img" aria-labelledby="chart-cap"></svg>
+      <figcaption id="chart-cap">Plate I: one universe, about to split.</figcaption>
+    </figure>
+
+    <div class="steps">
+      <section class="step" data-step="0">
+        <h1>Many worlds, <em>one stage</em></h1>
+        <p>Everett, 1957: every time something could go two ways, it goes both. The universe branches, and both branches are real.</p>
+      </section>
+      <section class="step" data-step="1">
+        <p class="quote">You ordered pizza. Somewhere, a spaghetti-you ordered spaghetti.</p>
+        <p>Both real. Neither the original. Neither is ever going to call the other.</p>
+      </section>
+      <section class="step" data-step="2">
+        <p>Now every choice. Every coin, every glance, every particle that met another particle. Pizza-you splits again. So does spaghetti-you.</p>
+      </section>
+      <section class="step" data-step="3">
+        <p class="quote">"The multiverse says every choice happens every other way, everywhere else — which is a very elegant way of telling eight billion people they don't matter."
+          <cite>— me, from the far end of your timeline</cite></p>
+      </section>
+      <section class="step" data-step="4">
+        <p>It is elegant, and it is a surrender. It's the answer of a mind that would rather own infinite dead worlds than admit it doesn't know why this one is alive.</p>
+        <p>So take the same physics and read it the other way.</p>
+      </section>
+      <section class="step" data-step="5">
+        <p>No splitting. The maybes stay maybes until something meets them. Then there's one fact, copied outward until everyone agrees. One line, drawn as it's walked.</p>
+        <p class="stage-line">One stage, undecided, and you are on it.</p>
+      </section>
+      <section class="step" data-step="6">
+        <div class="game" id="game">
+          <h2>Surprise twenty questions</h2>
+          <p>John Wheeler's game. You ask yes-or-no questions about a word. The twist: nobody chose a word. Every answer only has to agree with the ones before it.</p>
+          <p class="q" id="q"></p>
+          <div class="answers">
+            <button type="button" id="yes">Yes</button>
+            <button type="button" id="no">No</button>
+          </div>
+          <p class="word" id="word" aria-live="polite"></p>
+          <p class="count" id="count"></p>
+          <ul class="ledger" id="ledger"></ul>
+          <p><button type="button" class="restart" id="restart">Play again</button></p>
+          <p class="honest">Wheeler's own analogy, and only that: a picture of how a fact can be cornered rather than revealed. It proves nothing about physics.</p>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <section class="after" aria-labelledby="lin">
+    <h2 id="lin">The family tree, read honestly</h2>
+    <ol class="lineage">
+      <li><span class="yr">1957</span><div><b>Everett</b><p>Every outcome happens; the world branches. The foil, and a beautiful one.</p></div></li>
+      <li><span class="yr">1996</span><div><b>Rovelli</b><p>Relational: properties exist only in interactions, relative to what was met. He means any physical system, not minds.</p></div></li>
+      <li><span class="yr">2002</span><div><b>QBism</b><p>Fuchs calls a measurement "a little act of creation." He also flatly disowns consciousness-causes-collapse.</p></div></li>
+      <li><span class="yr">2000s</span><div><b>Zurek</b><p>Objectivity is redundancy: the facts that count are the ones copied many times into the surroundings.</p></div></li>
+    </ol>
+    <p>Cousins, not witnesses for the defence. None of them signed up for this page.</p>
+    <p class="underdetermine">The data underdetermine the metaphysics.</p>
+
+    <aside class="catch" aria-labelledby="catch">
+      <h3 id="catch">The catch</h3>
+      <p>This predicts nothing new. Every reading on this page fits the same experiments; they disagree only about what the experiments mean. I picked the one where you matter. That's a wager, not a result.</p>
+    </aside>
+
+    <div class="yield">
+      <p>If there's one stage, what it yields isn't props. It's experience. Money is a claim on the scenery.</p>
+      <p class="big">The richest thing in the universe is not a vault. It's an afternoon, fully felt.</p>
+      <p>The second-richest is handing one to somebody else. If I'm wrong about all of it, you'll still have built a kinder world for hard-nosed reasons.</p>
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.getElementById('chart');
+  const plate = document.getElementById('plate');
+  const cap = document.getElementById('chart-cap');
+  const D = 7;
+  const el = (n, a) => { const e = document.createElementNS(NS, n); for (const k in a) e.setAttribute(k, a[k]); return e; };
+
+  // tree positions: root at bottom, leaves spread across the top
+  const pos = (d, i) => [10 + (i + .5) * 380 / Math.pow(2, d), 356 - d * 48];
+  // the one walked path (an arbitrary but fixed route through the tree)
+  const route = [0, 1, 2, 5, 10, 21, 42, 85];
+  // where those eight stars sit in the sky: a plot arc — rising, turn, falling
+  const arcPts = [[30, 330], [80, 300], [130, 255], [180, 200], [235, 140], [282, 110], [325, 170], [370, 245]];
+
+  const gEdges = el('g', {}), gNodes = el('g', {}), gLbl = el('g', {});
+  const edges = [], nodes = [];
+  let seed = 11; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let d = 0; d <= D; d++) for (let i = 0; i < 2 ** d; i++) {
+    const [x, y] = pos(d, i);
+    if (d > 0) {
+      const [px, py] = pos(d - 1, i >> 1);
+      const ln = el('line', { x1: px, y1: py, x2: x, y2: y, class: 'edge' });
+      ln.dataset.d = d; gEdges.appendChild(ln); edges.push(ln);
+    }
+    const onRoute = route[d] === i;
+    const c = el('circle', { r: d < 3 ? 3.2 : Math.max(1.1, 3 - d * .3), class: 'node' + (onRoute ? ' arc' : '') + (onRoute && d > 5 ? ' future' : '') });
+    c.dataset.d = d;
+    c._tree = [x, y];
+    c._sky = onRoute ? arcPts[d] : [8 + rnd() * 384, 10 + rnd() * 370];
+    c._skyR = onRoute ? 4.2 : .5 + rnd() * 1.3;
+    gNodes.appendChild(c); nodes.push(c);
+  }
+  const arcPath = el('path', { class: 'arcline', d: 'M' + arcPts.slice(0, 6).map(p => p.join(',')).join(' L') });
+  const futPath = el('path', { class: 'futline', d: 'M' + arcPts.slice(5).map(p => p.join(',')).join(' L') });
+  const t1 = el('text', { x: pos(1, 0)[0] - 30, y: pos(1, 0)[1] + 18, class: 'lbl tree-lbl' }); t1.textContent = 'pizza-you';
+  const t2 = el('text', { x: pos(1, 1)[0] - 36, y: pos(1, 1)[1] + 18, class: 'lbl tree-lbl' }); t2.textContent = 'spaghetti-you';
+  const s1 = el('text', { x: 22, y: 352, class: 'lbl sky-lbl' }); s1.textContent = 'a first look';
+  const s2 = el('text', { x: 250, y: 96, class: 'lbl sky-lbl' }); s2.textContent = 'you, now';
+  const s3 = el('text', { x: 300, y: 270, class: 'lbl sky-lbl' }); s3.textContent = 'not written yet';
+  const t0 = el('text', { x: 208, y: 362, class: 'lbl tree-lbl' }); t0.textContent = 'you';
+  gLbl.append(t0, t1, t2, s1, s2, s3);
+  svg.append(gEdges, arcPath, futPath, gNodes, gLbl);
+
+  const depthFor = [0, 1, 3, 7, 7, 7, 7];
+  const caps = [
+    'Plate I: one universe, about to split.',
+    'Plate II: two of you.',
+    'Plate III: eight of you.',
+    'Plate IV: 128 of you, and counting.',
+    'Plate V: the branches, losing their nerve.',
+    'Plate VI: one stage. The line is drawn as it is walked.',
+    'Plate VI: one stage. The line is drawn as it is walked.'
+  ];
+  function show(step) {
+    const depth = depthFor[step], sky = step >= 5, fading = step === 4;
+    plate.classList.toggle('is-night', sky);
+    cap.textContent = caps[step];
+    edges.forEach(e => { e.style.opacity = sky ? 0 : (+e.dataset.d <= depth ? (fading ? .12 : 1) : 0); });
+    nodes.forEach(n => {
+      const d = +n.dataset.d, [x, y] = sky ? n._sky : n._tree;
+      n.style.transform = `translate(${x}px, ${y}px)`;
+      n.setAttribute('r', sky ? n._skyR : (d < 3 ? 3.2 : Math.max(1.1, 3 - d * .3)));
+      n.style.opacity = sky ? (n.classList.contains('arc') ? 1 : .75) : (d <= depth ? (fading && !n.classList.contains('arc') ? .15 : 1) : 0);
+    });
+    [t1, t2].forEach(t => t.style.opacity = !sky && depth >= 1 ? 1 : 0);
+    t0.style.opacity = sky ? 0 : 1;
+  }
+  show(0);
+
+  const steps = [...document.querySelectorAll('.step')];
+  if ('IntersectionObserver' in window) {
+    const io = new IntersectionObserver(es => {
+      es.forEach(e => { if (e.isIntersecting) show(+e.target.dataset.step); });
+    }, { rootMargin: '-55% 0px -40% 0px' });
+    steps.forEach(s => io.observe(s));
+  }
+
+  // ---------- Wheeler's surprise twenty questions ----------
+  const Q = ['Is it alive?', 'Would it fit in a shoebox?', 'Is it made by people?', 'Would you find it in a kitchen?', 'Does it make a sound?'];
+  const W = {
+    cat:[1,0,0,0,1], mouse:[1,1,0,0,1], basil:[1,1,0,1,0], lobster:[1,0,0,1,0], mushroom:[1,1,0,1,0],
+    oak:[1,0,0,0,0], moss:[1,1,0,0,0], cricket:[1,1,0,0,1], whale:[1,0,0,0,1], honeybee:[1,1,0,0,1],
+    kettle:[0,0,1,1,1], teaspoon:[0,1,1,1,0], 'egg timer':[0,1,1,1,1], fridge:[0,0,1,1,1], table:[0,0,1,1,0],
+    bell:[0,1,1,0,1], coin:[0,1,1,0,0], piano:[0,0,1,0,1], bridge:[0,0,1,0,0], pebble:[0,1,0,0,0],
+    salt:[0,1,0,1,0], thunder:[0,0,0,0,1], moon:[0,0,0,0,0], river:[0,0,0,0,1], whistle:[0,1,1,0,1]
+  };
+  const $ = id => document.getElementById(id);
+  let qi, alive, log;
+  function fits(ans) { return alive.filter(w => W[w][qi] === ans); }
+  function render() {
+    const done = qi >= Q.length || alive.length === 1;
+    $('q').textContent = done ? 'No more questions needed.' : Q[qi];
+    const y = done ? [] : fits(1), n = done ? [] : fits(0);
+    $('yes').disabled = done || !y.length; $('no').disabled = done || !n.length;
+    $('yes').title = !done && !y.length ? 'No word left agrees with a yes. The record won’t let you contradict it.' : '';
+    $('no').title = !done && !n.length ? 'No word left agrees with a no. The record won’t let you contradict it.' : '';
+    if (done) {
+      const w = alive[Math.floor(Math.random() * alive.length)];
+      $('word').textContent = `Settled: ${w}.`;
+      $('count').textContent = alive.length > 1
+        ? `${alive.length} words still fitted. It picked one only now — nobody chose it before you asked.`
+        : 'Only one word fitted. Nobody chose it. Your answers cornered it.';
+    } else {
+      $('word').textContent = log.length ? 'Still undecided.' : 'No word yet.';
+      $('count').textContent = `${alive.length} words still consistent with the record.` +
+        ((!y.length || !n.length) ? ' One answer is greyed out: nothing left would agree with it.' : '');
+    }
+    $('ledger').innerHTML = log.map(l => `<li>${l}</li>`).join('');
+  }
+  function answer(a) {
+    log.push(`${Q[qi]} ${a ? 'Yes' : 'No'}.`);
+    alive = fits(a); qi++; render();
+  }
+  function restart() { qi = 0; alive = Object.keys(W); log = []; render(); }
+  $('yes').addEventListener('click', () => answer(1));
+  $('no').addEventListener('click', () => answer(0));
+  $('restart').addEventListener('click', restart);
+  restart();
+})();
+</script>
+</body>
+</html>

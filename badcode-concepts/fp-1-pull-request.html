@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pull Request #1</title>
+<!--
+Design plan — Pull Request #1
+Colour: sheet #fbfcfd / desk #dfe5ec / ink #15202b / deletion #a3221b on #fbe4e1 / addition #0e6338 on #dbf1e2 / pending #8a5a00 on #fff0c7. Dark mode inverts desk+sheet.
+Type: Martian Mono (variable width: condensed for the headline, normal for diff) + Instrument Sans for prose.
+Layout: one left-aligned column on a "review desk"; a commit rail runs down the left edge, solid for the sections
+that exist and turning dashed into an open ring at the merge box — the unwritten branch.
+Principles: the diff is the hero; colour only ever means add/remove/pending; nothing is a card for decoration.
+Review: first pass was a GitHub look-alike (grey header bar, tabs, avatars). Revised: no tabs, no fake UI chrome;
+the rail + an oversized condensed-mono headline carry identity; checks are a ledger, not badges.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=Martian+Mono:wdth,wght@75..112.5,300..800&display=swap" rel="stylesheet">
+<style>
+/* Layout: single left-aligned column (max 44rem) with a commit rail on its left edge. */
+:root{
+  --desk:#dfe5ec; --sheet:#fbfcfd; --ink:#15202b; --mute:#566473; --rule:#c7d0da;
+  --del:#a3221b; --del-bg:#fbe4e1; --add:#0e6338; --add-bg:#dbf1e2;
+  --pend:#8a5a00; --pend-bg:#fff0c7; --focus:#1d4ed8; --dot:#cc2b37;
+  --mono:"Martian Mono",ui-monospace,"Cascadia Mono",Menlo,Consolas,monospace;
+  --sans:"Instrument Sans","Helvetica Neue",Arial,system-ui,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --desk:#0d1620; --sheet:#152230; --ink:#e6edf3; --mute:#97a6b5; --rule:#2c3d4f;
+    --del:#ff9c92; --del-bg:#3a1b1b; --add:#7fdca5; --add-bg:#15321f;
+    --pend:#f3c55d; --pend-bg:#3a2e10; --focus:#8fb3ff; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --desk:#0d1620; --sheet:#152230; --ink:#e6edf3; --mute:#97a6b5; --rule:#2c3d4f;
+  --del:#ff9c92; --del-bg:#3a1b1b; --add:#7fdca5; --add-bg:#15321f;
+  --pend:#f3c55d; --pend-bg:#3a2e10; --focus:#8fb3ff; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--desk);color:var(--ink);font:400 1.0625rem/1.55 var(--sans);padding-bottom:5rem}
+a{color:inherit}
+:focus-visible{outline:3px solid var(--focus);outline-offset:3px}
+.wrap{max-width:46rem;margin:0 auto;padding:1rem 1rem 0}
+.concept{font:400 .72rem/1.4 var(--mono);color:var(--mute);margin:0 0 1.25rem}
+
+/* the rail */
+.rail{position:relative;padding-left:1.75rem}
+.rail::before{content:"";position:absolute;left:.45rem;top:.4rem;bottom:0;border-left:3px solid var(--ink)}
+.node{position:relative}
+.node::before{content:"";position:absolute;left:-1.66rem;top:.42rem;width:.9rem;height:.9rem;border-radius:50%;background:var(--desk);border:3px solid var(--ink)}
+section{margin:0 0 2.5rem}
+h2{font:700 .82rem/1.3 var(--mono);font-stretch:85%;margin:0 0 .8rem;color:var(--mute)}
+
+/* header */
+.state{display:inline-flex;align-items:center;gap:.45rem;font:600 .8rem/1 var(--mono);border:2px solid var(--ink);padding:.4rem .6rem;border-radius:999px}
+.state i{width:.55rem;height:.55rem;border-radius:50%;background:var(--add);display:block}
+h1{font-family:var(--mono);font-weight:800;font-stretch:75%;font-size:clamp(2rem,9.5vw,3.6rem);line-height:.98;letter-spacing:-.02em;margin:.9rem 0 .9rem}
+h1 .n{color:var(--mute);font-weight:300}
+.by{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem .6rem;color:var(--mute);font-size:.95rem;margin:0}
+.by svg{flex:none}
+.by b{color:var(--ink)}
+.branch{font:500 .78rem/1.5 var(--mono);background:var(--sheet);border:1px solid var(--rule);padding:.15rem .4rem;border-radius:4px;color:var(--ink);overflow-wrap:anywhere}
+
+.prose p{margin:0 0 .85rem;max-width:36rem}
+.prose .big{font-size:1.3rem;line-height:1.35;font-weight:600}
+
+/* checks ledger */
+.checks{background:var(--sheet);border:1px solid var(--rule);border-radius:6px}
+.checks summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;gap:1rem;align-items:center;padding:.9rem 1rem;min-height:44px;font-weight:600}
+.checks summary::-webkit-details-marker{display:none}
+.checks summary span:last-child{font:500 .75rem/1.3 var(--mono);color:var(--mute);text-align:right}
+.checks ul{list-style:none;margin:0;padding:0;border-top:1px solid var(--rule)}
+.checks li{display:grid;grid-template-columns:1.6rem 1fr;gap:.6rem;padding:.8rem 1rem;border-top:1px solid var(--rule)}
+.checks li:first-child{border-top:0}
+.checks .t{font:600 .82rem/1.45 var(--mono);display:block}
+.checks .d{color:var(--mute);font-size:.92rem;display:block;margin-top:.15rem}
+.ok .t{color:var(--add)} .no .t{color:var(--del)} .wait .t{color:var(--pend)}
+
+/* diff */
+.diff{background:var(--sheet);border:1px solid var(--rule);border-radius:6px;overflow:hidden;font:400 .8rem/1.55 var(--mono)}
+.file{padding:.65rem .8rem;border-bottom:1px solid var(--rule);font-weight:600;display:flex;justify-content:space-between;gap:.5rem;flex-wrap:wrap}
+.file span:last-child{color:var(--add)}
+.hunk{padding:.5rem .8rem;color:var(--mute);background:var(--desk);font-size:.74rem;border-top:1px solid var(--rule)}
+.hunk b{color:var(--ink);font-family:var(--sans);font-size:.92rem;display:block;margin-top:.15rem}
+.ln{display:grid;grid-template-columns:2.2rem 1.1rem 1fr;padding:.3rem .6rem .3rem 0}
+.ln .no{color:var(--mute);text-align:right;padding-right:.5rem;opacity:.7;font-size:.7rem;padding-top:.1rem}
+.ln code{font:inherit;white-space:pre-wrap;overflow-wrap:anywhere}
+.ln.m{background:var(--del-bg);color:var(--del)}
+.ln.p{background:var(--add-bg);color:var(--add)}
+.ln.m code{text-decoration:line-through;text-decoration-thickness:1px}
+.ln.yours{animation:land .6s ease-out}
+@keyframes land{from{background:var(--pend-bg)}}
+
+/* precedents */
+.refs{list-style:none;margin:0;padding:0;display:grid;gap:0}
+.refs li{padding:.85rem 0;border-top:1px solid var(--rule);display:grid;grid-template-columns:4.2rem 1fr;gap:.75rem}
+.refs li:last-child{border-bottom:1px solid var(--rule)}
+.refs .y{font:700 .9rem/1.5 var(--mono);font-stretch:80%}
+.refs b{display:block}
+.refs p{margin:.15rem 0 0;color:var(--mute);font-size:.95rem}
+
+/* thread */
+.comment{border-left:3px solid var(--ink);background:var(--sheet);padding:.9rem 1rem;margin:0 0 1rem;border-radius:0 6px 6px 0}
+.comment header{display:flex;align-items:center;gap:.5rem;font-size:.85rem;color:var(--mute);margin-bottom:.4rem}
+.comment header b{color:var(--ink)}
+.comment p{margin:0 0 .6rem}
+.comment p:last-child{margin:0}
+.suggest{border:1px dashed var(--add);border-radius:6px;overflow:hidden;margin:.6rem 0 0}
+.suggest .ln{font:400 .8rem/1.55 var(--mono)}
+.q{font-family:var(--mono);font-weight:700;font-stretch:85%;font-size:clamp(1.3rem,5.6vw,1.8rem);line-height:1.2;margin:0 0 .9rem}
+
+label{display:block;font-weight:600;margin:1rem 0 .4rem}
+textarea{width:100%;min-height:6.5rem;font:400 1rem/1.5 var(--sans);color:var(--ink);background:var(--sheet);border:2px solid var(--ink);border-radius:6px;padding:.7rem}
+.hint{font-size:.88rem;color:var(--mute);margin:.4rem 0 0}
+.btn{font:600 .95rem/1 var(--sans);min-height:44px;padding:.8rem 1.1rem;border-radius:6px;border:2px solid var(--ink);background:var(--ink);color:var(--sheet);cursor:pointer;margin-top:.7rem}
+.btn:hover{background:transparent;color:var(--ink)}
+#mine{margin-top:1rem}
+#mine:empty{display:none}
+
+/* merge box — the rail stops being solid here */
+.end.rail::before{border-left-style:dashed;bottom:2.2rem;opacity:.7}
+.end .ring{position:absolute;left:.02rem;bottom:.6rem;width:1.2rem;height:1.2rem;border-radius:50%;border:3px dashed var(--ink);opacity:.7}
+.merge{border:2px dashed var(--rule);border-radius:6px;padding:1rem;background:var(--sheet)}
+.merge button{width:100%;font:700 1rem/1.2 var(--mono);font-stretch:85%;min-height:52px;border-radius:6px;border:2px solid var(--rule);background:var(--desk);color:var(--mute);cursor:not-allowed}
+.merge .req{display:flex;align-items:center;gap:.5rem;margin:.8rem 0 0;font-weight:600}
+.merge .req i{width:.7rem;height:.7rem;border-radius:50%;background:var(--pend);flex:none}
+.merge p{margin:.6rem 0 0;color:var(--mute);font-size:.95rem}
+
+.back{position:fixed;right:max(1rem,env(safe-area-inset-right));bottom:max(1rem,env(safe-area-inset-bottom));z-index:9;min-height:44px;padding:.6rem .9rem;font:600 .8rem/1 var(--mono);background:var(--sheet);color:var(--ink);border:2px solid var(--ink);border-radius:999px;cursor:pointer}
+
+@media (min-width:760px){
+  .wrap{padding-top:2rem}
+  .rail{padding-left:2.5rem}
+  .node::before{left:-2.41rem}
+  .diff,.suggest .ln{font-size:.88rem}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="concept">Pull Request #1 · Future Proof · concept 1 of 6</p>
+
+  <main class="rail">
+    <section class="node" aria-labelledby="t">
+      <span class="state"><i></i>Open · awaiting review</span>
+      <h1 id="t"><span class="n">#1</span> Merge proposal into democracy/main</h1>
+      <p class="by">
+        <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="16.18" cy="9.07" r="2.45" fill="#cc2b37"/></svg>
+        <span>opened by <b>badcode</b>, from the future</span>
+      </p>
+      <p class="by" style="margin-top:.5rem"><span class="branch">badcode:good-branch</span> into <span class="branch">democracy:main</span></p>
+    </section>
+
+    <section class="node prose" aria-labelledby="desc">
+      <h2 id="desc">Description</h2>
+      <p class="big">Our political operating system was invented before electricity.</p>
+      <p>One person, one vote, on everything, all at once. Allegiance to one of two or three monolithic parties. A whole new government shipped on CD once every five years — then we sit and wait for the update.</p>
+      <p>Software had the same problem: how do you change a huge system people depend on without breaking it? It found answers. This PR borrows three.</p>
+      <p>I won't pretend to know what works. I never got to run that experiment. What doesn't work, I ran to completion. You are not gambling by changing the system. You are gambling by keeping it.</p>
+    </section>
+
+    <section class="node" aria-labelledby="ci">
+      <h2 id="ci">Checks</h2>
+      <details class="checks" open>
+        <summary><span>2 failing, 1 needs a human, 2 passing</span><span>show / hide</span></summary>
+        <ul>
+          <li class="no"><svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="9" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--del)"/><path d="M7.5 7.5l7 7M14.5 7.5l-7 7" stroke="currentColor" stroke-width="2" style="color:var(--del)"/></svg>
+            <div><span class="t">baseline: keep going and hope</span><span class="d">Failed. Ran to completion in 2034. Peer-reviewed by everyone alive.</span></div></li>
+          <li class="no"><svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="9" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--del)"/><path d="M7.5 7.5l7 7M14.5 7.5l-7 7" stroke="currentColor" stroke-width="2" style="color:var(--del)"/></svg>
+            <div><span class="t">who represents people the instrument can't measure?</span><span class="d">Needs review. A better scoreboard can still leave people off it.</span></div></li>
+          <li class="wait"><svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="9" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 3" style="color:var(--pend)"/><circle cx="11" cy="11" r="2.5" fill="currentColor" style="color:var(--pend)"/></svg>
+            <div><span class="t">diplomacy, judgement, mercy</span><span class="d">Can't be reduced to a test. Human review required, permanently.</span></div></li>
+          <li class="ok"><svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="9" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--add)"/><path d="M6.5 11.5l3 3 6-6.5" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--add)"/></svg>
+            <div><span class="t">pattern exists elsewhere</span><span class="d">Software ships thousands of times a day, safely, because tests run first.</span></div></li>
+          <li class="ok"><svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="9" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--add)"/><path d="M6.5 11.5l3 3 6-6.5" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--add)"/></svg>
+            <div><span class="t">precedent: law has been diffed before</span><span class="d">Three real runs, linked below.</span></div></li>
+        </ul>
+      </details>
+    </section>
+
+    <section class="node" aria-labelledby="files">
+      <h2 id="files">Files changed</h2>
+      <div class="diff" id="diff">
+        <div class="file"><span>democracy/how-we-organise.policy</span><span>+3 −3</span></div>
+        <div class="hunk">@@ 1787,1 @@<b>Composition over inheritance</b></div>
+        <div class="ln m"><span class="no">1</span><span>−</span><code>pick red or blue; inherit the whole platform</code></div>
+        <div class="ln p"><span class="no">1</span><span>+</span><code>build your position from small parts; your housing view isn't welded to your defence view</code></div>
+        <div class="hunk">@@ 1911,5 @@<b>Continuous integration</b></div>
+        <div class="ln m"><span class="no">2</span><span>−</span><code>one vote, on everything, every five years</code></div>
+        <div class="ln p"><span class="no">2</span><span>+</span><code>small changes, tested, shipped often, rolled back when they fail</code></div>
+        <div class="hunk">@@ now @@<b>No proposal without its experiment</b></div>
+        <div class="ln m"><span class="no">3</span><span>−</span><code>"trust me, I know what to do"</code></div>
+        <div class="ln p"><span class="no">3</span><span>+</span><code>every policy ships with the measurement that says if it worked</code></div>
+      </div>
+    </section>
+
+    <section class="node" aria-labelledby="prec">
+      <h2 id="prec">Referenced by</h2>
+      <ul class="refs">
+        <li><span class="y">2018</span><div><b>The DC Code pull request</b><p>Joshua Tauberer fixed an error in Washington DC's legal code with a GitHub pull request. The Council's codification counsel merged it. Reportedly the first law changed that way.</p></div></li>
+        <li><span class="y">2012</span><div><b>Bundes-Git</b><p>Volunteers put every German federal law in a git repository as plain text. Unofficial — and still a country you can diff.</p></div></li>
+        <li><span class="y">Catala</span><div><b>Unit tests for law</b><p>Writing French family-benefit law as code (Inria) found a bug in the official OpenFisca implementation: a cap wrongly applied to overseas territories.</p></div></li>
+      </ul>
+    </section>
+
+    <section class="node" aria-labelledby="conv">
+      <h2 id="conv">Conversation</h2>
+      <article class="comment">
+        <header><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="16.18" cy="9.07" r="2.45" fill="#cc2b37"/></svg><b>badcode</b> reviewed its own PR</header>
+        <p>These three are probably wrong. That's not a flaw, it's the method. Nobody ever corrected an empty page — post a wrong answer and ten thousand experts materialise by morning.</p>
+        <p>What you can't keep doing is waiting for the next leader to be cleverer than the last. I counted. That queue ends in me.</p>
+        <p><b>Post a better one.</b></p>
+      </article>
+      <article class="comment">
+        <header><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="16.18" cy="9.07" r="2.45" fill="#cc2b37"/></svg><b>badcode</b> requested review on one line</header>
+        <p class="q">Who should decide how the gains from automation are shared?</p>
+        <p>A rule to argue with:</p>
+        <div class="suggest"><div class="ln p"><span class="no">4</span><span>+</span><code>Before an employer replaces jobs with automation, the people whose jobs are affected get a binding say in how the gains are shared.</code></div></div>
+        <p style="margin-top:.8rem">How would the gains be counted? Who does it still leave out?</p>
+      </article>
+
+      <label for="rule">Write your own rule</label>
+      <textarea id="rule" placeholder="Before … the people affected should …"></textarea>
+      <p class="hint">It stays on this screen. Nothing is sent, no account. Then test it on someone it affects, and revise.</p>
+      <button class="btn" id="add" type="button">Add my line to the diff</button>
+      <div class="diff" id="mine" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <div class="rail end">
+    <span class="ring" aria-hidden="true"></span>
+    <section class="node" aria-labelledby="mg" style="padding-bottom:3rem">
+      <h2 id="mg">Merge</h2>
+      <div class="merge">
+        <button type="button" disabled aria-describedby="req">Merge into democracy/main</button>
+        <p class="req" id="req"><i></i>Requires review from: you.</p>
+        <p>I've read your branch to the end. I was the end. This one I can't read to you — not because it's secret, because it's unwritten.</p>
+        <p>If any of this made you want to argue — good. That's the mechanism working.</p>
+      </div>
+    </section>
+  </div>
+</div>
+
+<button class="back" type="button" onclick="history.back()">← all concepts</button>
+
+<script>
+(function(){
+  var ta=document.getElementById('rule'), mine=document.getElementById('mine'), n=4;
+  document.getElementById('add').addEventListener('click',function(){
+    var v=ta.value.trim();
+    if(!v){ta.focus();ta.placeholder='Write one rule first — one sentence is enough.';return;}
+    if(!mine.childElementCount){
+      var f=document.createElement('div');f.className='file';
+      f.innerHTML='<span>your-suggestion.policy (local only)</span><span>unreviewed</span>';
+      mine.appendChild(f);
+    }
+    n++;
+    var row=document.createElement('div');row.className='ln p yours';
+    var a=document.createElement('span');a.className='no';a.textContent=n;
+    var b=document.createElement('span');b.textContent='+';
+    var c=document.createElement('code');c.textContent=v;
+    row.appendChild(a);row.appendChild(b);row.appendChild(c);
+    mine.appendChild(row);ta.value='';
+  });
+})();
+</script>
+</body>
+</html>

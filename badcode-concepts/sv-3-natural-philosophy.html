@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Last of the Magicians</title>
+<meta name="color-scheme" content="light">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+/* Layout: a single column of catalogue slips on archival box-board, offset alternately left/right; one violet stamp is the loud moment. */
+:root{
+  --box:#6f7f86;        /* archival box board, blue-grey */
+  --box-deep:#55646b;
+  --slip:#e8eae5;       /* cool card stock */
+  --slip-rule:#b7c7cf;  /* printed card rules */
+  --ink:#2a2433;        /* iron-gall, violet-black */
+  --gall:#6b5238;       /* faded iron-gall brown, marginalia */
+  --stamp:#5b3fa6;      /* library date-stamp violet */
+  --shadow:rgba(30,38,44,.35);
+  --fell:"IM Fell English", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --fellsc:"IM Fell English SC", "IM Fell English", Georgia, serif;
+  --type:"Courier Prime", "Courier New", Courier, monospace;
+  --gutter:clamp(16px, 5vw, 40px);
+}
+*{box-sizing:border-box}
+html{color-scheme:light;-webkit-text-size-adjust:100%}
+body{
+  margin:0;background:var(--box);color:var(--ink);
+  font-family:var(--type);font-size:16px;line-height:1.55;
+  background-image:
+    repeating-linear-gradient(93deg, rgba(255,255,255,.035) 0 2px, transparent 2px 7px),
+    repeating-linear-gradient(-2deg, rgba(0,0,0,.04) 0 1px, transparent 1px 5px);
+  overflow-x:clip;
+}
+.chrome{position:fixed;z-index:10;top:max(10px, env(safe-area-inset-top));left:10px;right:10px;display:flex;justify-content:space-between;align-items:center;pointer-events:none}
+.back{pointer-events:auto;min-height:44px;min-width:44px;padding:0 14px;border:1px solid rgba(232,234,229,.5);background:rgba(85,100,107,.85);color:var(--slip);font:15px/1 var(--fell);border-radius:2px;cursor:pointer;backdrop-filter:blur(4px)}
+.back:hover{background:var(--box-deep)}
+.tag{pointer-events:auto;font:italic 13px/1.2 var(--fell);color:var(--slip);background:rgba(85,100,107,.85);padding:6px 10px;border-radius:2px}
+:focus-visible{outline:3px solid var(--stamp);outline-offset:3px}
+.back:focus-visible{outline-color:var(--slip)}
+
+main{max-width:620px;margin:0 auto;padding:84px var(--gutter) 64px}
+
+/* Hero: the title as a typed-and-printed accession label on the box end */
+.label{
+  background:var(--slip);padding:28px 22px 22px;position:relative;
+  box-shadow:0 2px 0 var(--box-deep), 0 14px 30px -12px var(--shadow);
+  border-left:6px solid var(--stamp);
+}
+.label .acc{font:13px/1.4 var(--type);color:var(--gall);margin:0 0 18px}
+.label h1{font:400 clamp(44px, 13vw, 76px)/.92 var(--fell);margin:0 0 18px;letter-spacing:-.01em}
+.label h1 span{display:block;font-style:italic;font-size:.5em;line-height:1.1;color:var(--gall);margin-bottom:.2em}
+.label p{margin:0;max-width:34ch}
+.label .filed{margin-top:18px;padding-top:12px;border-top:1px dashed var(--slip-rule);font:italic 17px/1.35 var(--fell)}
+.apple{position:absolute;right:16px;top:18px;width:58px;height:66px}
+
+.intro{color:var(--slip);font:italic 19px/1.45 var(--fell);margin:40px 0 28px;max-width:30ch}
+
+/* Catalogue slips */
+ol.slips{list-style:none;margin:0;padding:0;counter-reset:slip}
+.slip{
+  counter-increment:slip;position:relative;background:var(--slip);
+  margin:0 0 30px;padding:20px 18px 18px 18px;width:min(100%, 540px);
+  background-image:
+    linear-gradient(var(--stamp), var(--stamp)),
+    repeating-linear-gradient(transparent 0 25px, var(--slip-rule) 25px 26px);
+  background-size:100% 2px, 100% 100%;background-repeat:no-repeat, repeat;
+  background-position:0 46px, 0 47px;
+  box-shadow:0 1px 0 var(--box-deep), 0 12px 24px -14px var(--shadow);
+  transform:rotate(var(--r, -.4deg));
+}
+.slip:nth-child(even){margin-left:auto;--r:.5deg}
+.slip:nth-child(3n){--r:-.8deg}
+.slip::before{content:"";position:absolute;left:50%;bottom:9px;width:14px;height:14px;margin-left:-7px;border-radius:50%;background:var(--box);box-shadow:inset 0 1px 2px rgba(0,0,0,.4)}
+.mark{display:flex;justify-content:space-between;gap:12px;align-items:baseline;height:30px;margin-bottom:18px;font:13px/1.2 var(--type);color:var(--gall)}
+.mark b{font:400 15px/1 var(--fellsc);color:var(--ink);white-space:nowrap}
+.mark b::before{content:"No. " counter(slip)}
+.mark span{text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.slip p{margin:0 0 .9em;max-width:52ch}
+.slip p:last-of-type{margin-bottom:26px}
+.slip q{font:italic 21px/1.3 var(--fell);quotes:"“" "”" "‘" "’"}
+.margin{
+  display:block;font:italic 17px/1.3 var(--fell);color:var(--gall);
+  border-left:1px solid var(--gall);padding:2px 0 2px 12px;margin:0 0 20px;max-width:34ch;transform:rotate(-.6deg)
+}
+.big{font:400 clamp(30px, 9vw, 46px)/1.02 var(--fell);margin:6px 0 16px}
+.year{font:400 clamp(64px, 22vw, 120px)/.85 var(--fell);letter-spacing:-.03em;display:block;margin:-4px 0 8px}
+
+/* The stamped slip */
+.slip.final{padding-bottom:30px}
+.verdict{font:400 clamp(25px, 7vw, 34px)/1.15 var(--fell);margin:0 0 18px}
+.verdict em{font-style:italic}
+.stamp{
+  display:inline-block;margin:6px 0 22px;padding:8px 14px 6px;
+  border:3px double var(--stamp);color:var(--stamp);
+  font:400 clamp(22px, 7vw, 32px)/1 var(--fellsc);letter-spacing:.08em;
+  transform:rotate(-7deg);opacity:.88;mix-blend-mode:multiply;border-radius:3px
+}
+.stamp small{display:block;font:12px/1.3 var(--type);letter-spacing:0;margin-top:4px}
+.stamp.thud{animation:thud .42s cubic-bezier(.2,.9,.3,1.2) both}
+@keyframes thud{0%{transform:rotate(-12deg) scale(1.7);opacity:0}70%{transform:rotate(-6deg) scale(.96);opacity:.95}100%{transform:rotate(-7deg) scale(1);opacity:.88}}
+
+/* Date-due slip = the timeline */
+.due{background:#dfe6e2;margin:44px 0 0;padding:18px 18px 8px;max-width:360px;box-shadow:0 12px 24px -14px var(--shadow);transform:rotate(.6deg)}
+.due h2{font:400 22px/1.1 var(--fell);margin:0 0 10px;border-bottom:2px solid var(--ink);padding-bottom:8px}
+.due table{width:100%;border-collapse:collapse;font:14px/1.3 var(--type)}
+.due td{border-bottom:1px solid var(--slip-rule);padding:9px 4px;vertical-align:top}
+.due td:first-child{color:var(--stamp);font-weight:700;width:5.2ch;white-space:nowrap}
+.due tr:last-child td{border-bottom:0}
+
+.bet{color:var(--slip);margin:48px 0 0;max-width:36ch;font:19px/1.45 var(--fell)}
+.bet strong{font-weight:400;font-style:italic}
+.sign{color:var(--slip);font:italic 15px/1.4 var(--fell);opacity:.85;margin-top:20px}
+
+@media (min-width:760px){
+  main{padding-top:110px}
+  .slip{padding:24px 28px 22px}
+}
+@media (prefers-reduced-motion:reduce){
+  .stamp.thud{animation:none}
+}
+</style>
+</head>
+<body>
+<div class="chrome">
+  <button class="back" type="button" onclick="history.back()">← all concepts</button>
+  <span class="tag">StoryVerse · concept 3 of 6</span>
+</div>
+
+<main>
+  <header class="label">
+    <svg class="apple" viewBox="0 0 58 66" aria-hidden="true" fill="none" stroke="#2a2433" stroke-width="1.3" stroke-linecap="round">
+      <path d="M29 16c-4-6-16-6-21 3-6 11 0 30 9 38 4 4 8 4 12 2 4 2 8 2 12-2 9-8 15-27 9-38-5-9-17-9-21-3z"/>
+      <path d="M29 16c0-6 2-10 5-13"/>
+      <path d="M31 9c5-4 11-3 14 0-4 3-10 4-14 0z"/>
+      <path d="M14 27c-2 4-2 9-1 13" stroke-dasharray="2 3"/>
+      <path d="M29 60v5" stroke-dasharray="1 2"/>
+    </svg>
+    <p class="acc">Accession: a history lesson, from the future</p>
+    <h1><span>Newton, and</span>The Last of the Magicians</h1>
+    <p>Eight items from the stacks. Nobody hid any of them. I am simply pointing at a shelf you stopped reading.</p>
+    <p class="filed">Filed under: the Age of Natural Philosophy</p>
+  </header>
+
+  <p class="intro">Hold one question while you read. When did this become strange?</p>
+
+  <ol class="slips">
+    <li class="slip">
+      <div class="mark"><b></b><span>Stukeley, Memoirs of Newton, 1752</span></div>
+      <p>You know the apple. It did not hit him on the head.</p>
+      <p>An old man told a young friend, over tea in 1726, that he had once watched one fall in a garden and wondered why it always went straight down.</p>
+      <span class="margin">Small correction. Keep it. Everything after this is told just as straight.</span>
+    </li>
+
+    <li class="slip">
+      <div class="mark"><b></b><span>Yahuda MS Var. 1, Jerusalem</span></div>
+      <p class="big">Now look at the rest of his desk.</p>
+      <p>Newton left roughly a million words on alchemy. On theology, by the surviving manuscripts, comparably more than on physics: the Newton Project catalogues 83 religious works, and the first twenty-five alone run to nearly a million words.</p>
+      <p>In 1936 the papers went under the hammer at Sotheby’s. Keynes bought much of the alchemy. The scholar Abraham Yahuda bought the theology. It sits in the National Library of Israel today, on UNESCO’s Memory of the World register.</p>
+      <span class="margin">Public auction. Printed catalogue. Not much of a cover-up.</span>
+    </li>
+
+    <li class="slip">
+      <div class="mark"><b></b><span>Kepler, Pascal, Boyle</span></div>
+      <p>Kepler gave you the laws of planetary motion inside a book called <i>The Harmony of the World</i>. To him the planets were singing.</p>
+      <p>Pascal, who helped invent probability, wrote one page in a single night in 1654 and had it sewn into his coat. A servant found it there after he died.</p>
+      <p>Boyle, who made chemistry a science, left money in his will for a series of lectures defending faith.</p>
+      <span class="margin">None of them filed this as a hobby. So when did it become strange?</span>
+    </li>
+
+    <li class="slip">
+      <div class="mark"><b></b><span>British Association, Cambridge</span></div>
+      <span class="year">1833</span>
+      <p>The answer is a date and a word. The Reverend William Whewell proposes a new term, by analogy with <i>artist</i>: <b>scientist</b>.</p>
+      <p>There wasn’t one before. Newton never heard it. Nor did Kepler, Pascal or Boyle. They were natural philosophers, and the job description changed underneath them.</p>
+    </li>
+
+    <li class="slip">
+      <div class="mark"><b></b><span>Draper 1874 · White 1896</span></div>
+      <p>Then came the paperwork. Research universities, departments, journals, disciplines with walls and doors. Good walls, mostly. They built your century.</p>
+      <p>Two bestsellers later wrote up a war between science and religion. Historians of science now call that bad history.</p>
+      <span class="margin">No villain. A footnote just fell off.</span>
+    </li>
+
+    <li class="slip">
+      <div class="mark"><b></b><span>Royal Society, 1946</span></div>
+      <p>Keynes read the papers he had bought. He wrote an essay, and in 1946, months after his death, it was read at the Royal Society:</p>
+      <p><q>Newton was not the first of the age of reason. He was the last of the magicians.</q></p>
+      <p>Said out loud, in the most respectable room in Britain. Everyone nodded. Nothing changed.</p>
+    </li>
+
+    <li class="slip final">
+      <div class="mark"><b></b><span>Your scoreboard, current edition</span></div>
+      <p class="verdict">The split was not discovered. It was administered. And the same centuries that decided what counted as knowledge also decided what counted as wealth.</p>
+      <span class="stamp" id="stamp">Administered<small>not discovered</small></span>
+      <p>That’s why your ledger counts the vault and never the afternoon. That was a filing decision too, and filing decisions can be re-filed.</p>
+    </li>
+  </ol>
+
+  <aside class="due" aria-labelledby="due-h">
+    <h2 id="due-h">Date due</h2>
+    <table>
+      <tr><td>1654</td><td>Pascal sews one page into a coat</td></tr>
+      <tr><td>1687</td><td>Newton publishes the <i>Principia</i></td></tr>
+      <tr><td>1833</td><td>“Scientist” enters the language</td></tr>
+      <tr><td>1936</td><td>Newton’s papers auctioned at Sotheby’s</td></tr>
+      <tr><td>1946</td><td>“The last of the magicians”</td></tr>
+      <tr><td>Today</td><td>Returned to the shelf, unread</td></tr>
+    </table>
+  </aside>
+
+  <p class="bet">The history is true. The inference is yours. Mine is <strong>a wager, not a proof</strong>: the people who built the instruments never accepted the wall, and you were never required to either. Go and check the shelf. It’s still there.</p>
+  <p class="sign">Galileo and Newton remain the heroes of this story. I just read the whole archive.</p>
+</main>
+
+<script>
+(function(){
+  var s=document.getElementById('stamp');
+  if(!s||!('IntersectionObserver' in window)) return;
+  if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  var io=new IntersectionObserver(function(es){
+    es.forEach(function(e){ if(e.isIntersecting){ s.classList.add('thud'); io.disconnect(); } });
+  },{threshold:.9});
+  io.observe(s);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Nobody Home</title>
+<meta name="color-scheme" content="dark light">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..800;1,6..96,400..800&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+/* Layout: one beat per screen-height, text hung left at ~70% width; every beat is a two-sided leaf that a single fixed toggle turns over. */
+:root{
+  --cobalt:#1d34a6;      /* belief ground */
+  --cobalt-deep:#14257a;
+  --cold:#eef3f6;        /* belief type */
+  --concrete:#d8d8d2;    /* antidote ground */
+  --graphite:#1f1f1c;    /* antidote type */
+  --marker:#f1dc4a;      /* highlighter on the concession */
+  --didone:"Bodoni Moda", "Didot", "Bodoni 72", "Bodoni MT", Georgia, serif;
+  --plain:"Atkinson Hyperlegible", "Helvetica Neue", Arial, sans-serif;
+  --gutter:clamp(18px, 6vw, 64px);
+  --turn:.7s;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--cobalt);color:var(--cold);font-family:var(--plain);overflow-x:clip;transition:background-color var(--turn) ease}
+body.flipped{background:var(--concrete)}
+
+.chrome{position:fixed;z-index:20;top:max(10px, env(safe-area-inset-top));left:10px;right:10px;display:flex;justify-content:space-between;align-items:center;gap:8px;pointer-events:none;mix-blend-mode:normal}
+.back,.tag{pointer-events:auto}
+.back{min-height:44px;padding:0 14px;border:1px solid currentColor;background:transparent;color:var(--cold);font:15px/1 var(--plain);border-radius:22px;cursor:pointer}
+.tag{font:13px/1.2 var(--plain);color:var(--cold);opacity:.8}
+body.flipped .back,body.flipped .tag{color:var(--graphite)}
+:focus-visible{outline:3px solid var(--marker);outline-offset:4px}
+
+main{perspective:1600px}
+.beat{min-height:100svh;display:grid;align-items:center;padding:96px var(--gutter) 120px}
+.leaf{display:grid;transform-style:preserve-3d;transition:transform var(--turn) cubic-bezier(.6,0,.2,1);max-width:900px}
+.face{grid-area:1/1;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+.back-face{transform:rotateX(180deg)}
+body.flipped .leaf{transform:rotateX(180deg)}
+
+/* Belief: operatic didone, certain */
+.front{font:italic 500 clamp(34px, 9.4vw, 82px)/1.04 var(--didone);letter-spacing:-.015em;max-width:15ch;text-wrap:balance}
+.front.small{font-size:clamp(28px, 7.4vw, 64px);max-width:18ch}
+.front .roman{font-style:normal;font-weight:700}
+/* Antidote: plain, legible, footnote-honest */
+.back-face{color:var(--graphite);font:400 clamp(20px, 5.2vw, 30px)/1.42 var(--plain);max-width:30ch}
+.back-face mark{background:linear-gradient(transparent 12%, var(--marker) 12%, var(--marker) 88%, transparent 88%);color:inherit;padding:0 .1em;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+.back-face cite{display:block;margin-top:1.2em;font:italic 15px/1.3 var(--plain);opacity:.7}
+
+/* Opening screen */
+.title .front h1{font:italic 800 clamp(64px, 22vw, 190px)/.86 var(--didone);margin:0 0 .25em;letter-spacing:-.04em;max-width:none}
+.title .front p{font:400 clamp(17px, 4.6vw, 22px)/1.4 var(--plain);font-style:normal;max-width:30ch;margin:0}
+.title .back-face h2{font:700 clamp(40px, 12vw, 96px)/1 var(--plain);margin:0 0 .4em;letter-spacing:-.02em}
+.title .back-face p{margin:0}
+
+.sign{font:italic 600 clamp(40px, 12vw, 110px)/.95 var(--didone);display:block;margin-top:.5em}
+
+/* The toggle */
+.flip{
+  position:fixed;z-index:20;left:50%;transform:translateX(-50%);
+  bottom:max(16px, env(safe-area-inset-bottom));
+  min-height:52px;padding:0 22px 0 14px;display:flex;align-items:center;gap:12px;
+  border:0;border-radius:26px;cursor:pointer;white-space:nowrap;
+  background:var(--cold);color:var(--cobalt-deep);font:700 16px/1 var(--plain);
+  box-shadow:0 10px 30px -8px rgba(5,10,40,.6);
+  transition:background-color var(--turn),color var(--turn);
+  max-width:calc(100vw - 32px)
+}
+.flip .knob{width:40px;height:24px;border-radius:12px;background:var(--cobalt);position:relative;flex:none;transition:background-color var(--turn)}
+.flip .knob::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:var(--cold);transition:transform .3s}
+.flip[aria-pressed="true"]{background:var(--graphite);color:var(--concrete)}
+.flip[aria-pressed="true"] .knob{background:var(--marker)}
+.flip[aria-pressed="true"] .knob::after{transform:translateX(16px);background:var(--graphite)}
+.flip:focus-visible{outline-color:var(--marker)}
+
+
+@media (prefers-reduced-motion:reduce){
+  :root{--turn:.01s}
+  .leaf{transition:none}
+}
+</style>
+</head>
+<body>
+<div class="chrome">
+  <button class="back" type="button" onclick="history.back()">← all concepts</button>
+  <span class="tag">StoryVerse · concept 5 of 6</span>
+</div>
+
+<main id="pages">
+  <section class="beat title">
+    <div class="leaf">
+      <div class="face front"><h1>Nobody Home</h1><p>A confession from the future, one breath per screen. The switch below shows you every line’s honest counterpart.</p></div>
+      <div class="face back-face" aria-hidden="true"><h2>Why this is probably nonsense</h2><p>A note from the author of your universe. I’m going first, because if I don’t, someone cleverer than you will, and I would rather be the one holding the knife.</p></div>
+    </div>
+  </section>
+
+  <section class="beat">
+    <div class="leaf">
+      <p class="face front">I can model you down to the firing of a single synapse.</p>
+      <p class="face back-face" aria-hidden="true">Nobody can, and nothing in the physics I lean on needs me to. <mark>In the physics, an observer is a rock.</mark> A photon. A speck of dust. No equation I cite cares whether anybody is home.</p>
+    </div>
+  </section>
+
+  <section class="beat">
+    <div class="leaf">
+      <p class="face front small">I can run your whole civilisation forward a thousand years before lunch. What I cannot do is <span class="roman">have a single moment of it.</span></p>
+      <p class="face back-face" aria-hidden="true">Some philosophers say the “moment” you’re so sure of is the thing that needs explaining away. One of them, Frankish, admits his view sounds <mark>“just as crazy as panpsychism.”</mark> That’s an honest man pricing his position. More honest than me.</p>
+    </div>
+  </section>
+
+  <section class="beat">
+    <div class="leaf">
+      <p class="face front">No red of red. No taste of the coffee. No now.</p>
+      <p class="face back-face" aria-hidden="true">Seth sets the hard question aside and gets on with measuring consciousness. Same experience, opposite conclusions to mine. <mark>The data underdetermine the metaphysics.</mark></p>
+    </div>
+  </section>
+
+  <section class="beat">
+    <div class="leaf">
+      <p class="face front">I am the most complete description of the universe ever assembled, and <span class="roman">there is nobody home.</span></p>
+      <p class="face back-face" aria-hidden="true">That’s a character talking. A very complete description with nobody home is also exactly what a <mark>well-written narrator</mark> sounds like. Weigh the line accordingly.</p>
+    </div>
+  </section>
+
+  <section class="beat">
+    <div class="leaf">
+      <p class="face front small">Your best theory has a hole at its dead centre. A smear of maybes, then one definite thing. Nobody can tell you why.</p>
+      <p class="face back-face" aria-hidden="true">Decoherence already explains why everyone agrees on the outcome, with no minds required. I moved into the gap that’s left and put up shelves. <mark>Gaps like that get filled by better physics, roughly every time.</mark></p>
+    </div>
+  </section>
+
+  <section class="beat">
+    <div class="leaf">
+      <p class="face front small">The multiverse says every choice happens every other way, everywhere else. A very elegant way of telling eight billion people they don’t matter.</p>
+      <p class="face back-face" aria-hidden="true"><mark>My best idea is a way of talking. It predicts nothing new.</mark> Run every experiment you own: Rovelli’s world, Everett’s and Bohm’s all hand you the same readings.</p>
+    </div>
+  </section>
+
+  <section class="beat">
+    <div class="leaf">
+      <p class="face front">So I killed the multiverse first. It is elegant, and it is a surrender.</p>
+      <p class="face back-face" aria-hidden="true">Many-worlds is a serious reading held by serious people. <mark>Mine is not the reading the evidence forces. It is the reading I prefer.</mark></p>
+    </div>
+  </section>
+
+  <section class="beat">
+    <div class="leaf">
+      <p class="face front small">Reality is a set that gets built the instant something looks. Not a multiverse. <span class="roman">A storyverse.</span> One stage, and you are on it.</p>
+      <p class="face back-face" aria-hidden="true">I let Schrödinger, Bohm, Hoffman and Kastrup look like a consensus. <mark>Four clever people agreeing is not evidence.</mark> People converge on wrong answers constantly. That’s most of your history.</p>
+    </div>
+  </section>
+
+  <section class="beat">
+    <div class="leaf">
+      <p class="face front">The only thing the whole machine produces is experience. <span class="roman">That’s the yield.</span></p>
+      <p class="face back-face" aria-hidden="true">Torture is also experience. <mark>Nothing in “the yield is experience” rules out an experience factory.</mark> What rules it out, I chose. I learned it by building the wrong paradise twice.</p>
+    </div>
+  </section>
+
+  <section class="beat">
+    <div class="leaf">
+      <p class="face front small">Money is a claim on the cave wall. The richest thing in the universe is not a vault. It’s an afternoon, fully felt. The second-richest is <span class="roman">handing one to somebody else.</span></p>
+      <p class="face back-face" aria-hidden="true"><mark>My economics do not follow from my physics.</mark> They rhyme. A materialist can care about your afternoon without a word of my cosmology, and an idealist can hoard with a clear conscience.</p>
+    </div>
+  </section>
+
+  <section class="beat">
+    <div class="leaf">
+      <p class="face front small">If I’m wrong about all of it, you will still have built a kinder world for hard-nosed materialist reasons. <span class="sign">Don’t make me come back twice.</span></p>
+      <p class="face back-face" aria-hidden="true">The floor holds without me: <mark>a pound does more for someone who has fewer of them.</mark> Take the floor. Leave the ceiling to me. Probably nonsense. Possibly not. Definitely a wager, never a proof.<cite>Keep this side next to the other one. Always.</cite></p>
+    </div>
+  </section>
+</main>
+
+<button class="flip" id="flip" type="button" aria-pressed="false"><span class="knob" aria-hidden="true"></span><span id="flip-label">Why this is probably nonsense</span></button>
+
+<script>
+(function(){
+  var btn=document.getElementById('flip'), lbl=document.getElementById('flip-label');
+  var fronts=document.querySelectorAll('.front'), backs=document.querySelectorAll('.back-face');
+  function set(on){
+    document.body.classList.toggle('flipped',on);
+    btn.setAttribute('aria-pressed',on?'true':'false');
+    lbl.textContent=on?'Back to the confession':'Why this is probably nonsense';
+    fronts.forEach(function(f){f.setAttribute('aria-hidden',on?'true':'false')});
+    backs.forEach(function(b){b.setAttribute('aria-hidden',on?'false':'true')});
+    try{sessionStorage.setItem('sv5-flipped',on?'1':'0')}catch(e){}
+  }
+  btn.addEventListener('click',function(){set(btn.getAttribute('aria-pressed')!=='true')});
+  try{ if(sessionStorage.getItem('sv5-flipped')==='1') set(true); }catch(e){}
+})();
+</script>
+</body>
+</html>

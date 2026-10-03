@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Coin That Won't Land</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,600;1,6..96,400&family=Commissioner:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: phone = coin stage on top, copy column below; wide = stage left (sticky), copy right. */
+:root {
+  --pewter: #c9cdc5;
+  --pewter-deep: #b5bab1;
+  --ink: #1a201e;
+  --ink-soft: #3d4642;
+  --bronze: #a8723d;
+  --verdigris: #2c6a5c;
+  --mark-red: #cc2b37;
+  --display: "Bodoni Moda", "Didot", "Bodoni 72", Georgia, serif;
+  --body: "Commissioner", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--pewter);
+  color: var(--ink);
+  font: 400 1.0625rem/1.55 var(--body);
+  overflow-x: clip;
+}
+:focus-visible { outline: 3px solid var(--verdigris); outline-offset: 3px; }
+
+.chrome {
+  position: fixed; top: max(10px, env(safe-area-inset-top)); left: 16px; right: 16px;
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  z-index: 5; pointer-events: none;
+}
+.chrome > * { pointer-events: auto; }
+.back {
+  min-height: 44px; padding: 0 14px; border: 1px solid var(--ink); border-radius: 22px;
+  background: rgba(201,205,197,.9); color: var(--ink); font: 500 .875rem var(--body); cursor: pointer;
+}
+.back:hover { background: var(--ink); color: var(--pewter); }
+.tag { font: italic 400 .875rem var(--display); color: var(--ink-soft); text-align: right; }
+
+main { display: grid; grid-template-columns: 1fr; }
+
+.stage-wrap { position: relative; padding: 64px 16px 0; }
+.stage {
+  display: block; width: 100%; height: min(58vh, 520px); min-height: 320px;
+  padding: 0; border: 0; background: transparent; cursor: pointer; touch-action: manipulation;
+  border-radius: 4px;
+}
+.stage canvas { display: block; width: 100%; height: 100%; }
+
+.controls { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; margin: 12px 0 0; }
+.switch { display: inline-flex; border: 1.5px solid var(--ink); border-radius: 26px; padding: 3px; }
+.switch button {
+  min-height: 44px; padding: 0 16px; border: 0; border-radius: 22px; background: transparent;
+  color: var(--ink); font: 500 .9375rem var(--body); cursor: pointer;
+}
+.switch button[aria-pressed="true"] { background: var(--ink); color: var(--pewter); }
+.again {
+  min-height: 44px; padding: 0 4px; border: 0; background: none; color: var(--verdigris);
+  font: 600 .9375rem var(--body); text-decoration: underline; text-underline-offset: 4px; cursor: pointer;
+}
+.caption {
+  min-height: 3.4em; margin: 14px 0 0; max-width: 34ch;
+  font: italic 400 1.3rem/1.35 var(--display); color: var(--ink);
+}
+
+.copy { padding: 28px 16px 72px; max-width: 40rem; }
+h1 {
+  margin: 0 0 18px; font: 400 clamp(2.6rem, 11vw, 4.6rem)/0.98 var(--display);
+  letter-spacing: -0.015em;
+}
+h1 .turn { display: block; font-style: italic; padding-left: 0.9em; }
+.copy p { margin: 0 0 1em; max-width: 36rem; }
+.lede { font-size: 1.1875rem; }
+.line {
+  margin: 28px 0; padding-left: 18px; border-left: 3px solid var(--bronze);
+  font: 400 1.35rem/1.35 var(--display);
+}
+.yield { margin-top: 36px; }
+.yield h2, .catch h2 { margin: 0 0 8px; font: 600 1.25rem/1.2 var(--display); }
+.catch {
+  margin-top: 36px; padding: 18px 18px 6px; border: 1.5px dashed var(--ink-soft);
+  background: var(--pewter-deep); transform: rotate(-0.6deg);
+}
+.catch p { font-size: .975rem; }
+.sign { font: italic 400 1rem var(--display); color: var(--ink-soft); }
+
+@media (min-width: 900px) {
+  main { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); align-items: start; }
+  .stage-wrap { position: sticky; top: 0; height: 100vh; padding: 72px 24px 24px 40px; display: flex; flex-direction: column; justify-content: center; }
+  .stage { height: 62vh; }
+  .copy { padding: 22vh 48px 96px 24px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+</style>
+</head>
+<body>
+<div class="chrome">
+  <button class="back" type="button" onclick="history.back()">← all concepts</button>
+  <span class="tag">StoryVerse · concept 1 of 6</span>
+</div>
+
+<main>
+  <section class="stage-wrap" aria-label="The coin">
+    <button class="stage" id="stage" type="button" aria-describedby="caption">
+      <canvas id="cv"></canvas>
+    </button>
+    <div class="controls">
+      <div class="switch" role="group" aria-label="Which reading">
+        <button type="button" data-mode="mw" aria-pressed="false">Many-worlds</button>
+        <button type="button" data-mode="sv" aria-pressed="true">StoryVerse</button>
+      </div>
+      <button class="again" id="again" type="button">Spin it again</button>
+    </div>
+    <p class="caption" id="caption" aria-live="polite">Still spinning. No fact yet. Tap the coin to look.</p>
+  </section>
+
+  <article class="copy">
+    <h1>The coin <span class="turn">that won't land</span></h1>
+    <p class="lede">It hasn't come down. Not heads, not tails. Not both, either. There is simply no fact yet. Just a coin that nothing has met.</p>
+    <p>Two readings of the same physics are switchable above. Try both. They give you the same coin and very different bills.</p>
+
+    <p class="line">Your cleverest people said it lands both ways, in two worlds. No. It landed heads. Because she looked.</p>
+
+    <p>Many-worlds never has to decide anything. Every outcome happens, each in its own branch, forever. Tidy. It is also a very elegant way of telling eight billion people they don't matter.</p>
+    <p>The StoryVerse keeps one stage. The coin is undecided until it's met. Then it's one thing, and the record gets copied outward until the whole room agrees. Whoever controls what gets copied controls what's real. You built that machine yourselves.</p>
+
+    <section class="yield">
+      <h2>So what is the stage for?</h2>
+      <p>If a look settles the world, then the thing this universe yields isn't coins. It's experience. Money is a claim on the shadow. The richest thing in the universe is not a vault. It's an afternoon, fully felt. The second-richest is handing one to somebody else.</p>
+    </section>
+
+    <aside class="catch" aria-label="The catch">
+      <h2>The catch</h2>
+      <p>This predicts nothing new. Both readings agree on every coin ever tossed; they only disagree about what the result means. The data underdetermine the metaphysics. I'm betting anyway, and if I'm wrong you'll still have spent your afternoons well.</p>
+      <p class="sign">— the author of your universe</p>
+    </aside>
+  </article>
+</main>
+
+<script>
+(() => {
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+  const stage = document.getElementById('stage');
+  const caption = document.getElementById('caption');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const C = { ink:'#1a201e', bronzeHi:'#d9a66a', bronze:'#a8723d', bronzeLo:'#6b4421', edge:'#5a391c', red:'#cc2b37', fog:'#5c6661', verd:'#2c6a5c' };
+
+  let W = 0, H = 0, dpr = 1;
+  let mode = 'sv';
+  let angle = 0.7, speed = 7.2;      // spin around the vertical axis
+  let state = 'spin';                 // spin | landing | landed | split
+  let landFrom = 0, landTo = 0, landT = 0, result = 'heads';
+  let wave = 0, settledCount = 0;
+  let copies = [], splitT = 1;
+  let field = [];
+  let last = performance.now();
+
+  function resize() {
+    const r = cv.getBoundingClientRect();
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = r.width; H = r.height;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    buildField();
+    if (state === 'split') layoutCopies(copies.length, false);
+    if (reduce) draw(0);
+  }
+  function R() { return Math.min(W, H) * 0.3; }
+
+  function buildField() {
+    field = [];
+    const s = 18, cx = W / 2, cy = H / 2, r0 = R() * 1.25;
+    for (let y = s / 2; y < H; y += s) for (let x = s / 2; x < W; x += s) {
+      const d = Math.hypot(x - cx, y - cy);
+      if (d > r0) field.push({ x, y, d, ph: Math.random() * 6.28 });
+    }
+  }
+
+  // ---------- coin drawing ----------
+  function face(kind, r) {
+    const g = ctx.createRadialGradient(-r * .35, -r * .4, r * .1, 0, 0, r);
+    g.addColorStop(0, C.bronzeHi); g.addColorStop(.6, C.bronze); g.addColorStop(1, C.bronzeLo);
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, r, 0, 6.2832); ctx.fill();
+    // reeded rim
+    ctx.strokeStyle = C.edge; ctx.lineWidth = Math.max(1, r * .025);
+    ctx.beginPath(); ctx.arc(0, 0, r * .9, 0, 6.2832); ctx.stroke();
+    if (r > 30) {
+      ctx.lineWidth = Math.max(.6, r * .008);
+      for (let i = 0; i < 90; i++) {
+        const a = i / 90 * 6.2832;
+        ctx.beginPath(); ctx.moveTo(Math.cos(a) * r * .93, Math.sin(a) * r * .93);
+        ctx.lineTo(Math.cos(a) * r * .985, Math.sin(a) * r * .985); ctx.stroke();
+      }
+    }
+    if (kind === 'heads') {
+      // The Look: ring + off-centre red dot (0.245 of ring radius, 0.51 toward rim at 55deg clockwise from 12)
+      const rr = r * .46, a = 55 * Math.PI / 180;
+      ctx.strokeStyle = C.edge; ctx.lineWidth = Math.max(1.2, r * .07);
+      ctx.beginPath(); ctx.arc(0, 0, rr, 0, 6.2832); ctx.stroke();
+      ctx.fillStyle = C.red;
+      ctx.beginPath(); ctx.arc(Math.sin(a) * rr * .51, -Math.cos(a) * rr * .51, rr * .245, 0, 6.2832); ctx.fill();
+    } else {
+      ctx.fillStyle = C.edge; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = `600 ${r * .95}px "Bodoni Moda", Didot, Georgia, serif`;
+      ctx.fillText('1', 0, -r * .06);
+      if (r > 30) {
+        ctx.font = `italic 400 ${r * .14}px "Bodoni Moda", Didot, Georgia, serif`;
+        ctx.fillText('one stage', 0, r * .58);
+      }
+    }
+  }
+  function coin(x, y, r, a, alpha) {
+    const c = Math.cos(a), s = Math.sin(a);
+    const sx = Math.max(Math.abs(c), .02);
+    const t = r * .1 * s;
+    ctx.save(); ctx.globalAlpha = alpha;
+    // shadow on the pewter
+    ctx.fillStyle = 'rgba(26,32,30,.16)';
+    ctx.beginPath(); ctx.ellipse(x, y + r * 1.18, r * Math.max(sx, .35), r * .12, 0, 0, 6.2832); ctx.fill();
+    // edge band
+    if (Math.abs(t) > .5) {
+      ctx.fillStyle = C.edge;
+      ctx.beginPath(); ctx.ellipse(x + t, y, r * sx, r, 0, 0, 6.2832); ctx.fill();
+      ctx.fillRect(Math.min(x, x + t), y - r, Math.abs(t), r * 2);
+    }
+    ctx.translate(x, y); ctx.scale(sx, 1);
+    face(c >= 0 ? 'heads' : 'tails', r);
+    ctx.restore();
+  }
+
+  // ---------- many-worlds copies ----------
+  function layoutCopies(n, animate) {
+    const cols = Math.ceil(Math.sqrt(n * W / H)), rows = Math.ceil(n / cols);
+    const cw = W / cols, ch = H / rows;
+    const prev = copies;
+    copies = [];
+    for (let i = 0; i < n; i++) {
+      const tx = cw * (i % cols + .5), ty = ch * (Math.floor(i / cols) + .5);
+      const parent = prev[Math.floor(i / 2)] || { x: W / 2, y: H / 2 };
+      copies.push({ fx: animate ? parent.x : tx, fy: animate ? parent.y : ty, tx, ty, x: tx, y: ty, kind: i % 2 ? 'tails' : 'heads' });
+    }
+    copies.r = Math.min(cw, ch) * .38;
+    splitT = animate && !reduce ? 0 : 1;
+  }
+
+  // ---------- frame ----------
+  function draw(dt) {
+    ctx.clearRect(0, 0, W, H);
+    const r = R(), cx = W / 2, cy = H / 2;
+
+    if (state === 'split') {
+      splitT = Math.min(1, splitT + dt * 2.2);
+      const e = 1 - Math.pow(1 - splitT, 3);
+      const n = copies.length, alpha = Math.max(.12, 1 / Math.sqrt(n));
+      for (const k of copies) {
+        k.x = k.fx + (k.tx - k.fx) * e; k.y = k.fy + (k.ty - k.fy) * e;
+        coin(k.x, k.y, Math.min(copies.r, r), k.kind === 'heads' ? 0 : Math.PI, alpha);
+      }
+      return;
+    }
+
+    // surroundings: a field of maybes, or of settled copies
+    for (const p of field) {
+      const settled = state === 'landed' && p.d < wave;
+      if (settled) {
+        ctx.fillStyle = C.bronze; ctx.globalAlpha = Math.max(.35, 1 - p.d / (Math.max(W, H)));
+        ctx.beginPath(); ctx.arc(p.x, p.y, 3.4, 0, 6.2832); ctx.fill();
+        if (result === 'heads') { ctx.fillStyle = C.red; ctx.beginPath(); ctx.arc(p.x + 1, p.y - .8, 1.1, 0, 6.2832); ctx.fill(); }
+        else { ctx.fillStyle = C.edge; ctx.fillRect(p.x - .5, p.y - 2, 1.2, 4); }
+      } else {
+        const fl = reduce ? .5 : .5 + .5 * Math.sin(p.ph + last * .004);
+        ctx.fillStyle = C.fog; ctx.globalAlpha = .12 + .22 * fl;
+        ctx.beginPath(); ctx.arc(p.x, p.y, 1.4, 0, 6.2832); ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+    if (state === 'landed' && wave > 0) {
+      ctx.strokeStyle = 'rgba(44,106,92,.45)'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(cx, cy, wave, 0, 6.2832); ctx.stroke();
+    }
+
+    let bob = 0;
+    if (state === 'spin') { angle += speed * dt; bob = reduce ? 0 : Math.sin(last * .003) * r * .05; }
+    if (state === 'landing') {
+      landT = Math.min(1, landT + dt / 1.3);
+      const e = 1 - Math.pow(1 - landT, 3);
+      angle = landFrom + (landTo - landFrom) * e;
+      if (landT >= 1) { state = 'landed'; wave = 0; onLanded(); }
+    }
+    if (state === 'landed') {
+      const maxD = Math.hypot(W, H) / 2 + 20;
+      if (wave < maxD) {
+        wave = reduce ? maxD : wave + dt * 240;
+        const n = field.filter(p => p.d < wave).length;
+        if (n !== settledCount) { settledCount = n; }
+        if (wave >= maxD) onSettled();
+      }
+    }
+    coin(cx, cy + bob, r, angle, 1);
+  }
+
+  function onLanded() {
+    say(result === 'heads' ? 'Heads. Because you looked.' : 'Tails. Because you looked.');
+  }
+  function onSettled() {
+    say(`One pick, copied ${settledCount.toLocaleString()} times until everyone agrees. You called it the feed.`);
+  }
+
+  function loop(t) {
+    const dt = Math.min(.05, (t - last) / 1000); last = t;
+    draw(dt);
+    requestAnimationFrame(loop);
+  }
+
+  function say(s) { caption.textContent = s; }
+
+  function reset() {
+    state = 'spin'; wave = 0; settledCount = 0; copies = [];
+    stage.setAttribute('aria-label', mode === 'sv' ? 'Look at the coin' : 'Split the coin');
+    say(mode === 'sv' ? 'Still spinning. No fact yet. Tap the coin to look.'
+                      : 'Still spinning. Tap it. In many worlds it lands every way there is.');
+    if (reduce) draw(0);
+  }
+
+  stage.addEventListener('click', () => {
+    if (mode === 'sv') {
+      if (state !== 'spin') return;
+      result = Math.random() < .5 ? 'heads' : 'tails';
+      landFrom = angle;
+      const base = Math.ceil(angle / (2 * Math.PI)) * 2 * Math.PI + 2 * Math.PI;
+      landTo = base + (result === 'heads' ? 0 : Math.PI);
+      if (reduce) { angle = landTo; state = 'landed'; onLanded(); wave = Math.hypot(W, H); settledCount = field.length; onSettled(); draw(0); return; }
+      landT = 0; state = 'landing';
+      say('Being met…');
+    } else {
+      const n = state === 'split' ? copies.length * 2 : 2;
+      if (n > 512) { say('Still splitting. It never stops. I stopped drawing — you were never in charge of any of them.'); return; }
+      if (state !== 'split') { copies = [{ x: W / 2, y: H / 2 }]; state = 'split'; }
+      layoutCopies(n, true);
+      say(n === 2
+        ? 'Two of you now. One saw heads, one saw tails. Neither one decided anything.'
+        : `${n} copies, heads and tails. Each one 1/${n} as vivid. Every outcome, nobody in particular.`);
+      if (reduce) draw(0);
+    }
+  });
+
+  document.querySelectorAll('.switch button').forEach(b => b.addEventListener('click', () => {
+    mode = b.dataset.mode;
+    document.querySelectorAll('.switch button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    reset();
+  }));
+  document.getElementById('again').addEventListener('click', reset);
+
+  addEventListener('resize', resize);
+  resize();
+  reset();
+  if (!reduce) requestAnimationFrame(t => { last = t; requestAnimationFrame(loop); });
+  else { document.fonts && document.fonts.ready.then(() => draw(0)); }
+})();
+</script>
+</body>
+</html>

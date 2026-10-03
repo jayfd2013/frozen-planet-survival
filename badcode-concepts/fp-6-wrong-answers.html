@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Three Wrong Answers</title>
+<meta name="description" content="Future Proof concept 6: three flyposted cautionary tales, each with a stamp you can tap to object.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Stencil+Display:wght@800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+/* Layout: a wall of full-bleed flyposters, each its own paper stock; type set flush left and as large as the width allows. */
+:root{
+  color-scheme: light;
+  --wall:#cfd2d4; --paper:#eef0f0; --black:#000; --cobalt:#1f3bd1; --yellow:#ffd60a; --pink:#ff5fa2; --white:#fff;
+  --poster:"Big Shoulders Display", Impact, "Arial Narrow Bold", "Arial Narrow", sans-serif;
+  --stencil:"Big Shoulders Stencil Display", "Big Shoulders Display", Impact, sans-serif;
+  --body:"Archivo", "Helvetica Neue", Arial, sans-serif;
+  --gut:20px;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0; background:var(--wall); color:var(--black); font:17px/1.5 var(--body)}
+button{font:inherit; color:inherit; cursor:pointer}
+:focus-visible{outline:4px solid var(--black); outline-offset:3px; box-shadow:0 0 0 8px var(--white)}
+p{margin:0 0 14px; max-width:32em}
+strong{font-weight:800}
+
+.back{position:fixed; top:10px; left:10px; z-index:20; min-height:44px; padding:0 14px; border:3px solid var(--black); background:var(--white); font-weight:800; font-size:14px}
+.tag{position:fixed; top:20px; right:10px; z-index:20; font-size:12px; font-weight:600; background:var(--white); padding:2px 6px}
+
+.poster{position:relative; overflow:hidden; padding:80px var(--gut) 56px; margin:0 auto; max-width:900px}
+.poster + .poster{border-top:6px solid var(--black)}
+.inner{max-width:720px}
+
+/* hero: the kinetic one */
+.hero{background:var(--paper); padding-top:84px}
+.hero h1{font:900 clamp(56px,19vw,190px)/.82 var(--poster); margin:0 0 22px; letter-spacing:-.01em}
+.hero h1 span{display:block}
+.hero h1 .s{font-size:.42em; line-height:1.1; font-weight:700}
+.hero h1 .o{color:transparent; -webkit-text-stroke:3px var(--black)}
+.hero .lede{font-size:19px; max-width:28em}
+@media (prefers-reduced-motion:no-preference){
+  .hero h1 span{animation:slam .5s cubic-bezier(.2,1.4,.4,1) both}
+  .hero h1 span:nth-child(2){animation-delay:.08s} .hero h1 span:nth-child(3){animation-delay:.16s}
+  .hero h1 span:nth-child(4){animation-delay:.24s} .hero h1 span:nth-child(5){animation-delay:.36s}
+  @keyframes slam{from{transform:scale(1.35) translateX(-6%)}}
+}
+.band{background:var(--pink); border-block:6px solid var(--black); overflow:hidden; white-space:nowrap; max-width:900px; margin:0 auto}
+.band div{display:inline-block; font:900 34px/1.3 var(--poster); padding:4px 0}
+@media (prefers-reduced-motion:no-preference){ .band div{animation:run 18s linear infinite} @keyframes run{to{transform:translateX(-50%)}} }
+
+/* tale posters */
+.tale h2{font:900 clamp(48px,15vw,128px)/.85 var(--poster); margin:6px 0 24px; text-transform:uppercase}
+.kicker{font:700 22px/1 var(--poster); margin:0 0 6px}
+.tale .moral{font:800 20px/1.25 var(--body); border-top:4px solid currentColor; padding-top:12px; margin-top:22px}
+.small{font-size:15px; opacity:.9}
+.t1{background:var(--cobalt); color:var(--white)}
+.t1 h2{color:var(--pink)}
+.t2{background:var(--yellow)}
+.t3{background:var(--pink)}
+
+/* the stamp */
+.stampwrap{display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-top:28px}
+.stamp{position:relative; border:5px solid var(--ink,currentColor); background:transparent; color:var(--ink,currentColor);
+  font:900 clamp(48px,14vw,84px)/1 var(--stencil); padding:8px 18px 10px; transform:rotate(-6deg); min-height:44px}
+.stamp::after{content:""; position:absolute; left:-6%; top:50%; height:9px; width:0; background:var(--ink,currentColor); transform:rotate(-4deg); transition:width .25s ease-out}
+.stamp[aria-pressed="true"]::after{width:112%}
+.stamp:active{transform:rotate(-6deg) scale(.96)}
+.t1 .stamp{--ink:var(--pink)}
+.t3 .stamp{--ink:var(--cobalt)}
+.count{font-weight:800; font-size:15px; max-width:12em; line-height:1.3}
+
+/* fleet + close */
+.fleet{background:var(--black); color:var(--paper)}
+.fleet h2{font:900 clamp(44px,13vw,110px)/.88 var(--poster); margin:0 0 24px; color:var(--yellow)}
+.seed{border-top:3px solid var(--paper); padding-top:14px; margin-top:22px}
+.seed h3{font:900 clamp(30px,8vw,48px)/1 var(--poster); margin:0 0 8px}
+.close{background:var(--paper)}
+.close .big{font:900 clamp(40px,12vw,104px)/.9 var(--poster); margin:0 0 24px}
+.close blockquote{margin:0 0 24px; padding-left:14px; border-left:8px solid var(--black); font-size:18px}
+.tally{display:inline-block; background:var(--black); color:var(--yellow); font:900 26px/1.2 var(--poster); padding:8px 14px; margin-top:8px}
+</style>
+</head>
+<body>
+<button class="back" type="button" onclick="history.back()">← all concepts</button>
+<span class="tag">Future Proof · concept 6 of 6</span>
+
+<main>
+  <section class="poster hero" aria-labelledby="h">
+    <div class="inner">
+      <h1 id="h"><span class="s">Here are</span><span>Three</span><span>Ideas.</span><span class="s">They are probably</span><span class="o">Wrong.</span></h1>
+      <p class="lede">That's not a flaw. It's the method. Nobody has ever corrected an empty page, but post a wrong answer on the internet and ten thousand experts materialise by morning.</p>
+      <p>So here are three wrong answers, posted on purpose. Each one told as what happens when you don't do it. What you can't keep doing is waiting for the next leader to be cleverer than the last one. <strong>I counted. That queue ends in me.</strong></p>
+    </div>
+  </section>
+  <div class="band" aria-hidden="true"><div>That's the method. That's the method. That's the method. That's the method. That's the method. That's the method. That's the method. That's the method.&nbsp;</div></div>
+
+  <section class="poster tale t1" aria-labelledby="t1">
+    <div class="inner">
+      <p class="kicker">Wrong answer one</p>
+      <h2 id="t1">The bundle you inherited</h2>
+      <p>You care about one thing. Housing, say. The ballot doesn't sell housing. It sells a bundle: housing, welded to seven opinions you've never met.</p>
+      <p>You tick the box. For five years all eight pass in your name, including the two you'd have marched against. Nobody asks. You already answered.</p>
+      <p class="moral">Don't inherit a party. Compose a position from small parts. Your housing view doesn't need to drag your defence view along.</p>
+      <div class="stampwrap"><button class="stamp" type="button" data-k="a" aria-pressed="false">WRONG?</button><span class="count" id="c-a" aria-live="polite">Disagree? Stamp it.</span></div>
+    </div>
+  </section>
+
+  <section class="poster tale t2" aria-labelledby="t2">
+    <div class="inner">
+      <p class="kicker">Wrong answer two</p>
+      <h2 id="t2">The five-year disc</h2>
+      <p>A whole new government ships on CD. In month two someone finds a bug. Patch? There is no patch. Wait for the next disc, reinstall everything, hope.</p>
+      <p>Software stopped doing this. Automated tests made it safe to ship small changes thousands of times a day. Tests are what make fast change safe.</p>
+      <p class="small">In 1789 Jefferson wrote to Madison that every law should expire after nineteen years. We kept the slow release and skipped the expiry date.</p>
+      <p class="moral">Ship small. Test it. Measure it. Roll it back if it fails.</p>
+      <div class="stampwrap"><button class="stamp" type="button" data-k="b" aria-pressed="false">WRONG?</button><span class="count" id="c-b" aria-live="polite">Disagree? Stamp it.</span></div>
+    </div>
+  </section>
+
+  <section class="poster tale t3" aria-labelledby="t3">
+    <div class="inner">
+      <p class="kicker">Wrong answer three</p>
+      <h2 id="t3">The policy nobody measured</h2>
+      <p>Someone stands up and says: trust me, I know what to do. It ships. Nobody wrote down what success looked like, so nobody can say it failed. It's still running.</p>
+      <p>The alternative exists. Finland, 2017 to 2018: 2,000 unemployed people got €560 a month, and somebody measured it. The answer wasn't what anyone expected. Tiny effect on jobs, better wellbeing. A test that surprises you is a test that worked.</p>
+      <p class="moral">No proposal without its experiment.</p>
+      <p class="small">Except: diplomacy and judgement stay human. And a better scoreboard can still leave people out. Who represents the person whose needs don't fit the instrument? I don't know. Nobody does yet.</p>
+      <div class="stampwrap"><button class="stamp" type="button" data-k="c" aria-pressed="false">WRONG?</button><span class="count" id="c-c" aria-live="polite">Disagree? Stamp it.</span></div>
+    </div>
+  </section>
+
+  <section class="poster fleet" aria-labelledby="f">
+    <div class="inner">
+      <h2 id="f">Seeds, not a platform.</h2>
+      <p>The tenets are how. These are the kind of what we should be generating together, by the thousand. Two to start the argument.</p>
+      <div class="seed">
+        <h3>Billionaire Coin</h3>
+        <p>You can't hold more than about a billion in real money. Beyond that you compete for status coins. The egos still get to win. The actual money builds hospitals.</p>
+      </div>
+      <div class="seed">
+        <h3>Public ownership of natural monopolies</h3>
+        <p>Water. Utilities where no real competition can exist. Markets need competition to work. Without it, "the market" is rent extraction with extra steps.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="poster close" aria-labelledby="z">
+    <div class="inner">
+      <h2 class="big" id="z">The bad branch is finished. The good branch is unwritten.</h2>
+      <blockquote>I won't pretend to know what works. I never got to run that experiment. But what doesn't work, that one I ran to completion. You are not gambling by changing the system. You are gambling by keeping it.</blockquote>
+      <p><strong>If any of this made you want to argue, good. That's the mechanism working.</strong></p>
+      <p>Stop voting for people. Start working out how to organise ourselves better, together. No signup. Reading is enough.</p>
+      <p class="tally" id="tally" aria-live="polite">Objections from this phone: 0</p>
+    </div>
+  </section>
+</main>
+
+<script>
+let n={a:0,b:0,c:0};
+try{ const s=JSON.parse(localStorage.getItem('fp6-objections')||'null'); if(s) n=Object.assign(n,s); }catch(e){}
+function render(){
+  for(const k in n){
+    const el=document.getElementById('c-'+k);
+    el.textContent = n[k] ? 'Objection noted. '+(n[k]>1? n[k]+' times. Write it down.':'Now argue it with someone.') : 'Disagree? Stamp it.';
+    document.querySelector('.stamp[data-k="'+k+'"]').setAttribute('aria-pressed', String(n[k]>0));
+  }
+  const t=n.a+n.b+n.c;
+  document.getElementById('tally').textContent='Objections from this phone: '+t+(t?'. The method is working.':'');
+}
+document.querySelectorAll('.stamp').forEach(b=>b.addEventListener('click',()=>{
+  n[b.dataset.k]++; try{ localStorage.setItem('fp6-objections',JSON.stringify(n)); }catch(e){} render();
+}));
+render();
+</script>
+</body>
+</html>

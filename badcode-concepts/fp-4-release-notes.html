@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Democracy, Boxed Edition</title>
+<!--
+Design plan — Democracy, Boxed Edition
+Colour: desktop teal #0f6f6b / box yellow #ffd21f / box spine #d9a800 / starburst red #e23a2c / window grey #c9c9c4 / paper #ffffff / ink #000.
+Type: Archivo at width 125 + black italic for the box (shouty 90s retail), Archivo normal width for prose; Fragment Mono
+only for version numbers and the readme, where text really is a file.
+Layout: hero = a shrink-wrapped box tilted in 3D with an install disc sliding out; below, bevelled desktop windows:
+release notes, then the 20-year release history with the disc/continuous toggle, then the takeaway on the bare desktop.
+Principles: the joke is the object — legacy software you can hold. Loud on the box, plain and readable in the windows.
+Review: first pass was a neon "vaporwave" retro (purple gradients, grid floor). That's a cliché; revised to the
+literal shop-shelf box and grey utility windows, which carry the "shipped on disc" point without decoration.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,400..900;1,62..125,400..900&family=Fragment+Mono&display=swap" rel="stylesheet">
+<style>
+/* Layout: one centred column (max 44rem) on a teal desktop; the box hero, then stacked bevelled windows. */
+:root{
+  --desk:#0f6f6b; --desk-2:#0c5d5a; --box:#ffd21f; --spine:#d9a800; --burst:#e23a2c;
+  --win:#c9c9c4; --hi:#f4f4f0; --lo:#6e6e69; --paper:#fff; --ink:#000; --title:#123c8c; --ok:#12733a;
+  --sans:"Archivo","Arial Black","Helvetica Neue",Arial,sans-serif;
+  --mono:"Fragment Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--desk);color:var(--ink);font:400 1.0625rem/1.55 var(--sans);padding-bottom:5rem;overflow-x:hidden}
+:focus-visible{outline:3px dashed #fff;outline-offset:3px}
+.wrap{max-width:44rem;margin:0 auto;padding:1rem}
+.concept{color:#d8f0ee;font:400 .78rem/1.4 var(--mono);margin:0 0 1rem}
+
+/* hero box */
+.hero{display:grid;place-items:center;padding:1.5rem 0 2rem;perspective:900px;overflow:hidden;overflow:clip}
+.box{position:relative;width:min(62vw,300px);aspect-ratio:3/4;transform:rotateY(-20deg) rotateX(4deg);transform-style:preserve-3d}
+.face{position:absolute;inset:0;background:var(--box);border:3px solid var(--ink);padding:1rem .9rem;display:flex;flex-direction:column;overflow:hidden}
+.side{position:absolute;top:0;bottom:0;right:-38px;width:40px;background:var(--spine);border:3px solid var(--ink);transform-origin:left;transform:rotateY(90deg);
+  writing-mode:vertical-rl;font:900 italic .8rem/1 var(--sans);font-stretch:125%;display:grid;place-items:center}
+.face .brand{font:900 italic clamp(1.5rem,6.8vw,2.5rem)/.9 var(--sans);font-stretch:112%;letter-spacing:-.03em;margin:0}
+.face .brand sup{font-size:.35em;vertical-align:top;position:relative;top:.2em}
+.face .ed{font:800 .95rem/1.1 var(--sans);font-stretch:110%;margin:.4rem 0 0;background:var(--ink);color:var(--box);align-self:flex-start;padding:.2rem .4rem}
+.face .stripes{margin:auto -1rem 0;height:56px;background:repeating-linear-gradient(180deg,var(--ink) 0 6px,transparent 6px 12px)}
+.face .req{background:var(--paper);border:2px solid var(--ink);padding:.45rem .5rem;font:500 .64rem/1.35 var(--mono);margin-top:.6rem;margin-right:1.2rem}
+.burst{position:absolute;right:-18px;top:56%;width:96px;height:96px;display:grid;place-items:center;text-align:center;color:#fff;
+  font:900 .72rem/1.05 var(--sans);font-stretch:110%;transform:rotate(12deg);
+  background:var(--burst);clip-path:polygon(50% 0,61% 15%,79% 9%,80% 27%,97% 32%,87% 48%,99% 64%,81% 70%,80% 89%,62% 84%,50% 100%,38% 84%,20% 89%,19% 70%,1% 64%,13% 48%,3% 32%,20% 27%,21% 9%,39% 15%)}
+.disc{position:absolute;left:56%;top:7%;width:62%;aspect-ratio:1;border-radius:50%;transform:translateZ(-2px);
+  background:radial-gradient(circle,#0f6f6b 0 9%,#ddd 9.5% 15%,transparent 15.5%),
+    conic-gradient(from 20deg,#e9e9e9,#bfe8f2,#f2d6f0,#fff3b8,#d2f2d6,#e9e9e9,#c7d9ff,#f5d2c4,#e9e9e9);
+  border:2px solid var(--ink);animation:eject 1.1s cubic-bezier(.2,.8,.2,1) .4s both}
+@keyframes eject{from{left:5%}}
+.box-wrap{position:relative;margin-right:min(17vw,170px)}
+
+h1.take{color:#fff;font:900 clamp(1.7rem,7.5vw,2.6rem)/1.05 var(--sans);font-stretch:118%;margin:0 0 .6rem;letter-spacing:-.01em}
+.lede{color:#e6f6f4;margin:0 0 1.6rem;max-width:34rem}
+
+/* windows */
+.win{background:var(--win);border:2px solid;border-color:var(--hi) var(--lo) var(--lo) var(--hi);box-shadow:2px 2px 0 var(--ink);margin:0 0 1.6rem}
+.bar{background:var(--title);color:#fff;font:700 .9rem/1 var(--sans);padding:.45rem .5rem;display:flex;justify-content:space-between;align-items:center;gap:.5rem}
+.bar span:last-child{display:flex;gap:3px}
+.bar i{display:block;width:16px;height:14px;background:var(--win);border:1px solid;border-color:var(--hi) var(--lo) var(--lo) var(--hi)}
+.pane{background:var(--paper);margin:.4rem;border:2px solid;border-color:var(--lo) var(--hi) var(--hi) var(--lo);padding:1rem}
+.pane h2{font:900 1.25rem/1.15 var(--sans);font-stretch:112%;margin:0 0 .25rem}
+.pane .small{font-size:.88rem;color:#444;margin:0 0 1rem}
+.rel{border-top:2px solid var(--ink);padding:.8rem 0 .3rem}
+.rel h3{display:flex;flex-wrap:wrap;gap:.3rem .7rem;align-items:baseline;margin:0 0 .35rem;font:800 1.02rem/1.25 var(--sans)}
+.rel h3 code{font:400 .9rem/1 var(--mono);background:var(--box);padding:.2rem .35rem;border:1px solid var(--ink)}
+.rel p{margin:0 0 .5rem}
+.rel ul{margin:0 0 .5rem;padding-left:1.1rem}
+.rel li{margin:0 0 .3rem}
+.rel.old h3 code{background:var(--win)}
+.tag{font:700 .78rem/1 var(--sans);padding:.2rem .35rem;border:1px solid currentColor}
+.tag.rb{color:var(--burst)} .tag.ok{color:var(--ok)} .tag.un{color:#555}
+q{font-style:italic}
+
+/* toggle + chart */
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin:0 0 1rem}
+.seg button{min-height:48px;font:800 .95rem/1.15 var(--sans);background:var(--win);color:var(--ink);cursor:pointer;
+  border:2px solid;border-color:var(--hi) var(--lo) var(--lo) var(--hi);padding:.5rem}
+.seg button[aria-pressed="true"]{border-color:var(--lo) var(--hi) var(--hi) var(--lo);background:#e2e2dc;box-shadow:inset 1px 1px 0 var(--ink)}
+#chart{display:block;width:100%;height:auto;background:#f6f6f2;border:1px solid #999}
+.stat{font:400 .95rem/1.45 var(--mono);margin:.8rem 0 0;min-height:4.4em}
+.legend{display:flex;flex-wrap:wrap;gap:.3rem 1rem;font-size:.82rem;margin:.6rem 0 0;color:#333}
+.legend span{display:inline-flex;align-items:center;gap:.35rem}
+.legend i{width:12px;height:12px;display:block}
+
+.end{padding:1.5rem 0 1rem}
+.end p.big{color:#fff;font:900 italic clamp(1.9rem,8.6vw,3.2rem)/1.02 var(--sans);font-stretch:122%;margin:0 0 1rem;letter-spacing:-.02em}
+.end p{color:#e6f6f4;max-width:34rem;margin:0 0 .8rem}
+.mark{display:flex;align-items:center;gap:.5rem;color:#fff;font:700 1rem/1 var(--sans);margin-top:1.4rem}
+
+.back{position:fixed;left:max(1rem,env(safe-area-inset-left));bottom:max(1rem,env(safe-area-inset-bottom));z-index:9;min-height:44px;padding:.6rem .9rem;
+  font:800 .85rem/1 var(--sans);background:var(--win);color:var(--ink);cursor:pointer;border:2px solid;border-color:var(--hi) var(--lo) var(--lo) var(--hi);box-shadow:2px 2px 0 var(--ink)}
+@media (min-width:760px){.hero{padding:3rem 0}.box{width:300px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="concept">Democracy, Boxed Edition · Future Proof · concept 4 of 6</p>
+
+  <div class="hero" role="img" aria-label="A yellow retail software box labelled Democracy, with an install disc sliding out. Requires: no electricity. Updates every 4 to 5 years, by post.">
+    <div class="box-wrap">
+      <div class="disc" aria-hidden="true"></div>
+      <div class="box" aria-hidden="true">
+        <div class="face">
+          <p class="brand">Democracy<sup>™</sup></p>
+          <p class="ed">Boxed Edition · v1.0</p>
+          <div class="req">Requires: no electricity.<br>Updates: every 4–5 years, by post.<br>Input device: one pencil.</div>
+          <div class="stripes"></div>
+        </div>
+        <div class="side">DEMOCRACY v1.0</div>
+        <div class="burst">Now with<br>2 or 3<br>parties!</div>
+      </div>
+    </div>
+  </div>
+
+  <h1 class="take">Our political operating system was invented before electricity.</h1>
+  <p class="lede">One vote, on everything, all at once. A whole new government shipped on disc every five years — then everyone waits for the update. Software stopped working like this a long time ago. Here's what the release notes could look like if politics did too.</p>
+
+  <section class="win" aria-labelledby="rn">
+    <div class="bar"><span>README.TXT — Notepad</span><span aria-hidden="true"><i></i><i></i></span></div>
+    <div class="pane">
+      <h2 id="rn">Release notes</h2>
+      <p class="small">Everything after v1.0 is a proposal. Nobody has shipped it. Not even me.</p>
+
+      <article class="rel old">
+        <h3><code>v1.0</code> Initial release, c. 1787</h3>
+        <ul>
+          <li>Pick one of two or three parties. Inherit all their views, including the ones you don't hold.</li>
+          <li>Known issue: no tests. Failures stay installed until the next disc.</li>
+        </ul>
+      </article>
+
+      <article class="rel">
+        <h3><code>v2.0.0</code> Composable positions <span class="tag un">proposed</span></h3>
+        <p>Your housing view no longer depends on your defence view. Build your position from small parts.</p>
+      </article>
+
+      <article class="rel">
+        <h3><code>v2.0.1</code> Rolled back a policy that failed its test <span class="tag rb">rollback</span></h3>
+        <p>It was measured, it didn't work, it came out. Nobody resigned. Nobody pretended. The test did its job.</p>
+      </article>
+
+      <article class="rel">
+        <h3><code>v2.0.2</code> Every law ships with a time-to-live <span class="tag un">proposed</span></h3>
+        <p>Default TTL: 19 years. Spec by Thomas Jefferson, in a 1789 letter to James Madison: <q>the earth belongs to the living.</q> Colorado shipped the first US sunset law in 1976.</p>
+      </article>
+
+      <article class="rel">
+        <h3><code>v2.0.3</code> A/B test: basic income <span class="tag ok">ran in production</span></h3>
+        <p>Finland, 2017–18: 2,000 unemployed people got €560 a month, no strings. Employment barely moved. Wellbeing improved. Not what anyone predicted — which is the point of testing.</p>
+      </article>
+
+      <article class="rel">
+        <h3><code>Known issues</code></h3>
+        <ul>
+          <li>Who represents the person whose needs don't fit the instrument? Open.</li>
+          <li>Diplomacy and judgement can't be unit-tested. They stay human.</li>
+          <li>These notes are probably wrong. Post better ones.</li>
+        </ul>
+      </article>
+    </div>
+  </section>
+
+  <section class="win" aria-labelledby="hist">
+    <div class="bar"><span>Release history — 20 years</span><span aria-hidden="true"><i></i><i></i></span></div>
+    <div class="pane">
+      <h2 id="hist">Same 20 years, two ways to ship</h2>
+      <p class="small">Software went from discs to deploying thousands of times a day — safely, because tests run first.</p>
+      <div class="seg" role="group" aria-label="Release strategy">
+        <button type="button" id="b-disc" aria-pressed="true">Ship on disc</button>
+        <button type="button" id="b-ci" aria-pressed="false">Ship continuously</button>
+      </div>
+      <svg id="chart" viewBox="0 0 360 150" role="img" aria-labelledby="stat"></svg>
+      <div class="legend" id="legend"></div>
+      <p class="stat" id="stat" aria-live="polite"></p>
+      <p class="small" style="margin:.4rem 0 0">Illustrative, not data.</p>
+    </div>
+  </section>
+
+  <section class="end" aria-labelledby="perm">
+    <p class="big" id="perm">Permission to question the system you inherited.</p>
+    <p>It feels immovable because it's the only version anyone remembers. It isn't. You're allowed to read the release notes and ask what's next.</p>
+    <p>First question: who should decide how the gains from automation are shared? Write one rule. Test it on someone it affects. Revise. No signup.</p>
+    <p>If any of this made you want to argue — good. That's the mechanism working.</p>
+    <div class="mark"><svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="none" stroke="#fff" stroke-width="2"/><circle cx="16.18" cy="9.07" r="2.45" fill="#cc2b37"/></svg>badcode</div>
+  </section>
+</div>
+
+<button class="back" type="button" onclick="history.back()">← all concepts</button>
+
+<script>
+(function(){
+  var svg=document.getElementById('chart'),stat=document.getElementById('stat'),leg=document.getElementById('legend');
+  var bd=document.getElementById('b-disc'),bc=document.getElementById('b-ci');
+  var NS='http://www.w3.org/2000/svg',X0=12,X1=348,BASE=118;
+  function el(n,a){var e=document.createElementNS(NS,n);for(var k in a)e.setAttribute(k,a[k]);return e;}
+  function x(y){return X0+(X1-X0)*y/20;}
+  function axis(){
+    svg.appendChild(el('line',{x1:X0,y1:BASE,x2:X1,y2:BASE,stroke:'#000','stroke-width':1.5}));
+    for(var y=0;y<=20;y+=5){
+      svg.appendChild(el('line',{x1:x(y),y1:BASE,x2:x(y),y2:BASE+5,stroke:'#000'}));
+      var t=el('text',{x:x(y),y:BASE+20,'text-anchor':y===0?'start':y===20?'end':'middle','font-size':11,'font-family':'Archivo,Arial,sans-serif',fill:'#000'});
+      t.textContent=y===0?'year 0':'year '+y;svg.appendChild(t);
+    }
+  }
+  function draw(mode){
+    while(svg.firstChild)svg.removeChild(svg.firstChild);
+    axis();
+    if(mode==='disc'){
+      [1,6,11,16].forEach(function(y,i){
+        var cx=x(y),cy=BASE-34;
+        svg.appendChild(el('line',{x1:cx,y1:BASE,x2:cx,y2:cy+22,stroke:'#000','stroke-width':2}));
+        svg.appendChild(el('circle',{cx:cx,cy:cy,r:22,fill:'#e9e9e9',stroke:'#000','stroke-width':1.5}));
+        svg.appendChild(el('circle',{cx:cx,cy:cy,r:5,fill:'#0f6f6b'}));
+        var t=el('text',{x:cx,y:cy-28,'text-anchor':'middle','font-size':10,'font-family':'Fragment Mono,monospace'});t.textContent='v1.0';svg.appendChild(t);
+      });
+      leg.innerHTML='<span><i style="background:#e9e9e9;border:1px solid #000;border-radius:50%"></i>Big-bang release</span>';
+      stat.textContent='4 releases. Tests run: 0. Rollbacks: 0 — a failure stays installed until the next disc, five years later.';
+    }else{
+      var seed=7,n=0,rb=0;function r(){seed=(seed*9301+49297)%233280;return seed/233280;}
+      for(var m=0;m<240;m++){
+        var y=m/12,cx=x(y)+1,bad=r()<0.12,h=10+r()*26;n++;
+        if(bad){rb++;
+          svg.appendChild(el('rect',{x:cx-.6,y:BASE-h,width:1.6,height:h,fill:'#e23a2c'}));
+          svg.appendChild(el('path',{d:'M'+(cx+1)+' '+(BASE-h-6)+' q -5 -6 -9 0',fill:'none',stroke:'#e23a2c','stroke-width':1.2}));
+        }else svg.appendChild(el('rect',{x:cx-.6,y:BASE-h,width:1.6,height:h,fill:'#12733a'}));
+      }
+      leg.innerHTML='<span><i style="background:#12733a"></i>Small tested release</span><span><i style="background:#e23a2c"></i>Failed its test, rolled back</span>';
+      stat.textContent=n+' small releases, each with a test. '+rb+' failed and were rolled back within the month. Nothing broken waited five years.';
+    }
+    bd.setAttribute('aria-pressed',mode==='disc');bc.setAttribute('aria-pressed',mode!=='disc');
+  }
+  bd.addEventListener('click',function(){draw('disc');});
+  bc.addEventListener('click',function(){draw('ci');});
+  draw('disc');
+})();
+</script>
+</body>
+</html>

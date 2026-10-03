@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Compose Your Politics</title>
+<meta name="description" content="Future Proof concept 3: a building-kit toy proving composition over inheritance.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+/* Layout: single left-aligned column (max 640px) on a studded baseplate; bricks are the only objects. */
+:root{
+  color-scheme: light;
+  --plate:#dde3e8; --stud:#c9d1d8; --ink:#17181d; --ink-2:#454a55;
+  --yellow:#f2b705; --teal:#12867c; --orange:#e5531a; --blue:#2353c6; --white:#fbfcfd;
+  --grey:#9aa3ad; --slab:#6d747d;
+  --display:"Bungee", "Arial Black", Impact, sans-serif;
+  --body:"Atkinson Hyperlegible", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --gut:20px;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; color:var(--ink); font:17px/1.55 var(--body);
+  background-color:var(--plate);
+  background-image:radial-gradient(circle at 50% 50%, var(--stud) 0 5px, transparent 5.5px);
+  background-size:24px 24px;
+}
+main{max-width:640px; margin:0 auto; padding:72px var(--gut) 96px}
+section{margin:0 0 72px}
+h1,h2,h3{font-family:var(--display); font-weight:400; line-height:1.05; margin:0 0 14px}
+h2{font-size:clamp(26px,7vw,36px)}
+h3{font-size:20px}
+p{margin:0 0 14px; max-width:34em}
+.lede{font-size:19px}
+.quiet{color:var(--ink-2)}
+button{font:inherit; color:inherit; cursor:pointer}
+:focus-visible{outline:3px solid var(--blue); outline-offset:3px}
+
+/* fixed chrome */
+.back{position:fixed; top:10px; left:10px; z-index:10; min-height:44px; padding:0 14px;
+  border:2px solid var(--ink); background:var(--white); font-weight:700; font-size:14px; box-shadow:0 3px 0 var(--ink)}
+.tag{position:fixed; top:20px; right:12px; z-index:10; font-size:12px; color:var(--ink-2); background:var(--plate); padding:2px 6px}
+
+/* brick primitive: studs on top, chunky bottom shadow like moulded plastic */
+.brick{position:relative; display:block; width:100%; text-align:left; border:0; color:var(--ink);
+  background:var(--c,var(--white)); padding:14px 16px 12px; margin-top:12px; border-radius:3px;
+  box-shadow:inset 0 -6px 0 rgba(0,0,0,.18), 0 2px 0 rgba(0,0,0,.25)}
+.brick::before{content:""; position:absolute; top:-9px; left:14px; right:14px; height:9px;
+  background:radial-gradient(ellipse 9px 9px at 13px 100%, var(--c,var(--white)) 0 8px, transparent 8.5px) 0 0/34px 9px repeat-x}
+.brick.dark{color:var(--white)}
+
+/* hero */
+.title{display:flex; flex-wrap:wrap; gap:14px 10px; margin:20px 0 26px}
+.title .brick{width:auto; margin:0; font-family:var(--display); font-size:clamp(34px,11vw,60px); line-height:1; padding:12px 14px 14px}
+.title .b1{--c:var(--yellow); transform:rotate(-2deg)}
+.title .b2{--c:var(--teal); color:var(--white)}
+.title .b3{--c:var(--orange); transform:translateY(4px) rotate(1.5deg)}
+@media (prefers-reduced-motion:no-preference){
+  .title .brick{animation:drop .5s cubic-bezier(.3,1.6,.6,1) both}
+  .title .b2{animation-delay:.12s} .title .b3{animation-delay:.24s}
+  @keyframes drop{from{transform:translateY(-40px)}}
+}
+
+/* step 1: parties */
+.parties{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:20px 0 8px}
+.party{min-height:88px; font-family:var(--display); font-size:18px; text-align:center; padding:14px 6px 12px}
+.party small{display:block; font-family:var(--body); font-size:13px; margin-top:4px}
+.party[aria-pressed="true"]{outline:4px solid var(--ink); outline-offset:3px}
+.slab{margin-top:22px; background:var(--slab); padding:10px; border-radius:3px; position:relative;
+  box-shadow:inset 0 -6px 0 rgba(0,0,0,.25)}
+.slab::after{content:"welded at the factory"; position:absolute; right:10px; bottom:-24px; font-size:13px; color:var(--ink-2); font-style:italic}
+.slab[hidden]{display:none}
+.row{display:flex; align-items:center; gap:12px; width:100%; min-height:48px; margin:0 0 4px; border:0;
+  background:var(--c); text-align:left; padding:8px 12px; border-radius:2px; box-shadow:inset 0 -4px 0 rgba(0,0,0,.2)}
+.row:last-child{margin-bottom:0}
+.row b{font-weight:700; min-width:6.4em; font-size:14px}
+.row span{flex:1; font-size:15px}
+.tick{width:28px; height:28px; flex:none; border:2px solid currentColor; border-radius:50%; display:grid; place-items:center; font-weight:700}
+.row[aria-pressed="true"] .tick{background:var(--ink); color:var(--white); border-color:var(--ink)}
+.row[aria-pressed="true"] .tick::after{content:"✓"}
+.verdict{font-family:var(--display); font-size:clamp(22px,6vw,30px); line-height:1.15; margin:44px 0 10px}
+.verdict .n{display:inline-block; min-width:1.2ch; background:var(--white); padding:0 6px; box-shadow:inset 0 -4px 0 var(--grey)}
+
+/* step 2: compose */
+.kit{margin-top:24px}
+.kit .brick{display:flex; align-items:center; gap:12px; min-height:60px; margin-top:14px; --c:var(--white); transition:background-color .15s}
+.kit .brick[data-v="0"]{--c:#eef1f4; color:var(--ink-2)}
+.kit .brick[data-v="1"]{--c:var(--yellow)}
+.kit .brick[data-v="2"]{--c:var(--blue); color:var(--white)}
+.kit .brick b{min-width:6.4em; font-size:14px}
+.kit .brick span{flex:1}
+.kit .brick i{font-style:normal; font-size:12px; opacity:.8}
+@media (prefers-reduced-motion:no-preference){ .kit .brick.snap{animation:snap .22s ease-out} @keyframes snap{50%{transform:translateY(-6px)}} }
+.copy{min-height:48px; padding:0 16px; border:2px solid var(--ink); background:transparent; font-weight:700; margin-top:16px}
+.copy[hidden]{display:none}
+.score{font-family:var(--display); font-size:22px; margin:26px 0 8px}
+
+/* but */
+.but{border-left:12px solid var(--orange); padding-left:16px}
+.but h2{font-size:clamp(40px,13vw,64px)}
+.hole{margin:22px 0 10px; border:3px dashed var(--ink-2); padding:18px 16px; border-radius:3px; color:var(--ink-2); font-style:italic; background:rgba(255,255,255,.35)}
+
+/* follow-ons */
+.strip{display:flex; gap:4px; align-items:flex-end; margin:16px 0 6px; height:56px}
+.disc{flex:none; width:56px; height:56px; border-radius:50%; background:radial-gradient(circle,var(--plate) 0 7px,var(--grey) 8px 26px,var(--slab) 27px)}
+.gap{flex:1; height:3px; background:var(--grey); align-self:center}
+.mini{flex:1; height:22px; background:var(--teal); border-radius:2px; box-shadow:inset 0 -4px 0 rgba(0,0,0,.2)}
+.mini.f{background:var(--orange); height:12px}
+.cap{font-size:14px; color:var(--ink-2); margin:0 0 18px}
+.tested{display:flex; align-items:stretch; margin-top:18px}
+.tested .brick{margin:0; flex:1; --c:var(--yellow)}
+.gauge{width:64px; background:var(--white); border:3px solid var(--ink); border-left:0; display:grid; place-items:center; font-size:12px; text-align:center; line-height:1.1; padding:4px}
+
+/* end */
+.end h2{font-size:clamp(30px,9vw,46px)}
+.unbuilt{height:120px; margin:22px 0; border:3px dashed var(--ink); background:repeating-linear-gradient(-45deg,transparent 0 12px,rgba(23,24,29,.06) 12px 24px);
+  display:grid; place-items:center; font-family:var(--display); font-size:15px; color:var(--ink-2); text-align:center; padding:12px}
+.take{font-family:var(--display); font-size:clamp(22px,6.4vw,30px); line-height:1.15; background:var(--ink); color:var(--white); padding:18px 16px; margin:24px 0 16px; border-radius:3px}
+.sr{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0)}
+@media (min-width:900px){ main{padding-top:96px} }
+</style>
+</head>
+<body>
+<button class="back" type="button" onclick="history.back()">← all concepts</button>
+<span class="tag">Future Proof · concept 3 of 6</span>
+
+<main>
+  <header>
+    <div class="title" aria-label="Compose your politics">
+      <h1 class="sr">Compose Your Politics</h1>
+      <span class="brick b1" aria-hidden="true">Compose</span>
+      <span class="brick b2 dark" aria-hidden="true">Your</span>
+      <span class="brick b3" aria-hidden="true">Politics</span>
+    </div>
+    <p class="lede">A thirty-second toy. Your politics came pre-assembled at the factory. I've seen how that ends. Let's take it apart.</p>
+  </header>
+
+  <section aria-labelledby="s1">
+    <h2 id="s1">Pick a party.</h2>
+    <p>Three parties. Each one comes as a single welded block of eight stances. You can't pick a brick. You pick the block.</p>
+    <div class="parties" role="group" aria-label="Parties">
+      <button class="brick party" style="--c:var(--yellow)" data-p="0" aria-pressed="false">A<small>8 stances</small></button>
+      <button class="brick party dark" style="--c:var(--teal)" data-p="1" aria-pressed="false">B<small>8 stances</small></button>
+      <button class="brick party" style="--c:var(--orange)" data-p="2" aria-pressed="false">C<small>8 stances</small></button>
+    </div>
+    <div class="slab" id="slab" hidden>
+      <p style="color:var(--white);font-size:15px;margin:2px 4px 10px">Congratulations, you now hold all of these. Tap the ones you actually agree with.</p>
+      <div id="rows"></div>
+    </div>
+    <p class="verdict" id="verdict" aria-live="polite">Go on. Pick one. Everyone else does.</p>
+  </section>
+
+  <section aria-labelledby="s2">
+    <h2 id="s2">Now build it yourself.</h2>
+    <p>Same eight questions, but every brick is loose. Tap a brick to flip it. Nothing is glued to anything. Your housing view doesn't have to drag your defence view along because somebody welded them together before you were born.</p>
+    <button class="copy" id="copy" type="button" hidden>Start from Party <span id="pn"></span>'s bricks</button>
+    <div class="kit" id="kit"></div>
+    <p class="score" id="score" aria-live="polite">0 of 8 placed.</p>
+  </section>
+
+  <section class="but" aria-labelledby="s3">
+    <h2 id="s3">But.</h2>
+    <p>Eight billion custom towers is not a government. <strong>Somebody has to add them up</strong>, and whoever builds the adding machine has power. Composition doesn't remove that problem. It moves it somewhere you can finally inspect it.</p>
+    <p>And the adding machine is an instrument. Instruments have blind spots. A better scoreboard can still leave someone out.</p>
+    <div class="hole">This slot is for the person whose needs don't fit the instrument. I don't know who represents them yet. Neither does anyone. That's the next question, not a footnote.</div>
+  </section>
+
+  <section aria-labelledby="s4">
+    <h2 id="s4">Two more bricks.</h2>
+    <h3>Ship small. Test everything.</h3>
+    <div class="strip" aria-hidden="true"><span class="disc"></span><span class="gap"></span><span class="disc"></span></div>
+    <p class="cap">Democracy: a whole new government shipped on CD every five years. Then you wait for the update.</p>
+    <div class="strip" aria-hidden="true">
+      <span class="mini"></span><span class="mini"></span><span class="mini f"></span><span class="mini"></span><span class="mini"></span><span class="mini"></span><span class="mini f"></span><span class="mini"></span><span class="mini"></span><span class="mini"></span><span class="mini"></span><span class="mini"></span>
+    </div>
+    <p class="cap">Software: thousands of small releases a day, each one tested. The orange ones failed their tests and got rolled back before anyone noticed. Tests are what make fast change safe.</p>
+    <h3 style="margin-top:30px">No brick without its test.</h3>
+    <div class="tested">
+      <span class="brick">Proposal: whatever you like</span>
+      <span class="gauge" aria-label="attached measurement">how we'll know</span>
+    </div>
+    <p class="cap" style="margin-top:12px">Today a policy ships on "trust me" and nobody measures the failure. Here it doesn't ship without the experiment that could prove it wrong. Not everything fits an experiment. Diplomacy and judgement stay human. Most of the rest doesn't get to hide.</p>
+  </section>
+
+  <section class="end" aria-labelledby="s5">
+    <h2 id="s5">The bad branch is finished.</h2>
+    <p>I ran it to the end. "Keep going and hope" has a result. The good branch I can't show you, not because it's secret, because it's unwritten.</p>
+    <div class="unbuilt">good branch: nothing built here yet</div>
+    <p class="take">Stop voting for people. Start working out how to organise ourselves better. Together.</p>
+    <p>That's the whole kit: permission to question the system you inherited. Three ideas, probably wrong. Argue with them. No signup. Reading is enough.</p>
+  </section>
+</main>
+
+<script>
+const Q=[
+ ["Housing","Build lots more, fast","Protect existing neighbourhoods"],
+ ["Defence","Spend more","Spend less"],
+ ["Climate","Faster transition","Slower, cheaper transition"],
+ ["Drugs","Treat as health issue","Keep criminal penalties"],
+ ["Tax","Higher, more services","Lower, fewer services"],
+ ["Immigration","More open","More restricted"],
+ ["Tech","Regulate hard","Let it run"],
+ ["Healthcare","Fully public","Public and private mix"]
+];
+// each party: option index (1 or 2) per question. Deliberately unprincipled bundles.
+const P=[[1,1,2,2,2,2,2,2],[2,2,1,1,1,1,1,1],[1,2,1,2,2,1,2,1]];
+const COL=["var(--yellow)","var(--teal)","var(--orange)"];
+let party=-1, agree=new Set();
+const rows=document.getElementById('rows'), slab=document.getElementById('slab'), verdict=document.getElementById('verdict');
+
+function pick(i){
+  party=i; agree.clear();
+  document.querySelectorAll('.party').forEach(b=>b.setAttribute('aria-pressed',String(+b.dataset.p===i)));
+  rows.innerHTML='';
+  Q.forEach((q,k)=>{
+    const b=document.createElement('button'); b.type='button'; b.className='row'+(i===1?' dark':'');
+    b.style.setProperty('--c',COL[i]); if(i===1) b.style.color='#fbfcfd';
+    b.setAttribute('aria-pressed','false');
+    b.innerHTML='<b>'+q[0]+'</b><span>'+q[P[i][k]]+'</span><span class="tick" aria-hidden="true"></span>';
+    b.onclick=()=>{agree.has(k)?agree.delete(k):agree.add(k); b.setAttribute('aria-pressed',String(agree.has(k))); say();};
+    rows.appendChild(b);
+  });
+  slab.hidden=false;
+  document.getElementById('pn').textContent='ABC'[i];
+  document.getElementById('copy').hidden=false;
+  say();
+}
+function say(){
+  const n=agree.size;
+  verdict.innerHTML = n===0 ? 'Tap the stances you actually hold. Be honest. Nobody is watching. I am, but I\'m from the future, so it doesn\'t count.'
+    : 'You agreed with <span class="n">'+n+'</span> of 8. You voted for all 8.' + (n<8?' The other '+(8-n)+' now pass in your name.':' Suspicious. Check again.');
+}
+document.querySelectorAll('.party').forEach(b=>b.onclick=()=>pick(+b.dataset.p));
+
+// composition kit: each brick cycles unset -> option 1 -> option 2
+const kit=document.getElementById('kit'), score=document.getElementById('score'), V=new Array(8).fill(0);
+Q.forEach((q,k)=>{
+  const b=document.createElement('button'); b.type='button'; b.className='brick'; b.dataset.v='0';
+  b.innerHTML='<b>'+q[0]+'</b><span>tap to choose</span><i>1 of 2</i>';
+  b.onclick=()=>set(k,(V[k]+1)%3);
+  kit.appendChild(b);
+});
+function set(k,v,quiet){
+  V[k]=v; const b=kit.children[k];
+  b.dataset.v=v; b.querySelector('span').textContent= v? Q[k][v] : 'no view yet';
+  b.querySelector('i').textContent= v? 'tap to flip' : 'tap to choose';
+  b.setAttribute('aria-label',Q[k][0]+': '+(v?Q[k][v]:'no view yet'));
+  if(!quiet){b.classList.remove('snap'); void b.offsetWidth; b.classList.add('snap');}
+  const placed=V.filter(Boolean).length;
+  score.textContent = placed===0 ? '0 of 8 placed.'
+    : placed+' of 8 placed. You agree with '+placed+' of '+placed+'. Funny how that works.'+(placed<8?' Blank bricks are allowed. "I don\'t know yet" is a position.':'');
+}
+V.forEach((_,k)=>{const b=kit.children[k]; b.setAttribute('aria-label',Q[k][0]+': no view yet');});
+document.getElementById('copy').onclick=()=>{ if(party<0) return; P[party].forEach((v,k)=>set(k,v,true)); score.textContent+=' Now flip the ones you never believed.'; };
+</script>
+</body>
+</html>

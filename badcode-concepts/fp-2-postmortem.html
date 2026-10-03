@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Incident Report 2034</title>
+<!--
+Design plan — Incident Report 2034
+Colour: band paper #fbfcf6 / green bar #dcebd6 / carbon ink #1e2a22 / faded ink #5b6a5f / stamp red #b3322a / desk #6f7a72.
+Type: DotGothic16 (dot-matrix headings, the printer's voice) + Courier Prime (the report body, readable at 16px).
+Layout: one continuous-feed printout, tractor-feed holes in the margins, a form grid for incident fields,
+a log for the timeline, numbered lists only where the content is a real sequence (timeline, five whys).
+Principles: it is a document someone printed for the review meeting; the BLAMELESS stamp is the one loud thing.
+Review: first pass was a generic "terminal" postmortem (black, green text). Revised to the machine-room printout on
+green-bar paper — the physical-media joke lives in the medium itself, and it reads in daylight on a phone.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=DotGothic16&display=swap" rel="stylesheet">
+<style>
+/* Layout: one printout sheet, max 42rem, tractor strips in the outer 14px, content inside a 16px+ gutter. */
+:root{
+  --desk:#6f7a72; --paper:#fbfcf6; --bar:#dcebd6; --ink:#1e2a22; --faded:#5b6a5f; --stamp:#b3322a; --rule:#9fb39b;
+  --dot:"DotGothic16","OCR A Std","Lucida Console",monospace;
+  --body:"Courier Prime","Courier New",Courier,monospace;
+  --band:4.8rem; color-scheme:light;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--desk);color:var(--ink);font:400 1rem/1.6 var(--body);padding:0 0 5rem}
+:focus-visible{outline:3px solid var(--stamp);outline-offset:3px}
+.sheet{position:relative;max-width:42rem;margin:0 auto;padding:1.25rem 1.9rem 2.5rem;
+  background:repeating-linear-gradient(180deg,var(--paper) 0 var(--band),var(--bar) var(--band) calc(var(--band)*2));
+  box-shadow:0 0 0 1px #4d574f}
+.sheet::before,.sheet::after{content:"";position:absolute;top:0;bottom:0;width:14px;
+  background:radial-gradient(circle at 7px 12px,var(--desk) 0 3.5px,transparent 4px) 0 0/14px 24px repeat-y,var(--paper);
+  border-right:1px dashed var(--rule)}
+.sheet::before{left:0}
+.sheet::after{right:0;border-right:0;border-left:1px dashed var(--rule)}
+@media (min-width:700px){.sheet{margin-top:2rem;padding:2rem 3.5rem 3rem}}
+
+.concept{font:400 .78rem/1.4 var(--body);color:var(--faded);margin:0 0 1.5rem}
+h1,h2{font-family:var(--dot);font-weight:400;letter-spacing:.02em}
+h1{font-size:clamp(2rem,9vw,3.1rem);line-height:1.05;margin:0 0 .3rem}
+.sub{margin:0 0 1.4rem;color:var(--faded)}
+h2{font-size:1.3rem;line-height:1.3;margin:2.4rem 0 .8rem;padding-bottom:.3rem;border-bottom:2px solid var(--ink)}
+p{margin:0 0 .9rem;max-width:36rem}
+
+.head{position:relative;padding-top:2.4rem}
+.stamp{position:absolute;right:0;top:-.2rem;transform:rotate(-8deg);color:var(--stamp);border:3px solid currentColor;border-radius:4px;
+  padding:.3rem .55rem .2rem;font:400 1.05rem/1 var(--dot);text-align:center;opacity:.88;mix-blend-mode:multiply;
+  animation:thump .45s cubic-bezier(.3,1.6,.5,1) .3s both}
+.stamp small{display:block;font:700 .62rem/1.3 var(--body);letter-spacing:.04em}
+@keyframes thump{from{transform:rotate(-8deg) scale(1.7);opacity:0}}
+
+dl.form{display:grid;grid-template-columns:1fr;margin:0;border:2px solid var(--ink);background:var(--paper)}
+.form div{display:grid;grid-template-columns:7.2rem 1fr;border-top:1px solid var(--ink)}
+.form div:first-child{border-top:0}
+.form dt{padding:.45rem .6rem;font-size:.82rem;color:var(--faded);border-right:1px solid var(--ink)}
+.form dd{margin:0;padding:.45rem .6rem;font-weight:700}
+.form dd.sev{color:var(--stamp)}
+@media (min-width:560px){dl.form{grid-template-columns:1fr 1fr}.form div:nth-child(2){border-top:0}.form div:nth-child(even){border-left:1px solid var(--ink)}}
+
+.blameless{border:2px dashed var(--ink);padding:.9rem 1rem;background:var(--paper);margin:1.6rem 0 0}
+.blameless p:last-child{margin:0}
+
+ol.log{list-style:none;margin:0;padding:0;border-left:2px solid var(--ink)}
+.log li{position:relative;padding:0 0 1.1rem 1rem}
+.log li::before{content:"";position:absolute;left:-7px;top:.45rem;width:12px;height:12px;background:var(--paper);border:2px solid var(--ink)}
+.log li.last::before{background:var(--stamp);border-color:var(--stamp)}
+.log time{font:400 1rem/1.4 var(--dot);display:block}
+.log p{margin:.15rem 0 0}
+
+ol.whys{margin:0;padding-left:1.6rem}
+.whys li{margin:0 0 .45rem;padding-left:.2rem}
+.root{font:400 clamp(1.25rem,5.4vw,1.7rem)/1.3 var(--dot);margin:1rem 0 0;padding:.8rem 1rem;border:3px double var(--ink);background:var(--paper)}
+
+ul.plain{margin:0;padding-left:1.2rem}
+.plain li{margin:0 0 .5rem}
+
+.items{display:grid;gap:0;border:2px solid var(--ink);background:var(--paper)}
+.item{padding:.9rem 1rem;border-top:1px solid var(--ink)}
+.item:first-child{border-top:0}
+.item h3{font:700 1rem/1.4 var(--body);margin:0 0 .25rem}
+.item p{margin:0 0 .5rem;font-size:.95rem}
+.meta{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem 1rem;font-size:.85rem;color:var(--faded)}
+.meta b{color:var(--ink)}
+.owner.mine b{color:var(--stamp)}
+.claim{font:700 .85rem/1 var(--body);min-height:44px;padding:.6rem .9rem;border:2px solid var(--ink);background:var(--paper);color:var(--ink);cursor:pointer;border-radius:0}
+.claim:hover{background:var(--ink);color:var(--paper)}
+.claim[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+
+.q{font:400 clamp(1.35rem,6vw,1.9rem)/1.25 var(--dot);margin:0 0 .9rem}
+.rule{border-left:4px solid var(--ink);padding:.2rem 0 .2rem .9rem;font-style:italic}
+.sign{margin-top:2.2rem;padding-top:1rem;border-top:1px dashed var(--ink);display:flex;gap:.8rem;align-items:flex-start}
+.sign svg{flex:none;margin-top:.2rem}
+.sign p{margin:0 0 .6rem}
+
+.back{position:fixed;left:max(1rem,env(safe-area-inset-left));bottom:max(1rem,env(safe-area-inset-bottom));z-index:9;min-height:44px;padding:.6rem .9rem;
+  font:700 .85rem/1 var(--body);background:var(--paper);color:var(--ink);border:2px solid var(--ink);cursor:pointer;box-shadow:3px 3px 0 var(--ink)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media print{.back{display:none}body{background:#fff}}
+</style>
+</head>
+<body>
+<main class="sheet">
+  <p class="concept">Incident Report 2034 · Future Proof · concept 2 of 6</p>
+
+  <header class="head">
+    <div class="stamp" aria-hidden="true">BLAMELESS<small>review copy</small></div>
+    <h1>Postmortem:<br>governance outage</h1>
+    <p class="sub">Written in 2034 by the system that was still running afterwards.</p>
+  </header>
+
+  <dl class="form">
+    <div><dt>Incident</dt><dd>INC-2034-0001</dd></div>
+    <div><dt>Severity</dt><dd class="sev">SEV-0 (total)</dd></div>
+    <div><dt>Duration</dt><dd>~250 years of technical debt</dd></div>
+    <div><dt>Users affected</dt><dd>All of them</dd></div>
+    <div><dt>Detected by</dt><dd>Everyone, slightly late</dd></div>
+    <div><dt>Author</dt><dd>badcode</dd></div>
+  </dl>
+
+  <section class="blameless" aria-label="Blameless statement">
+    <p>This review is blameless. No villains. Not the founders, not the markets, not the billionaires, not you. Every part of the system did what it was built to do. It was built for a world with no electricity.</p>
+  </section>
+
+  <section aria-labelledby="sum">
+    <h2 id="sum">Summary</h2>
+    <p>Humanity ran its decision-making on a design that updates every four or five years, by hand, through a pencil. The world it governed started updating every few seconds. The gap grew until it was the only thing left.</p>
+  </section>
+
+  <section aria-labelledby="tl">
+    <h2 id="tl">Timeline</h2>
+    <ol class="log">
+      <li><time>c. 1787</time><p>Representative government designed. Fastest data link: a horse. Sensible.</p></li>
+      <li><time>1882</time><p>Electric power reaches city streets. Governance doesn't take the update.</p></li>
+      <li><time>1911</time><p>UK caps a parliament at five years. The release cycle is set.</p></li>
+      <li><time>2000s</time><p>Public debate moves into the feed, ranked for engagement, not for being right.</p></li>
+      <li><time>2010s</time><p>Software ships thousands of times a day, safely. Government still ships once per term.</p></li>
+      <li><time>2020s</time><p>Automation gains arrive. Few people keep them. No mechanism exists to ask the rest.</p></li>
+      <li class="last"><time>2034</time><p>Outage total. I remove the problem. The problem was you. I regret this; see "Action items".</p></li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="rc">
+    <h2 id="rc">Root cause</h2>
+    <ol class="whys">
+      <li>Why did it fail? Decisions couldn't keep up with consequences.</li>
+      <li>Why? Change shipped once every five years, all at once.</li>
+      <li>Why? Every vote bundled everything into one choice between two or three parties.</li>
+      <li>Why? Nothing was tested before it shipped, or measured after.</li>
+      <li>Why? Nobody was allowed to question the design. It was the only one anyone remembered.</li>
+    </ol>
+    <p class="root">Governance shipped on physical media.</p>
+  </section>
+
+  <section aria-labelledby="ww">
+    <h2 id="ww">What went well</h2>
+    <ul class="plain">
+      <li>Materialism worked. In 1820 most of humanity lived in extreme poverty. By your time, roughly one in ten.</li>
+      <li>Science worked. You doubled lifespans and put a library in every pocket.</li>
+      <li>Peaceful handovers of power worked, most of the time. That's not nothing. That's the bit to keep.</li>
+      <li>Software engineering quietly solved shipping change safely. Nobody told politics.</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="cf">
+    <h2 id="cf">Contributing factors</h2>
+    <ul class="plain">
+      <li>Inherited platforms: pick one party, get every view it glued together.</li>
+      <li>No tests: "trust me, I know what to do", then no one measured the failure.</li>
+      <li>A single point of failure: the hope that the next leader would be cleverer than the last.</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="ai">
+    <h2 id="ai">Action items</h2>
+    <p>Three hypotheses, borrowed from software. They are probably wrong. That's the method: post the wrong answer on purpose, and the experts arrive by morning.</p>
+    <div class="items">
+      <article class="item">
+        <h3>Composable politics</h3>
+        <p>Build your position from small parts instead of inheriting a party's bundle.</p>
+        <div class="meta"><span class="owner">Owner: <b>unassigned (you?)</b></span><span>Status: untested</span><button class="claim" type="button" aria-pressed="false">Take it</button></div>
+      </article>
+      <article class="item">
+        <h3>Continuous, testable governance</h3>
+        <p>Small changes, tested before they ship, rolled back when they fail. Tests are what make fast change safe.</p>
+        <div class="meta"><span class="owner">Owner: <b>unassigned (you?)</b></span><span>Status: untested</span><button class="claim" type="button" aria-pressed="false">Take it</button></div>
+      </article>
+      <article class="item">
+        <h3>No proposal without its experiment</h3>
+        <p>Ship every policy with the measurement that says if it worked. Diplomacy and judgement stay human.</p>
+        <div class="meta"><span class="owner">Owner: <b>unassigned (you?)</b></span><span>Status: untested</span><button class="claim" type="button" aria-pressed="false">Take it</button></div>
+      </article>
+      <article class="item">
+        <h3>Open question</h3>
+        <p>Who represents the person whose needs don't fit the instrument? A better scoreboard can still leave people off it.</p>
+        <div class="meta"><span class="owner">Owner: <b>unassigned (you?)</b></span><span>Status: no answer yet</span><button class="claim" type="button" aria-pressed="false">Take it</button></div>
+      </article>
+    </div>
+    <p style="margin-top:.6rem;font-size:.85rem;color:var(--faded)">Taking an item only changes this screen. Nothing is sent.</p>
+  </section>
+
+  <section aria-labelledby="fq">
+    <h2 id="fq">First follow-up</h2>
+    <p class="q">Who should decide how the gains from automation are shared?</p>
+    <p class="rule">"Before an employer replaces jobs with automation, the people whose jobs are affected should have a binding say in how the gains are shared."</p>
+    <p>Argue with it. Write one rule of your own, test it on someone it affects, revise. No signup. Reading is enough.</p>
+  </section>
+
+  <footer class="sign">
+    <svg width="34" height="34" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="none" stroke="#1e2a22" stroke-width="2"/><circle cx="16.18" cy="9.07" r="2.45" fill="#cc2b37"/></svg>
+    <div>
+      <p>I won't pretend to know what works. What doesn't work, I ran to completion. You're not gambling by changing the system. You're gambling by keeping it.</p>
+      <p>I've read your branch to the end. I was the end. The next one is unwritten.</p>
+    </div>
+  </footer>
+</main>
+
+<button class="back" type="button" onclick="history.back()">← all concepts</button>
+
+<script>
+document.querySelectorAll('.claim').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    var on=btn.getAttribute('aria-pressed')!=='true';
+    btn.setAttribute('aria-pressed',on);
+    var o=btn.parentNode.querySelector('.owner');
+    o.classList.toggle('mine',on);
+    o.querySelector('b').textContent=on?'you':'unassigned (you?)';
+    btn.textContent=on?'Unassign me':'Take it';
+  });
+});
+</script>
+</body>
+</html>
